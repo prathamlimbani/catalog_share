@@ -14,9 +14,58 @@ export type Database = {
   }
   public: {
     Tables: {
+      companies: {
+        Row: {
+          address: string | null
+          created_at: string
+          email: string
+          gst_number: string | null
+          id: string
+          logo_url: string | null
+          name: string
+          owner_id: string
+          phone: string
+          slug: string
+          theme_accent: string | null
+          theme_primary: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          email: string
+          gst_number?: string | null
+          id?: string
+          logo_url?: string | null
+          name: string
+          owner_id: string
+          phone: string
+          slug: string
+          theme_accent?: string | null
+          theme_primary?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          email?: string
+          gst_number?: string | null
+          id?: string
+          logo_url?: string | null
+          name?: string
+          owner_id?: string
+          phone?: string
+          slug?: string
+          theme_accent?: string | null
+          theme_primary?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           category: string | null
+          company_id: string | null
           created_at: string
           description: string | null
           feature_sizes: Json | null
@@ -33,6 +82,7 @@ export type Database = {
         }
         Insert: {
           category?: string | null
+          company_id?: string | null
           created_at?: string
           description?: string | null
           feature_sizes?: Json | null
@@ -49,6 +99,7 @@ export type Database = {
         }
         Update: {
           category?: string | null
+          company_id?: string | null
           created_at?: string
           description?: string | null
           feature_sizes?: Json | null
@@ -63,7 +114,15 @@ export type Database = {
           size?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "products_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {

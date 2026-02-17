@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useCurrentCompany } from "@/hooks/useCompany";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Trash2, LogOut, Package, Edit, X, Upload, Pencil, Check } from "lucide-react";
+import { Plus, Trash2, LogOut, Package, Edit, X, Upload, Pencil, Check, Link as LinkIcon, Copy, ExternalLink, Store } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tables } from "@/integrations/supabase/types";
 
@@ -20,6 +21,7 @@ type Product = Tables<"products">;
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { data: company, isLoading: companyLoading } = useCurrentCompany();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [newCategory, setNewCategory] = useState("");
@@ -42,25 +44,34 @@ const AdminDashboard = () => {
   });
 
   useEffect(() => {
-    const checkAdmin = async () => {
+    const checkAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { navigate("/admin"); return; }
-      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin");
-      if (!roles || roles.length === 0) { navigate("/admin"); }
+      if (!user) { navigate("/login"); return; }
     };
-    checkAdmin();
+    checkAuth();
   }, [navigate]);
 
+  const storeUrl = company ? `${window.location.origin}/store/${company.slug}` : "";
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(storeUrl);
+    toast.success("Store link copied to clipboard!");
+  };
+
   const { data: products, isLoading } = useQuery({
-    queryKey: ["admin-products"],
+    queryKey: ["admin-products", company?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("products").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("company_id", company!.id)
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
+    enabled: !!company,
   });
 
-  // Get existing categories for the selector
   const existingCategories = Array.from(
     new Set(products?.map((p) => p.category).filter(Boolean) as string[])
   ).sort();
@@ -69,7 +80,6 @@ const AdminDashboard = () => {
     mutationFn: async (data: typeof form) => {
       const allImages = [...data.images];
       const featuresList = data.features ? data.features.split(",").map((f) => f.trim()).filter(Boolean) : [];
-      // Build feature_sizes JSONB: convert comma-separated size strings to arrays
       const featureSizesJson: Record<string, string[]> = {};
       featuresList.forEach((f) => {
         const sizesStr = data.feature_sizes[f] || "";
@@ -87,6 +97,7 @@ const AdminDashboard = () => {
         image_url: allImages[0] || data.image_url.trim() || null,
         images: allImages,
         feature_sizes: featuresList.length > 0 ? featureSizesJson : {},
+        company_id: company!.id,
       };
       if (editing) {
         const { error } = await supabase.from("products").update(payload).eq("id", editing.id);
@@ -97,7 +108,7 @@ const AdminDashboard = () => {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-products", company?.id] });
       toast.success(editing ? "Product updated!" : "Product added!");
       resetForm();
       setDialogOpen(false);
@@ -111,7 +122,7 @@ const AdminDashboard = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-products", company?.id] });
       toast.success("Product deleted!");
     },
     onError: (err: any) => toast.error(err.message),
@@ -119,14 +130,11 @@ const AdminDashboard = () => {
 
   const renameCategoryMutation = useMutation({
     mutationFn: async ({ oldName, newName }: { oldName: string; newName: string }) => {
-      const { error } = await supabase
-        .from("products")
-        .update({ category: newName })
-        .eq("category", oldName);
+      const { error } = await supabase.from("products").update({ category: newName }).eq("category", oldName).eq("company_id", company!.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-products", company?.id] });
       toast.success("Category renamed!");
       setRenamingCategory(null);
       setRenameCategoryValue("");
@@ -136,14 +144,11 @@ const AdminDashboard = () => {
 
   const removeCategoryMutation = useMutation({
     mutationFn: async (categoryName: string) => {
-      const { error } = await supabase
-        .from("products")
-        .update({ category: null })
-        .eq("category", categoryName);
+      const { error } = await supabase.from("products").update({ category: null }).eq("category", categoryName).eq("company_id", company!.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-products", company?.id] });
       toast.success("Category removed from all products!");
     },
     onError: (err: any) => toast.error(err.message),
@@ -155,7 +160,7 @@ const AdminDashboard = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-products", company?.id] });
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -169,7 +174,6 @@ const AdminDashboard = () => {
 
   const startEdit = (p: Product) => {
     setEditing(p);
-    // Convert feature_sizes from {feat: ["S","M"]} to {feat: "S, M"} for form
     const fsRaw = (p as any).feature_sizes as Record<string, string[]> | null;
     const fsForm: Record<string, string> = {};
     if (fsRaw) {
@@ -196,18 +200,16 @@ const AdminDashboard = () => {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-
     const uploadedUrls: string[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const ext = file.name.split(".").pop();
-      const path = `${Date.now()}-${i}.${ext}`;
+      const path = `${company?.id}/${Date.now()}-${i}.${ext}`;
       const { error } = await supabase.storage.from("product-images").upload(path, file);
       if (error) { toast.error(`Upload failed for ${file.name}`); continue; }
       const { data: urlData } = supabase.storage.from("product-images").getPublicUrl(path);
       uploadedUrls.push(urlData.publicUrl);
     }
-
     if (uploadedUrls.length > 0) {
       setForm((prev) => ({
         ...prev,
@@ -221,11 +223,7 @@ const AdminDashboard = () => {
   const removeImage = (url: string) => {
     setForm((prev) => {
       const newImages = prev.images.filter((img) => img !== url);
-      return {
-        ...prev,
-        images: newImages,
-        image_url: prev.image_url === url ? (newImages[0] || "") : prev.image_url,
-      };
+      return { ...prev, images: newImages, image_url: prev.image_url === url ? (newImages[0] || "") : prev.image_url };
     });
   };
 
@@ -245,11 +243,28 @@ const AdminDashboard = () => {
     navigate("/");
   };
 
+  if (companyLoading) {
+    return <div className="min-h-screen flex items-center justify-center"><p className="text-muted-foreground">Loading dashboard...</p></div>;
+  }
+
+  if (!company) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-center px-4">
+        <div>
+          <Store className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-30" />
+          <h1 className="text-2xl font-bold mb-2">No Company Found</h1>
+          <p className="text-muted-foreground mb-6">You haven't set up your company yet.</p>
+          <Button onClick={() => navigate("/register")}>Set Up Company</Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+          <h1 className="text-3xl font-bold">{company.name}</h1>
           <p className="text-muted-foreground">Manage your products</p>
         </div>
         <div className="flex gap-2">
@@ -279,59 +294,40 @@ const AdminDashboard = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Sizes (comma-separated)</Label>
-                  <Input value={form.size} onChange={(e) => setForm({ ...form, size: e.target.value })} placeholder="e.g. S, M, L, XL or 250g, 500g, 1kg" />
+                  <Input value={form.size} onChange={(e) => setForm({ ...form, size: e.target.value })} placeholder="e.g. S, M, L, XL" />
                 </div>
 
-                {/* Category selector */}
                 <div className="space-y-2">
                   <Label>Category</Label>
-                  <Select
-                    value={showNewCategory ? "__new__" : (form.category || undefined)}
-                    onValueChange={handleCategorySelect}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
+                  <Select value={showNewCategory ? "__new__" : (form.category || undefined)} onValueChange={handleCategorySelect}>
+                    <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                     <SelectContent className="bg-card z-50">
-                      {existingCategories.map((cat) => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                      ))}
+                      {existingCategories.map((cat) => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
                       <SelectItem value="__new__">+ Add New Category</SelectItem>
                     </SelectContent>
                   </Select>
-                  {showNewCategory && (
-                    <Input
-                      value={newCategory}
-                      onChange={(e) => setNewCategory(e.target.value)}
-                      placeholder="Enter new category name"
-                      autoFocus
-                    />
-                  )}
+                  {showNewCategory && <Input value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="Enter new category name" autoFocus />}
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Options / Variants (comma-separated, e.g. colors, textures)</Label>
-                  <Input value={form.features} onChange={(e) => setForm({ ...form, features: e.target.value })} placeholder="Red, Blue, Green or Glossy, Matte" />
+                  <Label>Options / Variants (comma-separated)</Label>
+                  <Input value={form.features} onChange={(e) => setForm({ ...form, features: e.target.value })} placeholder="Red, Blue, Green" />
                 </div>
 
-                {/* Per-feature size inputs */}
                 {(() => {
                   const featuresList = form.features ? form.features.split(",").map((f) => f.trim()).filter(Boolean) : [];
                   if (featuresList.length === 0) return null;
                   return (
                     <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
                       <Label className="text-sm font-medium">Sizes per Variant</Label>
-                      <p className="text-xs text-muted-foreground">Enter available sizes for each variant (comma-separated)</p>
+                      <p className="text-xs text-muted-foreground">Enter available sizes for each variant</p>
                       {featuresList.map((feat) => (
                         <div key={feat} className="flex items-center gap-2">
                           <Badge variant="secondary" className="text-xs min-w-[60px] justify-center">{feat}</Badge>
                           <Input
                             value={form.feature_sizes[feat] || ""}
-                            onChange={(e) => setForm({
-                              ...form,
-                              feature_sizes: { ...form.feature_sizes, [feat]: e.target.value }
-                            })}
-                            placeholder={`Sizes for ${feat}, e.g. S, M, L`}
+                            onChange={(e) => setForm({ ...form, feature_sizes: { ...form.feature_sizes, [feat]: e.target.value } })}
+                            placeholder={`Sizes for ${feat}`}
                             className="h-8 text-xs"
                           />
                         </div>
@@ -340,13 +336,11 @@ const AdminDashboard = () => {
                   );
                 })()}
 
-                {/* Multi-image upload */}
                 <div className="space-y-2">
                   <Label>Product Images</Label>
                   <div className="flex items-center gap-2">
                     <label className="flex items-center gap-2 px-4 py-2 border border-input rounded-md cursor-pointer hover:bg-accent text-sm">
-                      <Upload className="h-4 w-4" />
-                      Upload Images
+                      <Upload className="h-4 w-4" /> Upload Images
                       <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
                     </label>
                   </div>
@@ -355,11 +349,7 @@ const AdminDashboard = () => {
                       {form.images.map((url, i) => (
                         <div key={i} className="relative group">
                           <img src={url} alt={`Product ${i + 1}`} className="w-16 h-16 rounded-lg object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => removeImage(url)}
-                            className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
+                          <button type="button" onClick={() => removeImage(url)} className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">
                             <X className="h-3 w-3" />
                           </button>
                         </div>
@@ -391,6 +381,27 @@ const AdminDashboard = () => {
         </div>
       </div>
 
+      {/* Shareable Link */}
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3">
+            <LinkIcon className="h-5 w-5 text-primary flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium mb-1">Your Store Link</p>
+              <p className="text-xs text-muted-foreground truncate">{storeUrl}</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={copyLink}>
+              <Copy className="h-4 w-4 mr-1" /> Copy
+            </Button>
+            <Button size="sm" variant="outline" asChild>
+              <a href={storeUrl} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-4 w-4 mr-1" /> Open
+              </a>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Category Management */}
       {existingCategories.length > 0 && (
         <div className="mb-6">
@@ -399,51 +410,23 @@ const AdminDashboard = () => {
             {existingCategories.map((cat) => (
               <div key={cat} className="flex items-center gap-1 border rounded-lg px-3 py-1.5 bg-card">
                 {renamingCategory === cat ? (
-                  <form
-                    className="flex items-center gap-1"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (renameCategoryValue.trim() && renameCategoryValue.trim() !== cat) {
-                        renameCategoryMutation.mutate({ oldName: cat, newName: renameCategoryValue.trim() });
-                      } else {
-                        setRenamingCategory(null);
-                      }
-                    }}
-                  >
-                    <Input
-                      value={renameCategoryValue}
-                      onChange={(e) => setRenameCategoryValue(e.target.value)}
-                      className="h-6 text-xs w-24 px-1"
-                      autoFocus
-                    />
-                    <Button type="submit" size="icon" variant="ghost" className="h-6 w-6">
-                      <Check className="h-3 w-3" />
-                    </Button>
-                    <Button type="button" size="icon" variant="ghost" className="h-6 w-6" onClick={() => setRenamingCategory(null)}>
-                      <X className="h-3 w-3" />
-                    </Button>
+                  <form className="flex items-center gap-1" onSubmit={(e) => {
+                    e.preventDefault();
+                    if (renameCategoryValue.trim() && renameCategoryValue.trim() !== cat) {
+                      renameCategoryMutation.mutate({ oldName: cat, newName: renameCategoryValue.trim() });
+                    } else { setRenamingCategory(null); }
+                  }}>
+                    <Input value={renameCategoryValue} onChange={(e) => setRenameCategoryValue(e.target.value)} className="h-6 text-xs w-24 px-1" autoFocus />
+                    <Button type="submit" size="icon" variant="ghost" className="h-6 w-6"><Check className="h-3 w-3" /></Button>
+                    <Button type="button" size="icon" variant="ghost" className="h-6 w-6" onClick={() => setRenamingCategory(null)}><X className="h-3 w-3" /></Button>
                   </form>
                 ) : (
                   <>
                     <span className="text-sm">{cat}</span>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-6 w-6"
-                      onClick={() => { setRenamingCategory(cat); setRenameCategoryValue(cat); }}
-                    >
+                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => { setRenamingCategory(cat); setRenameCategoryValue(cat); }}>
                       <Pencil className="h-3 w-3" />
                     </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-6 w-6 text-destructive"
-                      onClick={() => {
-                        if (confirm(`Remove category "${cat}" from all products?`)) {
-                          removeCategoryMutation.mutate(cat);
-                        }
-                      }}
-                    >
+                    <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => { if (confirm(`Remove category "${cat}"?`)) removeCategoryMutation.mutate(cat); }}>
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </>
@@ -478,20 +461,11 @@ const AdminDashboard = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1">
-                    <Switch
-                      checked={p.in_stock}
-                      onCheckedChange={(v) => toggleStockMutation.mutate({ id: p.id, in_stock: v })}
-                    />
-                    <span className="text-xs text-muted-foreground hidden sm:inline">
-                      {p.in_stock ? "In Stock" : "Out"}
-                    </span>
+                    <Switch checked={p.in_stock} onCheckedChange={(v) => toggleStockMutation.mutate({ id: p.id, in_stock: v })} />
+                    <span className="text-xs text-muted-foreground hidden sm:inline">{p.in_stock ? "In Stock" : "Out"}</span>
                   </div>
-                  <Button size="icon" variant="ghost" onClick={() => startEdit(p)}>
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(p.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <Button size="icon" variant="ghost" onClick={() => startEdit(p)}><Edit className="h-4 w-4" /></Button>
+                  <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(p.id)}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               </CardContent>
             </Card>
