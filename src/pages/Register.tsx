@@ -19,7 +19,7 @@ const Register = () => {
 
   // Company fields
   const [companyName, setCompanyName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState("+91 ");
   const [address, setAddress] = useState("");
   const [gstNumber, setGstNumber] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -155,7 +155,7 @@ const Register = () => {
             </div>
             <div className="space-y-2">
               <Label>WhatsApp Number *</Label>
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="91XXXXXXXXXX (with country code)" required />
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 9876543210" required />
             </div>
             <div className="space-y-2">
               <Label>Address (optional)</Label>

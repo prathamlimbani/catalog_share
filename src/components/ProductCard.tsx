@@ -101,6 +101,9 @@ const ProductCard = ({ product }: { product: Product }) => {
       </div>
       <CardContent className="p-4 space-y-3">
         <h3 className="font-semibold text-base line-clamp-1">{product.name}</h3>
+        {product.price > 0 && (
+          <p className="text-sm font-semibold text-primary">₹{product.price}</p>
+        )}
         {product.description && (
           <p className="text-sm text-muted-foreground line-clamp-2">{product.description}</p>
         )}
