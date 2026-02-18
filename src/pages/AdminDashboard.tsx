@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Plus, Trash2, LogOut, Package, Edit, X, Upload, Pencil, Check, Link as LinkIcon, Copy, ExternalLink, Store } from "lucide-react";
+import CompanyEditDialog from "@/components/CompanyEditDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tables } from "@/integrations/supabase/types";
 
@@ -90,7 +91,7 @@ const AdminDashboard = () => {
         description: data.description.trim() || null,
         size: data.size.trim() || null,
         features: featuresList.length > 0 ? featuresList : null,
-        price: parseFloat(data.price) || 0,
+        price: data.price ? parseFloat(data.price) : 0,
         category: data.category.trim() || null,
         is_trending: data.is_trending,
         in_stock: data.in_stock,
@@ -267,7 +268,8 @@ const AdminDashboard = () => {
           <h1 className="text-3xl font-bold">{company.name}</h1>
           <p className="text-muted-foreground">Manage your products</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <CompanyEditDialog company={company} />
           <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
               <Button><Plus className="h-4 w-4 mr-2" /> Add Product</Button>
@@ -291,6 +293,10 @@ const AdminDashboard = () => {
                 <div className="space-y-2">
                   <Label>Description</Label>
                   <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Price (optional)</Label>
+                  <Input type="number" step="0.01" min="0" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="Leave empty if not applicable" />
                 </div>
                 <div className="space-y-2">
                   <Label>Sizes (comma-separated)</Label>
