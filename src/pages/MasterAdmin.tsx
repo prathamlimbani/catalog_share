@@ -1,15 +1,21 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { LogOut, Store, Phone, Mail, MapPin, FileText, ExternalLink } from "lucide-react";
+import { LogOut, Store, Phone, Mail, MapPin, FileText, ExternalLink, Trash2 } from "lucide-react";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const MasterAdmin = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [confirmText, setConfirmText] = useState("");
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -36,6 +42,23 @@ const MasterAdmin = () => {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (companyId: string) => {
+      // Delete products first, then company
+      const { error: prodErr } = await supabase.from("products").delete().eq("company_id", companyId);
+      if (prodErr) throw prodErr;
+      const { error } = await supabase.from("companies").delete().eq("id", companyId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-companies"] });
+      toast.success("Company and all its products deleted.");
+      setDeleteTarget(null);
+      setConfirmText("");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/");
@@ -48,9 +71,12 @@ const MasterAdmin = () => {
           <h1 className="text-3xl font-bold">Master Admin Panel</h1>
           <p className="text-muted-foreground">All registered companies</p>
         </div>
-        <Button variant="outline" onClick={handleLogout}>
-          <LogOut className="h-4 w-4 mr-2" /> Logout
-        </Button>
+        <div className="flex gap-2">
+          <ThemeToggle />
+          <Button variant="outline" onClick={handleLogout}>
+            <LogOut className="h-4 w-4 mr-2" /> Logout
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -95,7 +121,7 @@ const MasterAdmin = () => {
                         </div>
                       )}
                     </div>
-                    <div className="mt-2">
+                    <div className="mt-2 flex items-center gap-3">
                       <a
                         href={`/store/${company.slug}`}
                         target="_blank"
@@ -104,6 +130,12 @@ const MasterAdmin = () => {
                       >
                         <ExternalLink className="h-3 w-3" /> View Store
                       </a>
+                      <button
+                        onClick={() => setDeleteTarget({ id: company.id, name: company.name })}
+                        className="text-xs text-destructive hover:underline inline-flex items-center gap-1"
+                      >
+                        <Trash2 className="h-3 w-3" /> Delete
+                      </button>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       Registered: {new Date(company.created_at).toLocaleDateString()}
@@ -120,6 +152,38 @@ const MasterAdmin = () => {
           <p>No companies registered yet.</p>
         </div>
       )}
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setConfirmText(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Company</DialogTitle>
+            <DialogDescription>
+              This will permanently delete <strong>{deleteTarget?.name}</strong> and all its products. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Type <strong className="text-foreground">DELETE</strong> to confirm:
+            </p>
+            <Input
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="Type DELETE"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setDeleteTarget(null); setConfirmText(""); }}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={confirmText !== "DELETE" || deleteMutation.isPending}
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete Company"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

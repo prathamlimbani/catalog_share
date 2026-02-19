@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 import { ArrowRight, Store, Share2, MessageSquare, Shield, Zap, Users } from "lucide-react";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const Landing = () => {
   return (
@@ -14,6 +15,7 @@ const Landing = () => {
             <span className="font-bold text-lg">CatalogShare</span>
           </Link>
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <Button variant="ghost" asChild>
               <Link to="/login">Login</Link>
             </Button>
@@ -118,6 +120,7 @@ const Landing = () => {
               <span className="font-bold">CatalogShare</span>
             </div>
             <div className="text-sm text-muted-foreground flex gap-4">
+              <Link to="/about" className="hover:text-foreground transition-colors">About</Link>
               <Link to="/master-login" className="hover:text-foreground transition-colors">Admin</Link>
             </div>
           </div>

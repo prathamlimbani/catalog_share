@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Plus, Trash2, LogOut, Package, Edit, X, Upload, Pencil, Check, Link as LinkIcon, Copy, ExternalLink, Store } from "lucide-react";
 import CompanyEditDialog from "@/components/CompanyEditDialog";
+import ThemeToggle from "@/components/ThemeToggle";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tables } from "@/integrations/supabase/types";
 
@@ -269,6 +270,7 @@ const AdminDashboard = () => {
           <p className="text-muted-foreground">Manage your products</p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <ThemeToggle />
           <CompanyEditDialog company={company} />
           <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>

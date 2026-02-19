@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, TrendingUp, Package, Store, ShoppingCart } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const StoreFront = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -76,8 +77,9 @@ const StoreFront = () => {
               )}
               <span className="font-bold text-lg hidden sm:block">{company.name}</span>
             </Link>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <Link to={`/store/${slug}/products`} className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:block">Products</Link>
+              <ThemeToggle />
               <Link to={`/store/${slug}/cart`} className="relative">
                 <Button variant="outline" size="icon">
                   <ShoppingCart className="h-5 w-5" />
