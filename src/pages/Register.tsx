@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Store, Upload } from "lucide-react";
+import ColorThemePicker from "@/components/ColorThemePicker";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -24,6 +25,13 @@ const Register = () => {
   const [gstNumber, setGstNumber] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [themePrimary, setThemePrimary] = useState("25 95% 53%");
+  const [themeAccent, setThemeAccent] = useState("25 95% 95%");
+  const [contactName1, setContactName1] = useState("");
+  const [contactPhone1, setContactPhone1] = useState("");
+  const [contactName2, setContactName2] = useState("");
+  const [contactPhone2, setContactPhone2] = useState("");
+  const [googleMapsUrl, setGoogleMapsUrl] = useState("");
 
   const generateSlug = (name: string) => {
     return name
@@ -90,6 +98,13 @@ const Register = () => {
         address: address.trim() || null,
         gst_number: gstNumber.trim() || null,
         logo_url: logoUrl,
+        theme_primary: themePrimary,
+        theme_accent: themeAccent,
+        contact_name_1: contactName1.trim() || null,
+        contact_phone_1: contactPhone1.trim() || null,
+        contact_name_2: contactName2.trim() || null,
+        contact_phone_2: contactPhone2.trim() || null,
+        google_maps_url: googleMapsUrl.trim() || null,
       });
 
       if (error) throw error;
@@ -176,6 +191,35 @@ const Register = () => {
                   {logoFile ? "Change Logo" : "Upload Logo"}
                   <input type="file" accept="image/*" onChange={handleLogoSelect} className="hidden" />
                 </label>
+              </div>
+            </div>
+            <ColorThemePicker
+              selectedPrimary={themePrimary}
+              onSelect={(primary, accent) => { setThemePrimary(primary); setThemeAccent(accent); }}
+            />
+            <div className="border-t pt-4 mt-2">
+              <h3 className="font-semibold text-sm mb-3">About / Contact Page (optional)</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Contact Name 1</Label>
+                  <Input value={contactName1} onChange={(e) => setContactName1(e.target.value)} placeholder="e.g. John Doe" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Contact Phone 1</Label>
+                  <Input value={contactPhone1} onChange={(e) => setContactPhone1(e.target.value)} placeholder="e.g. +91 98765..." />
+                </div>
+                <div className="space-y-2">
+                  <Label>Contact Name 2</Label>
+                  <Input value={contactName2} onChange={(e) => setContactName2(e.target.value)} placeholder="e.g. Jane Doe" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Contact Phone 2</Label>
+                  <Input value={contactPhone2} onChange={(e) => setContactPhone2(e.target.value)} placeholder="e.g. +91 98765..." />
+                </div>
+              </div>
+              <div className="space-y-2 mt-3">
+                <Label>Google Maps Link</Label>
+                <Input value={googleMapsUrl} onChange={(e) => setGoogleMapsUrl(e.target.value)} placeholder="Paste Google Maps share link" />
               </div>
             </div>
             <Button type="submit" className="w-full" disabled={loading}>

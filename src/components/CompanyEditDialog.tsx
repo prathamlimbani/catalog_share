@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { toast } from "sonner";
 import { Settings, Upload } from "lucide-react";
 import { Tables } from "@/integrations/supabase/types";
+import ColorThemePicker from "@/components/ColorThemePicker";
 
 type Company = Tables<"companies">;
 
@@ -20,6 +21,13 @@ const CompanyEditDialog = ({ company }: { company: Company }) => {
     email: company.email,
     address: company.address || "",
     gst_number: company.gst_number || "",
+    theme_primary: company.theme_primary || "25 95% 53%",
+    theme_accent: company.theme_accent || "25 95% 95%",
+    contact_name_1: company.contact_name_1 || "",
+    contact_phone_1: company.contact_phone_1 || "",
+    contact_name_2: company.contact_name_2 || "",
+    contact_phone_2: company.contact_phone_2 || "",
+    google_maps_url: company.google_maps_url || "",
   });
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(company.logo_url);
@@ -55,6 +63,13 @@ const CompanyEditDialog = ({ company }: { company: Company }) => {
           address: form.address.trim() || null,
           gst_number: form.gst_number.trim() || null,
           logo_url: logoUrl,
+          theme_primary: form.theme_primary,
+          theme_accent: form.theme_accent,
+          contact_name_1: form.contact_name_1.trim() || null,
+          contact_phone_1: form.contact_phone_1.trim() || null,
+          contact_name_2: form.contact_name_2.trim() || null,
+          contact_phone_2: form.contact_phone_2.trim() || null,
+          google_maps_url: form.google_maps_url.trim() || null,
         })
         .eq("id", company.id);
       if (error) throw error;
@@ -78,6 +93,13 @@ const CompanyEditDialog = ({ company }: { company: Company }) => {
           email: company.email,
           address: company.address || "",
           gst_number: company.gst_number || "",
+          theme_primary: company.theme_primary || "25 95% 53%",
+          theme_accent: company.theme_accent || "25 95% 95%",
+          contact_name_1: company.contact_name_1 || "",
+          contact_phone_1: company.contact_phone_1 || "",
+          contact_name_2: company.contact_name_2 || "",
+          contact_phone_2: company.contact_phone_2 || "",
+          google_maps_url: company.google_maps_url || "",
         });
         setLogoPreview(company.logo_url);
         setLogoFile(null);
@@ -127,6 +149,35 @@ const CompanyEditDialog = ({ company }: { company: Company }) => {
                 {logoFile ? "Change Logo" : "Upload Logo"}
                 <input type="file" accept="image/*" onChange={handleLogoSelect} className="hidden" />
               </label>
+            </div>
+          </div>
+          <ColorThemePicker
+            selectedPrimary={form.theme_primary}
+            onSelect={(primary, accent) => setForm({ ...form, theme_primary: primary, theme_accent: accent })}
+          />
+          <div className="border-t pt-4 mt-2">
+            <h3 className="font-semibold text-sm mb-3">About / Contact Page</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Contact Name 1</Label>
+                <Input value={form.contact_name_1} onChange={(e) => setForm({ ...form, contact_name_1: e.target.value })} placeholder="e.g. John Doe" />
+              </div>
+              <div className="space-y-2">
+                <Label>Contact Phone 1</Label>
+                <Input value={form.contact_phone_1} onChange={(e) => setForm({ ...form, contact_phone_1: e.target.value })} placeholder="e.g. +91 98765..." />
+              </div>
+              <div className="space-y-2">
+                <Label>Contact Name 2</Label>
+                <Input value={form.contact_name_2} onChange={(e) => setForm({ ...form, contact_name_2: e.target.value })} placeholder="e.g. Jane Doe" />
+              </div>
+              <div className="space-y-2">
+                <Label>Contact Phone 2</Label>
+                <Input value={form.contact_phone_2} onChange={(e) => setForm({ ...form, contact_phone_2: e.target.value })} placeholder="e.g. +91 98765..." />
+              </div>
+            </div>
+            <div className="space-y-2 mt-3">
+              <Label>Google Maps Link</Label>
+              <Input value={form.google_maps_url} onChange={(e) => setForm({ ...form, google_maps_url: e.target.value })} placeholder="Paste your Google Maps share link" />
             </div>
           </div>
           <Button type="submit" className="w-full" disabled={updateMutation.isPending}>

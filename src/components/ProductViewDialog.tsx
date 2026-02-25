@@ -1,5 +1,5 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -44,23 +44,16 @@ const ProductViewDialog = ({ open, onOpenChange, images, productName }: ProductV
               >
                 <ChevronRight className="h-5 w-5" />
               </Button>
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                {images.map((_, i) => (
+                  <button
+                    key={i}
+                    className={`w-2 h-2 rounded-full transition-colors ${i === currentIdx ? "bg-primary" : "bg-muted-foreground/40"}`}
+                    onClick={() => setIdx(i)}
+                  />
+                ))}
+              </div>
             </>
-          )}
-          <div className="absolute top-2 right-2">
-            <Button size="icon" variant="secondary" onClick={() => onOpenChange(false)}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          {images.length > 1 && (
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-              {images.map((_, i) => (
-                <button
-                  key={i}
-                  className={`w-2 h-2 rounded-full transition-colors ${i === currentIdx ? "bg-primary" : "bg-muted-foreground/40"}`}
-                  onClick={() => setIdx(i)}
-                />
-              ))}
-            </div>
           )}
         </div>
         <div className="p-4">

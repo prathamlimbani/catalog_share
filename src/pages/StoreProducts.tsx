@@ -11,6 +11,7 @@ import { useState } from "react";
 import { Search, X, LayoutGrid, List, Store, ShoppingCart, ArrowLeft } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import ThemeToggle from "@/components/ThemeToggle";
+import useStoreTheme from "@/hooks/useStoreTheme";
 
 const StoreProducts = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -19,6 +20,9 @@ const StoreProducts = () => {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
+  // Apply company color theme
+  useStoreTheme(company?.theme_primary || null, company?.theme_accent || null);
 
   const { data: products, isLoading } = useQuery({
     queryKey: ["store-products", company?.id],
@@ -71,6 +75,7 @@ const StoreProducts = () => {
             </Link>
             <div className="flex items-center gap-3">
               <Link to={`/store/${slug}`} className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:block">Home</Link>
+              <Link to={`/store/${slug}/about`} className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:block">About</Link>
               <ThemeToggle />
               <Link to={`/store/${slug}/cart`} className="relative">
                 <Button variant="outline" size="icon">

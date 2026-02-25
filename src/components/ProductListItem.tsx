@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ShoppingCart, Check, Plus, Minus, Package, Eye } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ProductViewDialog from "@/components/ProductViewDialog";
 
 type Product = Tables<"products">;
@@ -34,6 +34,15 @@ const ProductListItem = ({ product }: { product: Product }) => {
     : globalSizes;
 
   const [selectedSize, setSelectedSize] = useState<string | null>(sizes.length === 1 ? sizes[0] : null);
+
+  // Auto-select size when only one available
+  useEffect(() => {
+    if (sizes.length === 1) {
+      setSelectedSize(sizes[0]);
+    } else {
+      setSelectedSize(null);
+    }
+  }, [selectedFeature, JSON.stringify(sizes)]);
 
   const mainImage = product.image_url || (product.images && product.images[0]);
 
@@ -96,7 +105,7 @@ const ProductListItem = ({ product }: { product: Product }) => {
                 </Select>
               )}
               {/* Size after feature */}
-              {sizes.length > 1 && (features.length === 0 || selectedFeature) && (
+              {sizes.length > 0 && (features.length === 0 || selectedFeature) && (
                 <div className="flex flex-wrap gap-1">
                   {sizes.map((s) => {
                     const isOutOfStock = s.startsWith("~") || s.endsWith("~");
@@ -106,13 +115,12 @@ const ProductListItem = ({ product }: { product: Product }) => {
                         key={s}
                         disabled={isOutOfStock}
                         onClick={() => !isOutOfStock && setSelectedSize(s)}
-                        className={`px-2 py-0.5 text-xs rounded border transition-colors ${
-                          isOutOfStock
+                        className={`px-2 py-0.5 text-xs rounded border transition-colors ${isOutOfStock
                             ? "opacity-40 cursor-not-allowed line-through bg-muted text-muted-foreground border-border"
                             : selectedSize === s
                               ? "bg-primary text-primary-foreground border-primary"
                               : "bg-card text-foreground border-border hover:border-primary"
-                        }`}
+                          }`}
                       >
                         {displaySize}
                       </button>

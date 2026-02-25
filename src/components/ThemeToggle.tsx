@@ -26,7 +26,8 @@ const ThemeToggle = () => {
       setDark(true);
     } else if (saved === "light") {
       setDark(false);
-    } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    } else {
+      // Default to dark mode
       setDark(true);
     }
   }, []);

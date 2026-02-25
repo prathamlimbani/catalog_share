@@ -17,6 +17,9 @@ const Landing = () => {
           <div className="flex items-center gap-3">
             <ThemeToggle />
             <Button variant="ghost" asChild>
+              <Link to="/about">About</Link>
+            </Button>
+            <Button variant="ghost" asChild>
               <Link to="/login">Login</Link>
             </Button>
             <Button asChild>
@@ -27,17 +30,18 @@ const Landing = () => {
       </header>
 
       <section className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-background to-accent">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-32 text-center">
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,hsl(var(--primary)/0.08),transparent_60%)]" />
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-32 text-center relative z-10">
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6 animate-fade-in-up">
             Your Wholesale Catalog,
-            <span className="text-primary block mt-2">One Link Away</span>
+            <span className="gradient-text block mt-2">One Link Away</span>
           </h1>
-          <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Create your online product catalog in minutes. Share a single link with customers. 
+          <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto animate-fade-in-up delay-100">
+            Create your online product catalog in minutes. Share a single link with customers.
             Receive orders directly on WhatsApp. Built for wholesalers.
           </p>
-          <div className="flex flex-wrap gap-3 justify-center">
-            <Button size="lg" asChild>
+          <div className="flex flex-wrap gap-3 justify-center animate-fade-in-up delay-200">
+            <Button size="lg" className="animate-pulse-glow" asChild>
               <Link to="/register">
                 Create Your Catalog <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
@@ -58,9 +62,9 @@ const Landing = () => {
             { icon: Share2, title: "2. Add Products & Share", desc: "Upload your product catalog and share a unique link with all your customers." },
             { icon: MessageSquare, title: "3. Receive Orders", desc: "Customers browse and send orders directly to your WhatsApp. Simple!" },
           ].map((f) => (
-            <Card key={f.title} className="text-center border-border/50">
+            <Card key={f.title} className="text-center border-border/50 card-hover">
               <CardContent className="pt-8 pb-6 px-6">
-                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4 animate-float">
                   <f.icon className="h-7 w-7 text-primary" />
                 </div>
                 <h3 className="font-bold text-lg mb-2">{f.title}</h3>

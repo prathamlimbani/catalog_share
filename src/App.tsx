@@ -14,6 +14,7 @@ import MasterAdmin from "./pages/MasterAdmin";
 import StoreFront from "./pages/StoreFront";
 import StoreProducts from "./pages/StoreProducts";
 import StoreCart from "./pages/StoreCart";
+import StoreAbout from "./pages/StoreAbout";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/store/:slug" element={<StoreFront />} />
             <Route path="/store/:slug/products" element={<StoreProducts />} />
             <Route path="/store/:slug/cart" element={<StoreCart />} />
+            <Route path="/store/:slug/about" element={<StoreAbout />} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

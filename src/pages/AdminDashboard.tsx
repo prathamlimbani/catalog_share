@@ -300,10 +300,6 @@ const AdminDashboard = () => {
                   <Label>Price (optional)</Label>
                   <Input type="number" step="0.01" min="0" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="Leave empty if not applicable" />
                 </div>
-                <div className="space-y-2">
-                  <Label>Sizes (comma-separated)</Label>
-                  <Input value={form.size} onChange={(e) => setForm({ ...form, size: e.target.value })} placeholder="e.g. S, M, L, XL" />
-                </div>
 
                 <div className="space-y-2">
                   <Label>Category</Label>

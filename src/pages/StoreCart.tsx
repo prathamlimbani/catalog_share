@@ -4,17 +4,23 @@ import { useCart, getCartKey } from "@/contexts/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, Minus, Send, ShoppingCart, Store } from "lucide-react";
+import { Trash2, Plus, Minus, Send, ShoppingCart, Store, StickyNote } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
+import useStoreTheme from "@/hooks/useStoreTheme";
 
 const StoreCart = () => {
   const { slug } = useParams<{ slug: string }>();
   const { data: company, isLoading: companyLoading } = useCompanyBySlug(slug || "");
   const { items, removeFromCart, updateQuantity, clearCart, totalItems } = useCart();
   const [customerName, setCustomerName] = useState("");
+  const [customNote, setCustomNote] = useState("");
+
+  // Apply company color theme
+  useStoreTheme(company?.theme_primary || null, company?.theme_accent || null);
 
   if (companyLoading) {
     return <div className="min-h-screen flex items-center justify-center"><p className="text-muted-foreground">Loading...</p></div>;
@@ -36,6 +42,9 @@ const StoreCart = () => {
       if (item.selectedFeature) message += `   Option: ${item.selectedFeature}\n`;
       message += `   Qty: ${item.quantity}\n\n`;
     });
+    if (customNote.trim()) {
+      message += `📝 *Special Note:*\n${customNote.trim()}\n\n`;
+    }
     message += `Please confirm this order. Thank you!`;
 
     const encoded = encodeURIComponent(message);
@@ -59,6 +68,7 @@ const StoreCart = () => {
             </Link>
             <div className="flex items-center gap-4">
               <Link to={`/store/${slug}/products`} className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Products</Link>
+              <Link to={`/store/${slug}/about`} className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">About</Link>
             </div>
           </div>
         </div>
@@ -118,6 +128,22 @@ const StoreCart = () => {
                 <div className="space-y-2">
                   <Label htmlFor="customerName">Your Name / Company Name *</Label>
                   <Input id="customerName" placeholder="Enter your name or company name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} maxLength={100} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="customNote" className="flex items-center gap-2">
+                    <StickyNote className="h-4 w-4 text-primary" />
+                    Special Instructions / Custom Note
+                  </Label>
+                  <Textarea
+                    id="customNote"
+                    placeholder="E.g., Need 100 pieces, deliver by next week, specific packaging requests..."
+                    value={customNote}
+                    onChange={(e) => setCustomNote(e.target.value)}
+                    maxLength={500}
+                    rows={3}
+                    className="resize-none"
+                  />
+                  <p className="text-xs text-muted-foreground">This note will be included in your WhatsApp order message.</p>
                 </div>
                 <div className="flex gap-3">
                   <Button variant="outline" onClick={clearCart} className="flex-1">Clear Cart</Button>

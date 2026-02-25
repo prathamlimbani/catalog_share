@@ -1,0 +1,1581 @@
+{
+  "companies": [
+    {
+      "id": "812963e9-7876-4bbd-8bca-6015a6164fcf",
+      "owner_id": "b293efeb-4cd4-43b5-aa9b-120e27cd1d21",
+      "name": "Sri vijayalaxmi traders",
+      "slug": "sri-vijayalaxmi-traders-",
+      "logo_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/logos/b293efeb-4cd4-43b5-aa9b-120e27cd1d21.jpg",
+      "phone": "+918310664131",
+      "email": "sumithpchabhaiya2006@gmail.com",
+      "address": "Toward JMIT Campus, old NH4 Service road, medehalli Bridge, Vidyanagara, Chitradurga 577502",
+      "gst_number": "29BYOPP6780R1ZY",
+      "theme_primary": "222 47% 11%",
+      "theme_accent": "210 40% 50%",
+      "created_at": "2026-02-18T04:59:04.66972+00:00",
+      "updated_at": "2026-02-18T13:46:20.95296+00:00"
+    },
+    {
+      "id": "00f2601e-5ef6-4965-b87e-25f1e1c94d2b",
+      "owner_id": "2e85dac9-26d9-48b2-a54f-17c5dabef5c3",
+      "name": "Prathik Raj",
+      "slug": "prathik-raj",
+      "logo_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/logos/2e85dac9-26d9-48b2-a54f-17c5dabef5c3.png",
+      "phone": "+918431654357",
+      "email": "prathik@sample.com",
+      "address": null,
+      "gst_number": null,
+      "theme_primary": "142 71% 45%",
+      "theme_accent": "142 71% 95%",
+      "created_at": "2026-02-18T11:06:46.543142+00:00",
+      "updated_at": "2026-02-25T13:55:12.049687+00:00"
+    }
+  ],
+  "products": [
+    {
+      "id": "9fc048d3-d994-43ed-9e97-ea762d660e5b",
+      "name": "0 crank hinges",
+      "description": "usa",
+      "size": "500g , 1kg , 2 kg ,5kg~",
+      "features": [
+        "100rs/kg"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/00f2601e-5ef6-4965-b87e-25f1e1c94d2b/1771412878521-0.webp",
+      "category": "Hinge",
+      "is_trending": true,
+      "created_at": "2026-02-18T11:07:39.163442+00:00",
+      "updated_at": "2026-02-19T17:06:38.486164+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/00f2601e-5ef6-4965-b87e-25f1e1c94d2b/1771412878521-0.webp"
+      ],
+      "feature_sizes": {
+        "100rs/kg": [
+          "500g",
+          "1kg",
+          "2 kg",
+          "5kg~"
+        ]
+      },
+      "company_id": "00f2601e-5ef6-4965-b87e-25f1e1c94d2b"
+    },
+    {
+      "id": "56b9e1a4-d3cf-4c34-a467-3249c63b59d1",
+      "name": "WOODAN PANTRY UNIT",
+      "description": null,
+      "size": null,
+      "features": [
+        "BURLIN",
+        "SIGNATURE",
+        "KUROVA"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771666492373-0.jpg",
+      "category": "PANTRY UNIT",
+      "is_trending": false,
+      "created_at": "2026-02-21T09:33:43.777217+00:00",
+      "updated_at": "2026-02-21T09:40:04.608457+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771666492373-0.jpg"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "450MM",
+          "600MM"
+        ],
+        "KUROVA": [
+          "450MM",
+          "600MM"
+        ],
+        "SIGNATURE": [
+          "450MM",
+          "600MM"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "dfdd4d7b-1eda-4c6e-a9ba-8f773ec74e0d",
+      "name": "WODEN QUADRO",
+      "description": null,
+      "size": null,
+      "features": [
+        "BURLIN"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771835591185-0.jpg",
+      "category": null,
+      "is_trending": false,
+      "created_at": "2026-02-23T08:33:19.303289+00:00",
+      "updated_at": "2026-02-23T08:33:19.303289+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771835591185-0.jpg"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "12 INCH",
+          "14 INCH",
+          "16 INCH",
+          "18 INCH",
+          "20 INCH"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "bc766128-38da-4f2f-ad5c-aa56d98a6ac8",
+      "name": "SLIDE ON SOFT CLOSE , CODE : (BH-SLIDEON)",
+      "description": "AGAINST ORDER",
+      "size": null,
+      "features": [
+        "BURLIN"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771836876898-0.jpg",
+      "category": "HINGES",
+      "is_trending": false,
+      "created_at": "2026-02-23T08:54:44.065185+00:00",
+      "updated_at": "2026-02-23T09:55:51.610405+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771836876898-0.jpg"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "0 CRANK",
+          "8 CRANK",
+          "15 CRANK"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "e9923060-8d33-4817-96a3-218c86d6bb7d",
+      "name": "CONCEALED HINGE (CODE : BH)",
+      "description": "AGAINST ORDER",
+      "size": null,
+      "features": [
+        "BURLIN"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771836457020-0.jpg",
+      "category": "HINGES",
+      "is_trending": false,
+      "created_at": "2026-02-23T08:47:42.851327+00:00",
+      "updated_at": "2026-02-23T09:56:01.78956+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771836457020-0.jpg"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "0 CRANK",
+          "8 CRANK",
+          "15 CRANK"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "39ec9c03-86d2-4c23-ad02-c308a27aa5cc",
+      "name": "BRN - CLOTH HANGER",
+      "description": "AGAINST ORDER",
+      "size": null,
+      "features": [
+        "GRAY",
+        "MOCHA"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771846133154-0.jpg",
+      "category": "WARDROBE ACCESSORIES",
+      "is_trending": false,
+      "created_at": "2026-02-23T11:29:20.038607+00:00",
+      "updated_at": "2026-02-24T10:27:03.98839+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771846133154-0.jpg",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771846146063-0.jpg"
+      ],
+      "feature_sizes": {
+        "GRAY": [
+          "111*455*115 MM"
+        ],
+        "MOCHA": [
+          "111*455*115 MM"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "d77809ee-c635-47ab-b1e7-50c717d95d7d",
+      "name": "TROUSER RACK",
+      "description": "AGAINST ORDER",
+      "size": null,
+      "features": [
+        "GRAY",
+        "MOCHA"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771845124795-0.jpg",
+      "category": "WARDROBE ACCESSORIES",
+      "is_trending": false,
+      "created_at": "2026-02-23T11:12:34.18974+00:00",
+      "updated_at": "2026-02-24T10:28:03.532692+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771845124795-0.jpg",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771845136203-0.jpg"
+      ],
+      "feature_sizes": {
+        "GRAY": [
+          "350*455*155 MM"
+        ],
+        "MOCHA": [
+          "350*455*155 MM"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "5c319769-a76b-4a12-91f9-d3934b22314e",
+      "name": "BRN - CLOTH LIFTER PULL DOWN",
+      "description": "AGAINST ORDER",
+      "size": null,
+      "features": [
+        "GRAY",
+        "MOCHA"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771846811422-0.jpg",
+      "category": "WARDROBE ACCESSORIES",
+      "is_trending": false,
+      "created_at": "2026-02-23T11:40:26.761467+00:00",
+      "updated_at": "2026-02-24T10:26:17.123008+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771846811422-0.jpg",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771846821835-0.webp"
+      ],
+      "feature_sizes": {
+        "GRAY": [
+          "630*455*115 MM"
+        ],
+        "MOCHA": [
+          "630*455*115 MM"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "06e1c4f5-68e7-4bcd-bdee-daf91112fba2",
+      "name": "BRN - DOUBLE TROUSER RACK",
+      "description": "AGAINST ORDER",
+      "size": null,
+      "features": [
+        "GRAY",
+        "MOCHA"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771845526250-0.jpg",
+      "category": "WARDROBE ACCESSORIES",
+      "is_trending": false,
+      "created_at": "2026-02-23T11:19:06.600019+00:00",
+      "updated_at": "2026-02-24T10:27:27.47391+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771845526250-0.jpg",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771845537642-0.jpg"
+      ],
+      "feature_sizes": {
+        "GRAY": [
+          "630*455*115 MM"
+        ],
+        "MOCHA": [
+          "630*455*115 MM"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "56197a8b-93cc-4d31-a221-d7644af82e74",
+      "name": "BRN - TIE RACK",
+      "description": "AGAINST ORDER",
+      "size": null,
+      "features": [
+        "GRAY",
+        "MOCHA"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771846428119-0.jpg",
+      "category": "WARDROBE ACCESSORIES",
+      "is_trending": false,
+      "created_at": "2026-02-23T11:34:44.748359+00:00",
+      "updated_at": "2026-02-24T11:29:29.223547+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771846428119-0.jpg",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771846479098-0.jpg"
+      ],
+      "feature_sizes": {
+        "GRAY": [
+          "420*112*80 MM"
+        ],
+        "MOCHA": [
+          "420*112*80 MM"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "8e3edafc-d575-451e-b0c2-9834e2bff3cd",
+      "name": "rfggdfgfdg",
+      "description": null,
+      "size": null,
+      "features": [
+        "red"
+      ],
+      "price": 0,
+      "image_url": null,
+      "category": "Hinge",
+      "is_trending": false,
+      "created_at": "2026-02-19T17:04:31.39696+00:00",
+      "updated_at": "2026-02-19T17:04:31.39696+00:00",
+      "in_stock": true,
+      "images": [],
+      "feature_sizes": {
+        "red": [
+          "100kg"
+        ]
+      },
+      "company_id": "00f2601e-5ef6-4965-b87e-25f1e1c94d2b"
+    },
+    {
+      "id": "b8a0908d-2cbe-4133-a725-f5c193a29c2a",
+      "name": "SS SLIDE ON SOFT CLOSE CODE : BH-SS-SLIDEON)",
+      "description": null,
+      "size": null,
+      "features": [
+        "BURLIN"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771585605774-0.jpg",
+      "category": "HINGES",
+      "is_trending": false,
+      "created_at": "2026-02-20T10:58:30.889552+00:00",
+      "updated_at": "2026-02-23T09:48:05.061405+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771585605774-0.jpg",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771585906171-0.jpg",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771840068974-0.PNG"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "2D 0 CRANK SS",
+          "2D 8 CRANK MS",
+          "2D 16 CRANK MS"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "fb52a481-8849-4195-b8ba-0349d76a2a4c",
+      "name": "DESIGNER BASKET",
+      "description": "PEARL",
+      "size": null,
+      "features": [
+        "PLAIN",
+        "THALE",
+        "CUP AND SAUCER",
+        "CUTLERY",
+        "DOUBLE BASKET",
+        "TRIPLE BASKET"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771595770719-0.png",
+      "category": "stainless steel",
+      "is_trending": false,
+      "created_at": "2026-02-20T13:37:01.170526+00:00",
+      "updated_at": "2026-02-20T14:08:20.895506+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771595770719-0.png",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771595772121-1.png",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771595772580-2.png",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771596278503-0.png",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771596290747-0.png",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771596309402-0.png"
+      ],
+      "feature_sizes": {
+        "PLAIN": [
+          "15*20*4",
+          "15*20*6",
+          "15*20*8",
+          "17*20*4",
+          "17*20*6",
+          "17*20*8",
+          "19*20*4",
+          "19*20*6",
+          "19*20*8",
+          "21*20*4",
+          "21*20*6",
+          "21*20*8"
+        ],
+        "THALE": [
+          "15*20*6",
+          "15*20*8",
+          "17*20*6",
+          "17*20*8",
+          "19*20*6",
+          "19*20*8",
+          "21*20*6",
+          "21*20*8"
+        ],
+        "CUTLERY": [
+          "15*20*4",
+          "17*20*4",
+          "19*20*4",
+          "21*20*4"
+        ],
+        "DOUBLE BASKET": [
+          "6*20*17",
+          "8*20*17",
+          "10*20*17",
+          "12*20*17"
+        ],
+        "TRIPLE BASKET": [
+          "6*20*21",
+          "8*20*21",
+          "10*20*21",
+          "12*20*21"
+        ],
+        "CUP AND SAUCER": [
+          "15*20*4",
+          "17*20*4",
+          "19*20*4",
+          "21*20*4"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "0c3e5d39-5d5a-4f06-a1be-50ba7bc8d833",
+      "name": "wire basket",
+      "description": "pearl",
+      "size": "15*20*4 plain,15*20*4 cup and saucer, 15*20*4 perforated cutlery",
+      "features": [
+        "plain",
+        "cup and saucer",
+        "perforatedd cutelery",
+        "thail",
+        "double basket",
+        "triple basket"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771584630444-0.png",
+      "category": "stainless steel",
+      "is_trending": false,
+      "created_at": "2026-02-18T05:01:06.131899+00:00",
+      "updated_at": "2026-02-20T14:09:33.348415+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771584630444-0.png",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771584663776-0.jpg",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771584694893-0.png",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771584706494-0.jpg"
+      ],
+      "feature_sizes": {
+        "plain": [
+          "15*20*4",
+          "15*20*6",
+          "15*20*8",
+          "17*20*4",
+          "17*20*6",
+          "17*20*8",
+          "19*20*4",
+          "19*20*6",
+          "19*20*8",
+          "21*20*4",
+          "21*20*6",
+          "21*20*8"
+        ],
+        "thail": [
+          "15×20×6",
+          "15*20*8",
+          "17*20*6",
+          "17*20*8",
+          "19*20*6",
+          "19*20*8",
+          "21*20*6",
+          "21*20*8"
+        ],
+        "double basket": [
+          "4*20*17",
+          "6*20*17",
+          "8*20*17",
+          "12*20*17"
+        ],
+        "triple basket": [
+          "6*20*21",
+          "8*20*21",
+          "10*20*21",
+          "12*20*21"
+        ],
+        "cup and saucer": [
+          "15*20*4",
+          "17*20*4",
+          "19*20*4",
+          "21*20*4"
+        ],
+        "perforatedd cutelery": [
+          "15*20*4",
+          "17*20*4",
+          "19*20*4",
+          "21*20*4"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "bd813cba-12be-48ea-9b34-6e1962aca44f",
+      "name": "BOTTLE PULLOUT",
+      "description": null,
+      "size": null,
+      "features": [
+        "BURLIN",
+        "SIGNATURE",
+        "KUROVA"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771665390203-0.png",
+      "category": null,
+      "is_trending": false,
+      "created_at": "2026-02-21T09:17:05.854623+00:00",
+      "updated_at": "2026-02-23T12:43:29.166737+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771665390203-0.png",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771665405991-0.jpg",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771839385325-0.png"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "200MM",
+          "250MM",
+          "300MM"
+        ],
+        "KUROVA": [
+          "200MM",
+          "250MM",
+          "300MM"
+        ],
+        "SIGNATURE": [
+          "200MM",
+          "250MM"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "9090460e-98bf-4966-a090-447d992441ae",
+      "name": "SWING CORNER",
+      "description": null,
+      "size": null,
+      "features": [
+        "BURLIN",
+        "SIGNATURE"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771650688616-0.jpg",
+      "category": "CORNER UNIT",
+      "is_trending": false,
+      "created_at": "2026-02-21T05:09:20.450846+00:00",
+      "updated_at": "2026-02-21T05:21:41.807611+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771650688616-0.jpg"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "900MM LH",
+          "900MM RH"
+        ],
+        "SIGNATURE": [
+          "900MM LH",
+          "900MM RH"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "efb83732-80e6-4c86-8c86-f01bf57c3513",
+      "name": "UNIVERSAL MAGIC CORNER",
+      "description": null,
+      "size": null,
+      "features": [
+        "BURLIN",
+        "SIGNATURE"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771651215491-0.jpg",
+      "category": "CORNER UNIT",
+      "is_trending": false,
+      "created_at": "2026-02-21T05:21:08.163092+00:00",
+      "updated_at": "2026-02-24T04:21:57.763387+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771651215491-0.jpg",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771839191058-0.png"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "900MM",
+          "1"
+        ],
+        "SIGNATURE": [
+          "900MM",
+          "1"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "964f9fc6-d199-46fa-a095-143dd5a1a117",
+      "name": "PVC WICKER BASKET",
+      "description": null,
+      "size": null,
+      "features": [
+        "KIOSK"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771669241114-0.jpg",
+      "category": "WICKER BASKET",
+      "is_trending": false,
+      "created_at": "2026-02-21T10:23:51.42574+00:00",
+      "updated_at": "2026-02-21T10:23:51.42574+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771669241114-0.jpg"
+      ],
+      "feature_sizes": {
+        "KIOSK": [
+          "450MM*4",
+          "450MM*6",
+          "450MM*8",
+          "600MM*4",
+          "600MM*6",
+          "600MM*8"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "fd98a6ad-29c2-43fd-8ef9-6758cece6a31",
+      "name": "UP LIFT",
+      "description": "AGAINST ORDER",
+      "size": null,
+      "features": [
+        "BURLIN"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771743471283-0.jpg",
+      "category": "LIFT UP SERIES",
+      "is_trending": false,
+      "created_at": "2026-02-22T06:58:45.191498+00:00",
+      "updated_at": "2026-02-22T06:58:45.191498+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771743471283-0.jpg"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "3KG TO 6KG",
+          "5KG TO 9KG"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "4aaa96ae-5478-430e-ac4f-d6206646c3ce",
+      "name": "BI-FOLD LIFT UP",
+      "description": "AGAINST ORDER",
+      "size": null,
+      "features": [
+        "BURLIN"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771671122560-0.png",
+      "category": "LIFT UP SERIES",
+      "is_trending": false,
+      "created_at": "2026-02-21T10:52:20.437294+00:00",
+      "updated_at": "2026-02-22T06:59:33.471411+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771671122560-0.png"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "5KG TO 6KG",
+          "7KG TO 8KG",
+          "9KG TO 10KG"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "95a8a74e-98ea-48fd-96f9-ea9f04ad50d4",
+      "name": "MINI LIFT UP",
+      "description": "AGAINST ORDER",
+      "size": null,
+      "features": [
+        "BURLIN"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771670847018-0.jpg",
+      "category": "LIFT UP SERIES",
+      "is_trending": false,
+      "created_at": "2026-02-21T10:47:39.507075+00:00",
+      "updated_at": "2026-02-22T06:59:42.831275+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771670847018-0.jpg"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "5KG",
+          "6KG",
+          "7KG",
+          "8KG",
+          "9KG",
+          "10KG",
+          "11KG",
+          "12KG"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "0dc57ed4-5fc6-4b38-b841-c971a8f6aa48",
+      "name": "PVC ROLLING SHUTTER",
+      "description": null,
+      "size": null,
+      "features": [
+        "BURLIN",
+        "SIGNATURE"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771668528844-0.jpg",
+      "category": "ROLLING SHUTTER",
+      "is_trending": false,
+      "created_at": "2026-02-21T10:09:07.836302+00:00",
+      "updated_at": "2026-02-23T12:42:50.909878+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771668528844-0.jpg",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771668534922-0.jpg",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771839595377-0.jpg"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "BLACK 450MM",
+          "BLACK 600MM",
+          "SILVER 450MM",
+          "SILVER 600MM"
+        ],
+        "SIGNATURE": [
+          "BLACK 450MM",
+          "BLACK 600MM",
+          "SILVER 450MM",
+          "SILVER 600MM"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "4d2f8f62-f657-4f04-b70f-adc17aec7cb2",
+      "name": "ELEVATOR WIRE",
+      "description": "AGAINST ORDER",
+      "size": null,
+      "features": [
+        "BURLIN"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771669905325-0.jpg",
+      "category": "ELEVATOR",
+      "is_trending": false,
+      "created_at": "2026-02-21T10:31:57.225258+00:00",
+      "updated_at": "2026-02-22T07:00:10.402027+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771669905325-0.jpg"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "600MM",
+          "900MM"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "7bd814a4-7643-4842-8cfd-fae65ea99f6f",
+      "name": "ELEVATOR GLASS",
+      "description": "AGAINST ORDER",
+      "size": null,
+      "features": [
+        "BURLIN"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771670280736-0.webp",
+      "category": "ELEVATOR",
+      "is_trending": false,
+      "created_at": "2026-02-21T10:38:13.693621+00:00",
+      "updated_at": "2026-02-23T09:45:46.182329+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771670280736-0.webp",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771839938305-0.png"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "600MM",
+          "900MM"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "49204070-b1dc-4c32-b01f-e454f6f5b45d",
+      "name": "ABS CUTLERY TRAY",
+      "description": null,
+      "size": null,
+      "features": [
+        "BURLIN"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771761522116-0.jpg",
+      "category": "Kitchen accessories",
+      "is_trending": false,
+      "created_at": "2026-02-22T11:58:54.093128+00:00",
+      "updated_at": "2026-02-22T11:58:54.093128+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771761522116-0.jpg"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "19*17",
+          "19*21",
+          "19*25",
+          "19*29",
+          "19*33"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "d1d3d171-5f89-4988-acef-b62e22770ea0",
+      "name": "GAS SPRING",
+      "description": null,
+      "size": null,
+      "features": [
+        "BURLIN"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771835286534-0.jpg",
+      "category": null,
+      "is_trending": false,
+      "created_at": "2026-02-23T08:28:11.205707+00:00",
+      "updated_at": "2026-02-23T08:28:11.205707+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771835286534-0.jpg"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "5KG",
+          "10KG",
+          "15KG",
+          "20KG",
+          "25KG"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "70968e1e-c9d0-491b-8d1c-25f73ac7afd2",
+      "name": "GLASS ROLLING SHUTTER",
+      "description": null,
+      "size": null,
+      "features": [
+        "BURLIN",
+        "SIGNATURE"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771668008918-0.webp",
+      "category": "ROLLING SHUTTER",
+      "is_trending": false,
+      "created_at": "2026-02-21T10:00:36.39665+00:00",
+      "updated_at": "2026-02-23T12:43:00.572207+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771668008918-0.webp",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771668022897-0.jpg"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "BLACK 450MM",
+          "BLACK 600MM",
+          "WHITE 450MM",
+          "WHITE 600MM",
+          "FROSTED 450MM",
+          "FROSTED 600MM"
+        ],
+        "SIGNATURE": [
+          "BLACK 450MM",
+          "BLACK 600MM",
+          "SILVER 450MM",
+          "SILVER 600MM"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "0a5db7f1-8c4a-44a7-82a9-a6006ec9e4f3",
+      "name": "WICKER BASKET (BEACH WOOD)",
+      "description": "AGAINST ORDER",
+      "size": null,
+      "features": [
+        "BURLIN"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771668991889-0.jpg",
+      "category": "WICKER BASKET",
+      "is_trending": false,
+      "created_at": "2026-02-21T10:16:42.04092+00:00",
+      "updated_at": "2026-02-23T09:44:05.324188+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771668991889-0.jpg",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771839836432-0.PNG"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "450MM*4",
+          "450MM*6",
+          "450MM*8",
+          "600MM*4",
+          "600MM*6",
+          "600MM*8"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "08b8db3b-ba79-4150-8a76-bd21a87edbef",
+      "name": "BED LIFTER",
+      "description": null,
+      "size": null,
+      "features": [
+        "BURLIN",
+        "WOODCRAFT"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771762302767-0.jpg",
+      "category": null,
+      "is_trending": false,
+      "created_at": "2026-02-22T12:12:11.499813+00:00",
+      "updated_at": "2026-02-23T09:38:17.610361+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771762302767-0.jpg",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771762303828-1.png",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771839489817-0.png"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "5FET* 125KG",
+          "5FET*150KG",
+          "5FET*175KG",
+          "5FET*200KG"
+        ],
+        "WOODCRAFT": [
+          "5FET*100KG",
+          "5FET*125KG",
+          "5FET*150KG",
+          "5FET*175KG",
+          "5FET*200KG",
+          "5FET*250KG",
+          "4FET*100KG",
+          "4FET*125KG",
+          "4FET*150KG",
+          "4FET*175KG",
+          "4FET*200KG",
+          "4FET*250KG"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "0d2b7aa6-2e13-4278-b925-31c3cde2ddbb",
+      "name": "3D SOFT CLOSE HINGE (CODE : BH-3D-HD)",
+      "description": null,
+      "size": null,
+      "features": [
+        "BURLIN"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771840519728-0.PNG",
+      "category": "HINGES",
+      "is_trending": false,
+      "created_at": "2026-02-23T09:55:37.08101+00:00",
+      "updated_at": "2026-02-23T09:55:37.08101+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771840519728-0.PNG"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "3D 0 CRANK"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "d4a48d41-abf2-4cb1-aff5-7196d581a900",
+      "name": "TELESCOPIC CHANNEL (CODE : SH- 75)",
+      "description": "AGAINST ORDER ONLY FOR 22 INCH AND 24 INCH",
+      "size": null,
+      "features": [
+        "BURLIN"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771841229027-0.jpg",
+      "category": "TELESCOPIC",
+      "is_trending": false,
+      "created_at": "2026-02-23T10:07:14.196997+00:00",
+      "updated_at": "2026-02-23T10:07:14.196997+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771841229027-0.jpg"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "10 INCH",
+          "12",
+          "14",
+          "16",
+          "18",
+          "20",
+          "22",
+          "24"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "df9c8455-16b0-44a5-8448-efea8e4d9e81",
+      "name": "BRN - CLOTH BASKET",
+      "description": "AGAINST ORDER",
+      "size": null,
+      "features": [
+        "GRAY",
+        "MOCHA"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771842780117-0.jpg",
+      "category": "WARDROBE ACCESSORIES",
+      "is_trending": false,
+      "created_at": "2026-02-23T10:33:41.119516+00:00",
+      "updated_at": "2026-02-23T10:39:25.016585+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771842780117-0.jpg",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771842816574-0.webp"
+      ],
+      "feature_sizes": {
+        "GRAY": [
+          "600 MM",
+          "700 MM",
+          "800 MM",
+          "900 MM"
+        ],
+        "MOCHA": [
+          "600 MM",
+          "700 MM",
+          "800 MM",
+          "900 MM"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "4d0e50bf-cdad-4351-8ad5-bdfe31bc9d92",
+      "name": "TROUSER RACK",
+      "description": "AGAINST ORDER",
+      "size": null,
+      "features": [
+        "GRAY",
+        "MOCHA"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771842132821-0.jpg",
+      "category": "WARDROBE ACCESSORIES",
+      "is_trending": false,
+      "created_at": "2026-02-23T10:22:40.061761+00:00",
+      "updated_at": "2026-02-23T10:39:45.09939+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771842132821-0.jpg",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771842142141-0.jpg"
+      ],
+      "feature_sizes": {
+        "GRAY": [
+          "600 MM",
+          "700 MM",
+          "800 MM",
+          "900 MM"
+        ],
+        "MOCHA": [
+          "600 MM",
+          "700 MM",
+          "800 MM",
+          "900 MM"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "a9155a4b-db1f-4401-981b-d7917745a685",
+      "name": "BRN - SHOE RACK",
+      "description": "AGAINST ORDER",
+      "size": null,
+      "features": [
+        "GRAY",
+        "MOCHA"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771843445784-0.jpg",
+      "category": "WARDROBE ACCESSORIES",
+      "is_trending": false,
+      "created_at": "2026-02-23T10:44:24.260283+00:00",
+      "updated_at": "2026-02-23T10:44:41.048152+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771843445784-0.jpg",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771843458836-0.jpg"
+      ],
+      "feature_sizes": {
+        "GRAY": [
+          "600 MM",
+          "700 MM",
+          "800 MM",
+          "900 MM"
+        ],
+        "MOCHA": [
+          "600 MM",
+          "700 MM",
+          "800 MM",
+          "900 MM"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "e0252ba8-99ea-41bc-8546-e426046cecbc",
+      "name": "BRN - GARNISHRY RACK",
+      "description": "AGAINST ORDER",
+      "size": null,
+      "features": [
+        "GRAY",
+        "MOCHA"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771844479143-0.jpg",
+      "category": "WARDROBE ACCESSORIES",
+      "is_trending": false,
+      "created_at": "2026-02-23T11:02:55.042291+00:00",
+      "updated_at": "2026-02-23T11:02:55.042291+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771844479143-0.jpg",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771844558727-0.jpg"
+      ],
+      "feature_sizes": {
+        "GRAY": [
+          "600 MM",
+          "700 MM",
+          "800 MM",
+          "900 MM"
+        ],
+        "MOCHA": [
+          "600 MM",
+          "700 MM",
+          "800 MM",
+          "900 MM"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "33fe1182-6cab-4950-96aa-8dd8ebbc9c7c",
+      "name": "GLASS PANTRY UNIT",
+      "description": "AGAINST ORDER",
+      "size": null,
+      "features": [
+        "BURLIN",
+        "SIGNATURE"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771667069757-0.jpg",
+      "category": "PANTRY UNIT",
+      "is_trending": false,
+      "created_at": "2026-02-21T09:44:42.444883+00:00",
+      "updated_at": "2026-02-23T12:43:10.125207+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771667069757-0.jpg",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771839663434-0.PNG",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771839776271-0.PNG"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "450MM",
+          "600MM"
+        ],
+        "SIGNATURE": [
+          "450MM",
+          "600MM"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "6ea933fe-50f4-4a23-8de2-20e5f4b714af",
+      "name": "SLIM TANDAM BOX",
+      "description": null,
+      "size": null,
+      "features": [
+        "BURLIN",
+        "SIGNATURE",
+        "HAUZE",
+        "KUROVA",
+        "TERRA"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771597012986-0.jpg",
+      "category": "Kitchen accessories",
+      "is_trending": false,
+      "created_at": "2026-02-20T14:15:52.93491+00:00",
+      "updated_at": "2026-02-24T06:03:00.226975+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771597012986-0.jpg",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771839448870-0.jpg"
+      ],
+      "feature_sizes": {
+        "HAUZE": [
+          "4*20",
+          "6*20",
+          "8*20"
+        ],
+        "TERRA": [
+          "4*20",
+          "6*20",
+          "8*20"
+        ],
+        "BURLIN": [
+          "4*20",
+          "6*20",
+          "8*20",
+          "10*20"
+        ],
+        "KUROVA": [
+          "4*20",
+          "6*20",
+          "8*20"
+        ],
+        "SIGNATURE": [
+          "4*20",
+          "6*20",
+          "8*20"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "eb844d32-35c0-4f8b-8d6e-dacc25183370",
+      "name": "BRN - ROTATING FULL LENGTH MIRROR",
+      "description": "AGAINST ORDER",
+      "size": null,
+      "features": [
+        "GRAY"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771849711042-0.jpg",
+      "category": "WARDROBE ACCESSORIES",
+      "is_trending": false,
+      "created_at": "2026-02-23T12:28:37.868963+00:00",
+      "updated_at": "2026-02-23T12:28:37.868963+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771849711042-0.jpg"
+      ],
+      "feature_sizes": {
+        "GRAY": [
+          "1000*350-1200*350 MM"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "d15974e9-15b2-4308-aa51-e8841fb98dc3",
+      "name": "BRN - ROTATING SHOE RACK",
+      "description": "AGAINST ORDER",
+      "size": null,
+      "features": [
+        "GRAY",
+        "MOCHA"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771849441907-0.png",
+      "category": "WARDROBE ACCESSORIES",
+      "is_trending": false,
+      "created_at": "2026-02-23T12:21:40.151736+00:00",
+      "updated_at": "2026-02-23T12:30:02.504252+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771849441907-0.png",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771849464664-0.jpg"
+      ],
+      "feature_sizes": {
+        "GRAY": [
+          "700*360*1070-1270 MM/ 6 LAYER",
+          "700*360*1350-1500MM / 8 LAYER",
+          "700*360*1630-1830MM / 10 LAYER",
+          "700*360*1910-2110MM / 12 LAYER"
+        ],
+        "MOCHA": [
+          "700*360*1070-1270 MM/ 6 LAYER",
+          "700*360*1350-1500MM / 8 LAYER",
+          "700*360*1630-1830MM / 10 LAYER",
+          "700*360*1910-2110MM / 12 LAYER"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "5fd6785c-f04e-4fa4-9eb7-a841d0814e28",
+      "name": "BRN - PASSWORD BOX",
+      "description": "AGAINST ORDER",
+      "size": null,
+      "features": [
+        "GRAY"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771850011937-0.webp",
+      "category": "WARDROBE ACCESSORIES",
+      "is_trending": false,
+      "created_at": "2026-02-23T12:33:37.437239+00:00",
+      "updated_at": "2026-02-23T12:33:37.437239+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771850011937-0.webp"
+      ],
+      "feature_sizes": {
+        "GRAY": [
+          "500 MM"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "6cb0858f-7a0e-4468-aab1-f4ccdb2e3731",
+      "name": "SOFT CLOSE TELESCOPIC CHANNEL (CODE : BSC SILK-75)",
+      "description": "AGAINST ORDER",
+      "size": null,
+      "features": [
+        "BURLIN"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771850513489-0.jpg",
+      "category": "TELESCOPIC",
+      "is_trending": false,
+      "created_at": "2026-02-23T10:15:39.738642+00:00",
+      "updated_at": "2026-02-23T12:42:36.852841+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771850513489-0.jpg",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771850549627-0.jpg"
+      ],
+      "feature_sizes": {
+        "BURLIN": [
+          "10 INCH",
+          "12 INCH",
+          "14 INCH",
+          "16 INCH",
+          "18 INCH",
+          "20 INCH",
+          "22 INCH",
+          "24 INCH"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "de39ce98-b531-46d4-a996-6c13da410e2c",
+      "name": "PVD T PATTI",
+      "description": null,
+      "size": null,
+      "features": [
+        "GOLD",
+        "ROSE GOLD",
+        "CHROME",
+        "BLACK"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771932223170-0.jpg",
+      "category": null,
+      "is_trending": false,
+      "created_at": "2026-02-24T11:23:51.933917+00:00",
+      "updated_at": "2026-02-24T11:23:51.933917+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771932223170-0.jpg"
+      ],
+      "feature_sizes": {
+        "GOLD": [
+          "8MM",
+          "12MM",
+          "25MM"
+        ],
+        "BLACK": [
+          "12MM"
+        ],
+        "CHROME": [
+          "12MM"
+        ],
+        "ROSE GOLD": [
+          "8MM",
+          "12MM"
+        ]
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "c56ead34-518c-4ea6-bde2-b91b8276291a",
+      "name": ".92 MM FABRIC LAMINATE",
+      "description": ".92 MM",
+      "size": null,
+      "features": null,
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771853599075-0.jpg",
+      "category": "LAMINATE",
+      "is_trending": false,
+      "created_at": "2026-02-23T13:33:35.522713+00:00",
+      "updated_at": "2026-02-23T13:34:46.491637+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771853599075-0.jpg"
+      ],
+      "feature_sizes": {},
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "16a470d6-c74e-467a-bea2-274941b60652",
+      "name": ".72 MM FABRIC LAMINATE",
+      "description": null,
+      "size": null,
+      "features": [
+        "41102",
+        "42007"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771853788516-0.jpg",
+      "category": "LAMINATE",
+      "is_trending": false,
+      "created_at": "2026-02-23T13:36:41.390322+00:00",
+      "updated_at": "2026-02-23T13:39:29.222067+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771853788516-0.jpg",
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771853952861-0.jpg"
+      ],
+      "feature_sizes": {
+        "41102": [],
+        "42007": []
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "d1132995-aecb-4307-ab98-edd5e35440ef",
+      "name": "WOODAN LAMINATE",
+      "description": ".8 MM",
+      "size": null,
+      "features": null,
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771854517609-0.jpg",
+      "category": "LAMINATE",
+      "is_trending": false,
+      "created_at": "2026-02-23T13:48:54.477887+00:00",
+      "updated_at": "2026-02-23T13:48:54.477887+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771854517609-0.jpg"
+      ],
+      "feature_sizes": {},
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "c6747b9e-f563-4fb7-a482-0fb2d8196acd",
+      "name": "ALIM TRACK",
+      "description": "SLIDING WARDROBE TRACK",
+      "size": null,
+      "features": [
+        "8FT",
+        "12FT"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771928179396-0.webp",
+      "category": "WARDROBE ACCESSORIES",
+      "is_trending": false,
+      "created_at": "2026-02-24T10:17:13.924577+00:00",
+      "updated_at": "2026-02-24T10:17:13.924577+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771928179396-0.webp"
+      ],
+      "feature_sizes": {
+        "8FT": [],
+        "12FT": []
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    },
+    {
+      "id": "b0a08cef-e1bd-4ce3-8d0a-08523c852be8",
+      "name": "WARDROBE SALIDING WHELL",
+      "description": null,
+      "size": null,
+      "features": [
+        "SIGNATURE WHELL"
+      ],
+      "price": 0,
+      "image_url": "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771928388015-0.jpg",
+      "category": "WARDROBE ACCESSORIES",
+      "is_trending": false,
+      "created_at": "2026-02-24T10:21:00.74008+00:00",
+      "updated_at": "2026-02-25T05:09:42.524765+00:00",
+      "in_stock": true,
+      "images": [
+        "https://fspnvgvnqgtrlttrfgxm.supabase.co/storage/v1/object/public/product-images/812963e9-7876-4bbd-8bca-6015a6164fcf/1771928388015-0.jpg"
+      ],
+      "feature_sizes": {
+        "SIGNATURE WHELL": []
+      },
+      "company_id": "812963e9-7876-4bbd-8bca-6015a6164fcf"
+    }
+  ]
+}
