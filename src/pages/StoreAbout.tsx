@@ -173,28 +173,25 @@ const StoreAbout = () => {
                     {hasMapUrl && (
                         <div className="space-y-4">
                             <h2 className="text-xl font-bold mb-4">Our Location</h2>
-                            <Card className="overflow-hidden">
-                                <div className="aspect-square sm:aspect-[4/3]">
-                                    <iframe
-                                        src={getEmbedUrl(company.google_maps_url!)}
-                                        width="100%"
-                                        height="100%"
-                                        style={{ border: 0 }}
-                                        allowFullScreen
-                                        loading="lazy"
-                                        referrerPolicy="no-referrer-when-downgrade"
-                                        title="Store Location"
-                                    />
-                                </div>
+                            <Card className="overflow-hidden group hover:border-primary/50 transition-colors">
+                                <CardContent className="p-8 text-center">
+                                    <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                                        <MapPin className="h-8 w-8 text-primary" />
+                                    </div>
+                                    <h3 className="font-semibold text-lg mb-2">Find Us on the Map</h3>
+                                    <p className="text-sm text-muted-foreground mb-4">Click below to view our location on Google Maps</p>
+                                    <a
+                                        href={company.google_maps_url!}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        <Button className="gap-2">
+                                            <MapPin className="h-4 w-4" />
+                                            Open in Google Maps
+                                        </Button>
+                                    </a>
+                                </CardContent>
                             </Card>
-                            <a
-                                href={company.google_maps_url!}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
-                            >
-                                <MapPin className="h-4 w-4" /> Open in Google Maps
-                            </a>
                         </div>
                     )}
                 </div>

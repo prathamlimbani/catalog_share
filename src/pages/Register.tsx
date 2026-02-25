@@ -6,17 +6,18 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Store, Upload } from "lucide-react";
+import { Store, Upload, Mail, KeyRound, CheckCircle } from "lucide-react";
 import ColorThemePicker from "@/components/ColorThemePicker";
 
 const Register = () => {
   const navigate = useNavigate();
-  const [step, setStep] = useState<"auth" | "company">("auth");
+  const [step, setStep] = useState<"email" | "otp" | "company">("email");
   const [loading, setLoading] = useState(false);
 
   // Auth fields
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
 
   // Company fields
   const [companyName, setCompanyName] = useState("");
@@ -42,19 +43,47 @@ const Register = () => {
       .trim();
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    setLoading(true);
+    try {
+      // Sign up the user — Supabase will send a confirmation OTP email
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: "https://catalogshare.online/register",
+        },
+      });
+      if (error) throw error;
+      toast.success("OTP sent to your email! Check your inbox.");
+      setStep("otp");
+    } catch (error: any) {
+      toast.error(error.message || "Signup failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({ email, password });
-      if (error) throw error;
-      // Immediately sign in so the session is active for company creation
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-      if (signInError) throw signInError;
-      toast.success("Account created! Now set up your company.");
+      // Verify OTP
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        email,
+        token: otp,
+        type: "signup",
+      });
+      if (verifyError) throw verifyError;
+      toast.success("Email verified! Now set up your company.");
       setStep("company");
     } catch (error: any) {
-      toast.error(error.message || "Signup failed");
+      toast.error(error.message || "Invalid OTP. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -121,19 +150,20 @@ const Register = () => {
     }
   };
 
-  if (step === "auth") {
+  // Step 1: Email & Password
+  if (step === "email") {
     return (
       <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-primary/5 to-background">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-              <Store className="h-6 w-6 text-primary" />
+              <Mail className="h-6 w-6 text-primary" />
             </div>
             <CardTitle className="text-2xl">Create Your Account</CardTitle>
-            <CardDescription>Step 1: Set up your login credentials</CardDescription>
+            <CardDescription>Step 1 of 3: Enter your email and password</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSignup} className="space-y-4">
+            <form onSubmit={handleSendOtp} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" required />
@@ -143,7 +173,7 @@ const Register = () => {
                 <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Min 6 characters" required minLength={6} />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Creating..." : "Create Account"}
+                {loading ? "Sending OTP..." : "Send OTP to Email"}
               </Button>
               <p className="text-sm text-center text-muted-foreground">
                 Already have an account? <Link to="/login" className="text-primary hover:underline">Login</Link>
@@ -155,15 +185,62 @@ const Register = () => {
     );
   }
 
+  // Step 2: OTP Verification
+  if (step === "otp") {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-primary/5 to-background">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+              <KeyRound className="h-6 w-6 text-primary" />
+            </div>
+            <CardTitle className="text-2xl">Verify Your Email</CardTitle>
+            <CardDescription>
+              Step 2 of 3: Enter the OTP code sent to <strong>{email}</strong>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleVerifyOtp} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="otp">OTP Code</Label>
+                <Input
+                  id="otp"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                  placeholder="Enter 6-digit code"
+                  required
+                  maxLength={6}
+                  className="text-center text-2xl tracking-[0.5em] font-mono"
+                />
+                <p className="text-xs text-muted-foreground text-center">Check your email inbox (and spam folder)</p>
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Verifying..." : "Verify & Continue"}
+              </Button>
+              <button
+                type="button"
+                onClick={() => setStep("email")}
+                className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1 mx-auto"
+              >
+                ← Change email
+              </button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Step 3: Company Setup
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-gradient-to-br from-primary/5 to-background">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-            <Store className="h-6 w-6 text-primary" />
+          <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-3">
+            <CheckCircle className="h-6 w-6 text-green-500" />
           </div>
           <CardTitle className="text-2xl">Set Up Your Company</CardTitle>
-          <CardDescription>Step 2: Tell us about your business</CardDescription>
+          <CardDescription>Step 3 of 3: Tell us about your business</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleCompanySetup} className="space-y-4">
