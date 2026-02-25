@@ -53,7 +53,7 @@ const AdminDashboard = () => {
     checkAuth();
   }, [navigate]);
 
-  const storeUrl = company ? `${window.location.origin}/store/${company.slug}` : "";
+  const storeUrl = company ? `https://catalogshare.online/store/${company.slug}` : "";
 
   const copyLink = () => {
     navigator.clipboard.writeText(storeUrl);
