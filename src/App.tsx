@@ -15,6 +15,7 @@ import StoreFront from "./pages/StoreFront";
 import StoreProducts from "./pages/StoreProducts";
 import StoreCart from "./pages/StoreCart";
 import StoreAbout from "./pages/StoreAbout";
+import ForgotPassword from "./pages/ForgotPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/about" element={<About />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/dashboard" element={<AdminDashboard />} />
 
             {/* Master admin */}

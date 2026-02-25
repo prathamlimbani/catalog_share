@@ -48,6 +48,9 @@ const Register = () => {
     try {
       const { error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
+      // Immediately sign in so the session is active for company creation
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) throw signInError;
       toast.success("Account created! Now set up your company.");
       setStep("company");
     } catch (error: any) {
