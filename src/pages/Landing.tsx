@@ -9,7 +9,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ThemeToggle from "@/components/ThemeToggle";
 
-const SURVEY_QUESTIONS = [
+type SurveyQuestion =
+  | { id: string; question: string; options: string[]; type?: undefined }
+  | { id: string; question: string; type: "stars"; options?: undefined };
+
+const SURVEY_QUESTIONS: SurveyQuestion[] = [
   {
     id: "role",
     question: "What best describes you?",
@@ -28,7 +32,7 @@ const SURVEY_QUESTIONS = [
   {
     id: "rating",
     question: "How would you rate this platform?",
-    type: "stars" as const,
+    type: "stars",
   },
 ];
 
@@ -105,7 +109,7 @@ const Landing = () => {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className="border-b bg-card/80 backdrop-blur-md sticky top-0 z-50">
+      <header className="border-b border-border/50 bg-background/60 backdrop-blur-xl backdrop-saturate-150 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2">
             <Store className="h-6 w-6 text-primary" />
@@ -275,8 +279,8 @@ const Landing = () => {
                           >
                             <Star
                               className={`h-10 w-10 transition-colors ${star <= (hoverRating || rating)
-                                  ? "text-yellow-400 fill-yellow-400"
-                                  : "text-white/30"
+                                ? "text-yellow-400 fill-yellow-400"
+                                : "text-white/30"
                                 }`}
                             />
                           </button>
@@ -290,13 +294,13 @@ const Landing = () => {
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-3">
-                      {currentQ.options?.map((opt) => (
+                      {(currentQ as { id: string; question: string; options: string[] }).options.map((opt) => (
                         <button
                           key={opt}
                           onClick={() => handleAnswer(currentQ.id, opt)}
                           className={`p-3 rounded-xl text-sm font-medium text-left transition-all border ${answers[currentQ.id] === opt
-                              ? "bg-indigo-500 border-indigo-400 text-white shadow-lg shadow-indigo-500/25"
-                              : "bg-white/5 border-white/20 text-white/80 hover:bg-white/10 hover:border-white/30"
+                            ? "bg-indigo-500 border-indigo-400 text-white shadow-lg shadow-indigo-500/25"
+                            : "bg-white/5 border-white/20 text-white/80 hover:bg-white/10 hover:border-white/30"
                             }`}
                         >
                           {opt}

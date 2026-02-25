@@ -196,7 +196,7 @@ const Register = () => {
             </div>
             <CardTitle className="text-2xl">Verify Your Email</CardTitle>
             <CardDescription>
-              Step 2 of 3: Enter the OTP code sent to <strong>{email}</strong>
+              Step 2 of 3: Enter the verification code sent to <strong>{email}</strong>
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -207,10 +207,10 @@ const Register = () => {
                   id="otp"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                  placeholder="Enter 6-digit code"
+                  placeholder="Enter code from email"
                   required
-                  maxLength={6}
-                  className="text-center text-2xl tracking-[0.5em] font-mono"
+                  maxLength={8}
+                  className="text-center text-2xl tracking-[0.3em] font-mono"
                 />
                 <p className="text-xs text-muted-foreground text-center">Check your email inbox (and spam folder)</p>
               </div>
