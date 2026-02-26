@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ShoppingCart, Check, Plus, Minus, Package, Eye } from "lucide-react";
 import { useState, useEffect } from "react";
 import ProductViewDialog from "@/components/ProductViewDialog";
+import { supabase } from "@/integrations/supabase/client";
 
 type Product = Tables<"products">;
 
@@ -55,13 +56,25 @@ const ProductListItem = ({ product }: { product: Product }) => {
     setQuantity(1);
   };
 
+  const handleView = () => {
+    supabase.from("analytics_events").insert({
+      event_type: "product_click",
+      page_url: window.location.pathname,
+      company_id: product.company_id,
+      product_id: product.id,
+    }).then(({ error }) => {
+      if (error) console.error("Failed to track product click", error);
+    });
+    setViewOpen(true);
+  };
+
   return (
     <>
       <Card className="overflow-hidden hover:shadow-md transition-shadow">
         <CardContent className="p-3 sm:p-4 flex gap-3 sm:gap-4">
           <div
             className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden bg-muted flex-shrink-0 cursor-pointer relative group"
-            onClick={() => allImages.length > 0 && setViewOpen(true)}
+            onClick={() => allImages.length > 0 && handleView()}
           >
             {mainImage ? (
               <>

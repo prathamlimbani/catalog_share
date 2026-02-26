@@ -11,6 +11,7 @@ import { Trash2, Plus, Minus, Send, ShoppingCart, Store, StickyNote, Menu, X } f
 import { toast } from "sonner";
 import { useState } from "react";
 import useStoreTheme from "@/hooks/useStoreTheme";
+import { supabase } from "@/integrations/supabase/client";
 
 const StoreCart = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -51,6 +52,16 @@ const StoreCart = () => {
     // Strip anything that isn't a digit (like '+', ' ', '-') from the phone number
     const formattedPhone = company.phone?.replace(/\D/g, '') || '';
     const encoded = encodeURIComponent(message);
+
+    // Track WhatsApp click event
+    supabase.from("analytics_events").insert({
+      event_type: "whatsapp_click",
+      page_url: `/store/${slug}/cart`,
+      company_id: company.id,
+    }).then(({ error }) => {
+      if (error) console.error("Failed to track whatsapp click", error);
+    });
+
     window.open(`https://wa.me/${formattedPhone}?text=${encoded}`, "_blank");
     toast.success("Opening WhatsApp...");
   };

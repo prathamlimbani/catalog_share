@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ShoppingCart, Check, Plus, Minus, ChevronLeft, ChevronRight, Eye } from "lucide-react";
 import { useState, useEffect } from "react";
 import ProductViewDialog from "@/components/ProductViewDialog";
+import { supabase } from "@/integrations/supabase/client";
 
 type Product = Tables<"products">;
 
@@ -58,13 +59,25 @@ const ProductCard = ({ product }: { product: Product }) => {
     setQuantity(1);
   };
 
+  const handleView = () => {
+    supabase.from("analytics_events").insert({
+      event_type: "product_click",
+      page_url: window.location.pathname,
+      company_id: product.company_id,
+      product_id: product.id,
+    }).then(({ error }) => {
+      if (error) console.error("Failed to track product click", error);
+    });
+    setViewOpen(true);
+  };
+
   const nextImage = () => setCurrentImageIdx((i) => (i + 1) % allImages.length);
   const prevImage = () => setCurrentImageIdx((i) => (i - 1 + allImages.length) % allImages.length);
 
   return (
     <>
       <Card className="group overflow-hidden hover:shadow-lg transition-all duration-300 border-border/50">
-        <div className="aspect-square overflow-hidden bg-muted relative cursor-pointer" onClick={() => allImages.length > 0 && setViewOpen(true)}>
+        <div className="aspect-square overflow-hidden bg-muted relative cursor-pointer" onClick={() => allImages.length > 0 && handleView()}>
           {allImages.length > 0 ? (
             <>
               <img
@@ -96,7 +109,7 @@ const ProductCard = ({ product }: { product: Product }) => {
               )}
               {/* View button */}
               <div className="absolute top-3 right-3 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                <Button size="icon" variant="secondary" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setViewOpen(true); }}>
+                <Button size="icon" variant="secondary" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleView(); }}>
                   <Eye className="h-4 w-4" />
                 </Button>
               </div>
@@ -193,7 +206,7 @@ const ProductCard = ({ product }: { product: Product }) => {
               size="sm"
               variant="outline"
               className="flex-1"
-              onClick={() => setViewOpen(true)}
+              onClick={handleView}
             >
               <Eye className="h-4 w-4 mr-1" /> View
             </Button>

@@ -115,6 +115,21 @@ const Landing = () => {
   const [suggestion, setSuggestion] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Analytics tracking for Landing Page
+  useEffect(() => {
+    const trackView = async () => {
+      try {
+        await supabase.from("analytics_events").insert({
+          event_type: "page_view",
+          page_url: "/",
+        });
+      } catch (err) {
+        console.error("Failed to track view", err);
+      }
+    };
+    trackView();
+  }, []);
+
   const handleAnswer = (questionId: string, answer: string) => {
     setAnswers((prev) => ({ ...prev, [questionId]: answer }));
     if (surveyStep < SURVEY_QUESTIONS.length - 1) {

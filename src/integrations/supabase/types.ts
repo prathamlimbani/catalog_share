@@ -208,6 +208,54 @@ export type Database = {
         }
         Relationships: []
       }
+      analytics_events: {
+        Row: {
+          id: string
+          event_type: string
+          page_url: string | null
+          company_id: string | null
+          product_id: string | null
+          ip_hash: string | null
+          user_agent: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          event_type: string
+          page_url?: string | null
+          company_id?: string | null
+          product_id?: string | null
+          ip_hash?: string | null
+          user_agent?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          event_type?: string
+          page_url?: string | null
+          company_id?: string | null
+          product_id?: string | null
+          ip_hash?: string | null
+          user_agent?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analytics_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analytics_events_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never

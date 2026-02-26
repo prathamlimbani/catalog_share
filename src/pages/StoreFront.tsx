@@ -14,7 +14,7 @@ import { ArrowRight, TrendingUp, Package, Store, ShoppingCart, Star, MessageSqua
 import { useCart } from "@/contexts/CartContext";
 import ThemeToggle from "@/components/ThemeToggle";
 import useStoreTheme from "@/hooks/useStoreTheme";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 
 const StoreFront = () => {
@@ -34,6 +34,24 @@ const StoreFront = () => {
   const [surveySending, setSurveySending] = useState(false);
   const [surveyDone, setSurveyDone] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Analytics tracking for Store Front
+  useEffect(() => {
+    if (company?.id) {
+      const trackView = async () => {
+        try {
+          await supabase.from("analytics_events").insert({
+            event_type: "page_view",
+            page_url: `/store/${slug}`,
+            company_id: company.id,
+          });
+        } catch (err) {
+          console.error("Failed to track store view", err);
+        }
+      };
+      trackView();
+    }
+  }, [company?.id, slug]);
 
   const { data: trending, isLoading: trendingLoading } = useQuery({
     queryKey: ["store-trending", company?.id],

@@ -3,20 +3,23 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { LogOut, Store, Phone, Mail, MapPin, FileText, ExternalLink, Trash2, MessageSquare, Star, ClipboardList } from "lucide-react";
+import { LogOut, Store, Phone, Mail, MapPin, FileText, ExternalLink, Trash2, MessageSquare, Star, ClipboardList, BarChart3, Download } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 const MasterAdmin = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [confirmText, setConfirmText] = useState("");
-  const [activeTab, setActiveTab] = useState<"companies" | "suggestions" | "surveys">("companies");
+  const [activeTab, setActiveTab] = useState<"companies" | "suggestions" | "surveys" | "analytics">("companies");
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | "all">("all");
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -67,6 +70,74 @@ const MasterAdmin = () => {
     },
   });
 
+  const { data: analyticsEvents, isLoading: analyticsLoading } = useQuery({
+    queryKey: ["all-analytics", selectedCompanyId],
+    queryFn: async () => {
+      let query = supabase
+        .from("analytics_events")
+        .select("*, companies(name)")
+        .order("created_at", { ascending: true }); // Important for time series
+
+      if (selectedCompanyId !== "all") {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const generatePDF = async (companyName: string) => {
+    try {
+      toast.info("Generating Report PDF...");
+      // @ts-ignore - html2pdf is dynamically loaded or available globally
+      const html2pdf = (await import('html2pdf.js')).default;
+      const element = document.getElementById('analytics-report-content');
+
+      const opt = {
+        margin: 0.5,
+        filename: `${companyName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_analytics_report.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' }
+      };
+
+      await html2pdf().set(opt).from(element).save();
+      toast.success("PDF Downloaded successfully!");
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to generate PDF");
+    }
+  };
+
+  // Group events by day for charts
+  const getChartData = () => {
+    if (!analyticsEvents) return [];
+
+    // Group by Date -> Event Type Count
+    const groups: Record<string, any> = {};
+
+    analyticsEvents.forEach((event: any) => {
+      const date = new Date(event.created_at).toLocaleDateString();
+      if (!groups[date]) {
+        groups[date] = { date, page_view: 0, product_click: 0, whatsapp_click: 0 };
+      }
+      groups[date][event.event_type] = (groups[date][event.event_type] || 0) + 1;
+    });
+
+    return Object.values(groups).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  };
+
+  const chartData = getChartData();
+
+  // Aggregate stats
+  const aggregateStats = {
+    views: analyticsEvents?.filter((e: any) => e.event_type === "page_view").length || 0,
+    clicks: analyticsEvents?.filter((e: any) => e.event_type === "product_click").length || 0,
+    whatsapp: analyticsEvents?.filter((e: any) => e.event_type === "whatsapp_click").length || 0,
+  };
+
   const deleteMutation = useMutation({
     mutationFn: async (companyId: string) => {
       const { error: prodErr } = await supabase.from("products").delete().eq("company_id", companyId);
@@ -116,6 +187,7 @@ const MasterAdmin = () => {
     { key: "companies" as const, label: "Companies", icon: Store, count: companies?.length || 0 },
     { key: "suggestions" as const, label: "Suggestions", icon: MessageSquare, count: suggestions?.length || 0 },
     { key: "surveys" as const, label: "Surveys", icon: ClipboardList, count: surveys?.length || 0 },
+    { key: "analytics" as const, label: "Analytics", icon: BarChart3, count: 0 },
   ];
 
   return (
@@ -140,8 +212,8 @@ const MasterAdmin = () => {
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === tab.key
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+              ? "bg-card text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
               }`}
           >
             <tab.icon className="h-4 w-4" />
@@ -334,6 +406,155 @@ const MasterAdmin = () => {
             </div>
           )}
         </>
+      )}
+
+      {/* Analytics Tab */}
+      {activeTab === "analytics" && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <h2 className="text-xl font-bold">Performance Analytics</h2>
+
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+              <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+                <SelectTrigger className="w-full sm:w-[250px]">
+                  <SelectValue placeholder="Select a company" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Companies (Aggregate)</SelectItem>
+                  {companies?.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {selectedCompanyId !== "all" && (
+                <Button
+                  onClick={() => generatePDF(companies?.find(c => c.id === selectedCompanyId)?.name || "Company")}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                >
+                  <Download className="mr-2 h-4 w-4" /> Export PDF
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {analyticsLoading ? (
+            <div className="py-20 text-center text-muted-foreground w-full">Loading analytics data...</div>
+          ) : (
+            <div id="analytics-report-content" className="space-y-6 bg-background rounded-xl">
+              {/* Header for PDF (mostly hidden in web view, shows in print/PDF) */}
+              <div className="hidden print:block mb-8 text-center border-b pb-6">
+                <h1 className="text-3xl font-bold mb-2">
+                  {selectedCompanyId === "all" ? "Aggregate System Analytics" : `${companies?.find(c => c.id === selectedCompanyId)?.name} - Performance Report`}
+                </h1>
+                <p className="text-muted-foreground">Generated on {new Date().toLocaleDateString()}</p>
+              </div>
+
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center">
+                        <BarChart3 className="h-6 w-6 text-blue-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Total Views</p>
+                        <h3 className="text-3xl font-bold">{aggregateStats.views}</h3>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center">
+                        <Store className="h-6 w-6 text-indigo-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Product Clicks</p>
+                        <h3 className="text-3xl font-bold">{aggregateStats.clicks}</h3>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center border-green-500/20 border">
+                        <MessageSquare className="h-6 w-6 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground text-green-700/80 dark:text-green-400">WhatsApp Orders</p>
+                        <h3 className="text-3xl font-bold text-green-700 dark:text-green-400">{aggregateStats.whatsapp}</h3>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Charts */}
+              {chartData.length > 0 ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-12">
+                  <Card>
+                    <CardHeader className="p-6 pb-2">
+                      <h3 className="font-bold text-lg">Engagement over Time (Line)</h3>
+                    </CardHeader>
+                    <CardContent className="p-6 pt-0">
+                      <div className="h-[300px] w-full mt-4">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                            <XAxis dataKey="date" fontSize={12} tickMargin={10} />
+                            <YAxis fontSize={12} />
+                            <RechartsTooltip
+                              contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: '8px', color: '#fff' }}
+                            />
+                            <Legend />
+                            <Line type="monotone" dataKey="page_view" name="Store Views" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                            <Line type="monotone" dataKey="product_click" name="Product Clicks" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 4 }} />
+                            <Line type="monotone" dataKey="whatsapp_click" name="WhatsApp Hits" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="p-6 pb-2">
+                      <h3 className="font-bold text-lg">Event Breakdown (Bar)</h3>
+                    </CardHeader>
+                    <CardContent className="p-6 pt-0">
+                      <div className="h-[300px] w-full mt-4">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                            <XAxis dataKey="date" fontSize={12} tickMargin={10} />
+                            <YAxis fontSize={12} />
+                            <RechartsTooltip
+                              cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                              contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: '8px', color: '#fff' }}
+                            />
+                            <Legend />
+                            <Bar dataKey="page_view" name="Store Views" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="product_click" name="Product Clicks" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="whatsapp_click" name="WhatsApp Hits" fill="#10b981" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : (
+                <div className="py-20 text-center border rounded-xl bg-card border-dashed">
+                  <BarChart3 className="h-12 w-12 mx-auto mb-3 opacity-20 text-muted-foreground" />
+                  <p className="text-muted-foreground font-medium">No analytics data available yet.</p>
+                  <p className="text-sm text-muted-foreground mt-1">Events will appear here as users interact with the stores.</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Delete confirmation dialog */}
