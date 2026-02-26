@@ -205,27 +205,59 @@ const MasterAdmin = () => {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 mb-6 p-1 bg-muted/50 rounded-xl w-fit">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === tab.key
-              ? "bg-card text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-              }`}
+      {/* Responsive Tabs Navigation */}
+      <div className="mb-6">
+        {/* Mobile Dropdown (visible only on small screens) */}
+        <div className="block sm:hidden">
+          <Select
+            value={activeTab}
+            onValueChange={(value: any) => setActiveTab(value)}
           >
-            <tab.icon className="h-4 w-4" />
-            {tab.label}
-            {tab.count > 0 && (
-              <span className={`text-xs px-1.5 py-0.5 rounded-full ${activeTab === tab.key ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                }`}>
-                {tab.count}
-              </span>
-            )}
-          </button>
-        ))}
+            <SelectTrigger className="w-full bg-card">
+              <SelectValue>
+                {tabs.find(t => t.key === activeTab)?.label}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {tabs.map((tab) => (
+                <SelectItem key={tab.key} value={tab.key}>
+                  <div className="flex items-center gap-2">
+                    <tab.icon className="h-4 w-4" />
+                    <span>{tab.label}</span>
+                    {tab.count > 0 && (
+                      <Badge variant="secondary" className="ml-2 text-xs">
+                        {tab.count}
+                      </Badge>
+                    )}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Desktop Tabs (visible only on sm screens and up) */}
+        <div className="hidden sm:flex gap-1 p-1 bg-muted/50 rounded-xl w-fit">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === tab.key
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+                }`}
+            >
+              <tab.icon className="h-4 w-4" />
+              {tab.label}
+              {tab.count > 0 && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-full ${activeTab === tab.key ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                  }`}>
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Companies Tab */}
