@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -36,23 +36,91 @@ const SURVEY_QUESTIONS: SurveyQuestion[] = [
   },
 ];
 
-const StarField = () => (
-  <div className="absolute inset-0 overflow-hidden pointer-events-none">
-    {Array.from({ length: 60 }).map((_, i) => (
-      <div
-        key={i}
-        className="absolute rounded-full bg-white animate-pulse"
-        style={{
-          width: `${Math.random() * 2 + 1}px`,
-          height: `${Math.random() * 2 + 1}px`,
-          left: `${Math.random() * 100}%`,
-          top: `${Math.random() * 100}%`,
-          opacity: Math.random() * 0.6 + 0.1,
-          animationDelay: `${Math.random() * 4}s`,
-          animationDuration: `${Math.random() * 3 + 2}s`,
-        }}
-      />
-    ))}
+/* ─── Animated Sky Background ─── */
+const SkyBackground = () => {
+  const [isDark, setIsDark] = useState(true);
+
+  useEffect(() => {
+    const check = () => setIsDark(document.documentElement.classList.contains("dark"));
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none transition-colors duration-700">
+      {isDark ? (
+        /* ── Night Sky: Moving Stars + Moon ── */
+        <>
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-indigo-950 to-purple-950" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.15),transparent_70%)]" />
+          {/* Twinkling stars */}
+          {Array.from({ length: 80 }).map((_, i) => (
+            <div
+              key={`star-${i}`}
+              className="absolute rounded-full bg-white"
+              style={{
+                width: `${Math.random() * 2.5 + 0.5}px`,
+                height: `${Math.random() * 2.5 + 0.5}px`,
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+                opacity: Math.random() * 0.7 + 0.2,
+                animation: `twinkle ${Math.random() * 3 + 2}s ease-in-out infinite, drift ${Math.random() * 40 + 30}s linear infinite`,
+                animationDelay: `${Math.random() * 5}s`,
+              }}
+            />
+          ))}
+          {/* Moon */}
+          <div className="absolute top-12 right-[15%] w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-yellow-100 to-yellow-200 shadow-[0_0_40px_rgba(255,255,200,0.3)] animate-float" />
+          <div className="absolute top-14 right-[16%] w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-slate-950 to-indigo-950" />
+        </>
+      ) : (
+        /* ── Day Sky: Sun + Clouds + Blue Sky ── */
+        <>
+          <div className="absolute inset-0 bg-gradient-to-b from-sky-400 via-sky-300 to-cyan-200" />
+          {/* Sun with glow */}
+          <div className="absolute top-10 right-[18%] animate-float">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-yellow-300 to-orange-400 shadow-[0_0_60px_rgba(255,200,50,0.5),0_0_120px_rgba(255,200,50,0.2)]" />
+            {/* Sun rays */}
+            <div className="absolute inset-0 animate-spin" style={{ animationDuration: "20s" }}>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div
+                  key={`ray-${i}`}
+                  className="absolute w-0.5 h-6 bg-yellow-300/40 rounded-full"
+                  style={{
+                    top: "50%",
+                    left: "50%",
+                    transformOrigin: "0 0",
+                    transform: `rotate(${i * 45}deg) translate(-50%, -140%)`,
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+          {/* Floating clouds */}
+          <Cloud className="top-[15%] -left-[5%] w-32 sm:w-48" dur="35s" delay="0s" />
+          <Cloud className="top-[30%] left-[60%] w-24 sm:w-36" dur="45s" delay="5s" />
+          <Cloud className="top-[10%] left-[30%] w-20 sm:w-28" dur="40s" delay="12s" />
+          <Cloud className="top-[50%] left-[80%] w-28 sm:w-40" dur="50s" delay="8s" />
+          <Cloud className="top-[40%] -left-[10%] w-36 sm:w-52" dur="55s" delay="20s" />
+        </>
+      )}
+    </div>
+  );
+};
+
+const Cloud = ({ className, dur, delay }: { className: string; dur: string; delay: string }) => (
+  <div
+    className={`absolute ${className} opacity-90`}
+    style={{ animation: `cloudDrift ${dur} linear infinite`, animationDelay: delay }}
+  >
+    <svg viewBox="0 0 200 80" fill="white" className="drop-shadow-lg">
+      <ellipse cx="70" cy="50" rx="50" ry="25" opacity="0.9" />
+      <ellipse cx="100" cy="35" rx="40" ry="30" />
+      <ellipse cx="130" cy="50" rx="45" ry="22" opacity="0.9" />
+      <ellipse cx="90" cy="55" rx="60" ry="20" opacity="0.85" />
+    </svg>
   </div>
 );
 
@@ -108,19 +176,19 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen">
-      {/* Header */}
+      {/* Header — Glassy */}
       <header className="border-b border-border/50 bg-background/60 backdrop-blur-xl backdrop-saturate-150 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2">
             <Store className="h-6 w-6 text-primary" />
-            <span className="font-bold text-lg">CatalogShare</span>
+            <span className="font-bold text-lg text-foreground">CatalogShare</span>
           </Link>
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <Button variant="ghost" asChild>
+            <Button variant="ghost" className="text-foreground" asChild>
               <Link to="/about">About</Link>
             </Button>
-            <Button variant="ghost" asChild>
+            <Button variant="ghost" className="text-foreground" asChild>
               <Link to="/login">Login</Link>
             </Button>
             <Button asChild>
@@ -130,22 +198,21 @@ const Landing = () => {
         </div>
       </header>
 
-      {/* Hero with space stars */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950 to-purple-950 text-white">
-        <StarField />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.15),transparent_70%)]" />
+      {/* Hero with animated sky */}
+      <section className="relative overflow-hidden min-h-[85vh] flex items-center">
+        <SkyBackground />
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-36 text-center relative z-10">
-          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-1.5 text-sm mb-6 animate-fade-in-up">
-            <Zap className="h-3.5 w-3.5 text-yellow-400" />
-            <span className="text-white/80">Free for wholesalers</span>
+          <div className="inline-flex items-center gap-2 bg-white/20 dark:bg-white/10 backdrop-blur-sm border border-white/30 dark:border-white/20 rounded-full px-4 py-1.5 text-sm mb-6 animate-fade-in-up">
+            <Zap className="h-3.5 w-3.5 text-yellow-500 dark:text-yellow-400" />
+            <span className="text-slate-800 dark:text-white/80">Free for wholesalers</span>
           </div>
           <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold tracking-tight mb-6 animate-fade-in-up">
-            Your Wholesale Catalog,
-            <span className="block mt-2 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+            <span className="text-white drop-shadow-lg dark:drop-shadow-none">Your Wholesale Catalog,</span>
+            <span className="block mt-2 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 dark:from-indigo-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
               One Link Away
             </span>
           </h1>
-          <p className="text-lg sm:text-xl text-white/60 mb-10 max-w-2xl mx-auto animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
+          <p className="text-lg sm:text-xl text-slate-700/80 dark:text-white/60 mb-10 max-w-2xl mx-auto animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
             Create your online product catalog in minutes. Share a single link with customers.
             Receive orders directly on WhatsApp. Built for wholesalers.
           </p>
@@ -155,7 +222,7 @@ const Landing = () => {
                 Create Your Catalog <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
-            <Button size="lg" variant="outline" className="border-white/20 text-white hover:bg-white/10" asChild>
+            <Button size="lg" variant="outline" className="border-white/40 dark:border-white/20 text-slate-800 dark:text-white bg-white/30 dark:bg-transparent hover:bg-white/50 dark:hover:bg-white/10 backdrop-blur-sm" asChild>
               <Link to="/login">I already have an account</Link>
             </Button>
           </div>
@@ -215,27 +282,27 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Survey Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-indigo-950 via-slate-950 to-purple-950 text-white">
-        <StarField />
+      {/* Survey Section — Theme Aware */}
+      <section className="relative overflow-hidden">
+        <SkyBackground />
         <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-20 relative z-10">
           <div className="text-center mb-8">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-3">Quick Survey</h2>
-            <p className="text-white/60">Help us improve — takes less than 30 seconds!</p>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-3 text-white drop-shadow-lg">Quick Survey</h2>
+            <p className="text-slate-200 dark:text-white/60">Help us improve — takes less than 30 seconds!</p>
           </div>
 
           {surveySubmitted ? (
-            <Card className="bg-white/10 backdrop-blur-md border-white/20">
+            <Card className="bg-white/20 dark:bg-white/10 backdrop-blur-md border-white/30 dark:border-white/20">
               <CardContent className="p-8 text-center">
                 <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
                   <CheckCircle className="h-8 w-8 text-green-400" />
                 </div>
                 <h3 className="text-xl font-bold text-white mb-2">Thank You!</h3>
-                <p className="text-white/60">Your response has been recorded. We appreciate your feedback!</p>
+                <p className="text-white/70">Your response has been recorded. We appreciate your feedback!</p>
               </CardContent>
             </Card>
           ) : (
-            <Card className="bg-white/10 backdrop-blur-md border-white/20">
+            <Card className="bg-white/20 dark:bg-white/10 backdrop-blur-md border-white/30 dark:border-white/20">
               <CardContent className="p-6 sm:p-8">
                 {/* Progress */}
                 <div className="flex gap-1 mb-6">
@@ -250,7 +317,7 @@ const Landing = () => {
 
                 {/* Name Input */}
                 <div className="mb-5">
-                  <Label className="text-white/80 text-sm mb-2 block">Your Name</Label>
+                  <Label className="text-white/90 text-sm mb-2 block">Your Name</Label>
                   <Input
                     value={surveyName}
                     onChange={(e) => setSurveyName(e.target.value)}

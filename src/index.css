@@ -262,3 +262,48 @@ html {
   background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.06) 45%, transparent 50%);
   animation: shimmer 3s infinite;
 }
+
+/* Sky animations */
+@keyframes twinkle {
+
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes drift {
+  0% {
+    transform: translate(0, 0);
+  }
+
+  25% {
+    transform: translate(3px, -2px);
+  }
+
+  50% {
+    transform: translate(-2px, 3px);
+  }
+
+  75% {
+    transform: translate(4px, 1px);
+  }
+
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes cloudDrift {
+  0% {
+    transform: translateX(-120%);
+  }
+
+  100% {
+    transform: translateX(calc(100vw + 120%));
+  }
+}
