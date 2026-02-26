@@ -26,7 +26,7 @@ ON public.analytics_events
 FOR SELECT
 TO authenticated
 USING (
-  public.has_role('admin'::public.app_role, auth.uid())
+  public.has_role(auth.uid(), 'admin'::public.app_role)
 );
 
 -- Allow Master Admins to delete history if needed
@@ -35,7 +35,7 @@ ON public.analytics_events
 FOR DELETE
 TO authenticated
 USING (
-  public.has_role('admin'::public.app_role, auth.uid())
+  public.has_role(auth.uid(), 'admin'::public.app_role)
 );
 
 -- Optional: Create indexes for performance on grouping queries
