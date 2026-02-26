@@ -21,7 +21,7 @@ const Register = () => {
 
   // Company fields
   const [companyName, setCompanyName] = useState("");
-  const [phone, setPhone] = useState("+91 ");
+  const [phone, setPhone] = useState("+91");
   const [address, setAddress] = useState("");
   const [gstNumber, setGstNumber] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -105,7 +105,7 @@ const Register = () => {
         owner_id: user.id,
         name: companyName.trim(),
         slug,
-        phone: phone.trim(),
+        phone: phone.replace(/\s+/g, ''),
         email: email.trim(),
         address: address.trim() || null,
         gst_number: gstNumber.trim() || null,
@@ -113,9 +113,9 @@ const Register = () => {
         theme_primary: themePrimary,
         theme_accent: themeAccent,
         contact_name_1: contactName1.trim() || null,
-        contact_phone_1: contactPhone1.trim() || null,
+        contact_phone_1: contactPhone1.replace(/\s+/g, '') || null,
         contact_name_2: contactName2.trim() || null,
-        contact_phone_2: contactPhone2.trim() || null,
+        contact_phone_2: contactPhone2.replace(/\s+/g, '') || null,
         google_maps_url: googleMapsUrl.trim() || null,
       });
 
@@ -187,7 +187,7 @@ const Register = () => {
             </div>
             <div className="space-y-2">
               <Label>WhatsApp Number *</Label>
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 9876543210" required />
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+919876543210" required />
             </div>
             <div className="space-y-2">
               <Label>Address (optional)</Label>
@@ -223,7 +223,7 @@ const Register = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Contact Phone 1</Label>
-                  <Input value={contactPhone1} onChange={(e) => setContactPhone1(e.target.value)} placeholder="e.g. +91 98765..." />
+                  <Input value={contactPhone1} onChange={(e) => setContactPhone1(e.target.value)} placeholder="e.g. +9198765..." />
                 </div>
                 <div className="space-y-2">
                   <Label>Contact Name 2</Label>
@@ -231,7 +231,7 @@ const Register = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Contact Phone 2</Label>
-                  <Input value={contactPhone2} onChange={(e) => setContactPhone2(e.target.value)} placeholder="e.g. +91 98765..." />
+                  <Input value={contactPhone2} onChange={(e) => setContactPhone2(e.target.value)} placeholder="e.g. +9198765..." />
                 </div>
               </div>
               <div className="space-y-2 mt-3">

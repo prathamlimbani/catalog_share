@@ -35,8 +35,10 @@ const Cart = () => {
     });
     message += `Please confirm this order. Thank you!`;
 
+    // Strip any non-numeric characters
+    const formattedPhone = WHATSAPP_NUMBER.replace(/\D/g, '');
     const encoded = encodeURIComponent(message);
-    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encoded}`, "_blank");
+    window.open(`https://wa.me/${formattedPhone}?text=${encoded}`, "_blank");
     toast.success("Opening WhatsApp...");
   };
 

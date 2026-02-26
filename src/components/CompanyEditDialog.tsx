@@ -58,7 +58,7 @@ const CompanyEditDialog = ({ company }: { company: Company }) => {
         .from("companies")
         .update({
           name: form.name.trim(),
-          phone: form.phone.trim(),
+          phone: form.phone.replace(/\s+/g, ''),
           email: form.email.trim(),
           address: form.address.trim() || null,
           gst_number: form.gst_number.trim() || null,
@@ -66,9 +66,9 @@ const CompanyEditDialog = ({ company }: { company: Company }) => {
           theme_primary: form.theme_primary,
           theme_accent: form.theme_accent,
           contact_name_1: form.contact_name_1.trim() || null,
-          contact_phone_1: form.contact_phone_1.trim() || null,
+          contact_phone_1: form.contact_phone_1.replace(/\s+/g, '') || null,
           contact_name_2: form.contact_name_2.trim() || null,
-          contact_phone_2: form.contact_phone_2.trim() || null,
+          contact_phone_2: form.contact_phone_2.replace(/\s+/g, '') || null,
           google_maps_url: form.google_maps_url.trim() || null,
         })
         .eq("id", company.id);
@@ -164,7 +164,7 @@ const CompanyEditDialog = ({ company }: { company: Company }) => {
               </div>
               <div className="space-y-2">
                 <Label>Contact Phone 1</Label>
-                <Input value={form.contact_phone_1} onChange={(e) => setForm({ ...form, contact_phone_1: e.target.value })} placeholder="e.g. +91 98765..." />
+                <Input value={form.contact_phone_1} onChange={(e) => setForm({ ...form, contact_phone_1: e.target.value })} placeholder="e.g. +9198765..." />
               </div>
               <div className="space-y-2">
                 <Label>Contact Name 2</Label>
@@ -172,7 +172,7 @@ const CompanyEditDialog = ({ company }: { company: Company }) => {
               </div>
               <div className="space-y-2">
                 <Label>Contact Phone 2</Label>
-                <Input value={form.contact_phone_2} onChange={(e) => setForm({ ...form, contact_phone_2: e.target.value })} placeholder="e.g. +91 98765..." />
+                <Input value={form.contact_phone_2} onChange={(e) => setForm({ ...form, contact_phone_2: e.target.value })} placeholder="e.g. +9198765..." />
               </div>
             </div>
             <div className="space-y-2 mt-3">

@@ -48,8 +48,10 @@ const StoreCart = () => {
     }
     message += `Please confirm this order. Thank you!`;
 
+    // Strip anything that isn't a digit (like '+', ' ', '-') from the phone number
+    const formattedPhone = company.phone?.replace(/\D/g, '') || '';
     const encoded = encodeURIComponent(message);
-    window.open(`https://wa.me/${company.phone}?text=${encoded}`, "_blank");
+    window.open(`https://wa.me/${formattedPhone}?text=${encoded}`, "_blank");
     toast.success("Opening WhatsApp...");
   };
 
