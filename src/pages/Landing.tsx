@@ -71,33 +71,13 @@ const SkyBackground = () => {
               }}
             />
           ))}
-          {/* Moon */}
-          <div className="absolute top-12 right-[15%] w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-yellow-100 to-yellow-200 shadow-[0_0_40px_rgba(255,255,200,0.3)] animate-float" />
-          <div className="absolute top-14 right-[16%] w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-slate-950 to-indigo-950" />
+
         </>
       ) : (
         /* ── Day Sky: Sun + Clouds + Blue Sky ── */
         <>
           <div className="absolute inset-0 bg-gradient-to-b from-sky-400 via-sky-300 to-cyan-200" />
-          {/* Sun with glow */}
-          <div className="absolute top-10 right-[18%] animate-float">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-yellow-300 to-orange-400 shadow-[0_0_60px_rgba(255,200,50,0.5),0_0_120px_rgba(255,200,50,0.2)]" />
-            {/* Sun rays */}
-            <div className="absolute inset-0 animate-spin" style={{ animationDuration: "20s" }}>
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div
-                  key={`ray-${i}`}
-                  className="absolute w-0.5 h-6 bg-yellow-300/40 rounded-full"
-                  style={{
-                    top: "50%",
-                    left: "50%",
-                    transformOrigin: "0 0",
-                    transform: `rotate(${i * 45}deg) translate(-50%, -140%)`,
-                  }}
-                />
-              ))}
-            </div>
-          </div>
+
           {/* Floating clouds */}
           <Cloud className="top-[15%] -left-[5%] w-32 sm:w-48" dur="35s" delay="0s" />
           <Cloud className="top-[30%] left-[60%] w-24 sm:w-36" dur="45s" delay="5s" />
