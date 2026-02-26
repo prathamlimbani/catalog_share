@@ -198,13 +198,13 @@ const ProductCard = ({ product }: { product: Product }) => {
               <Eye className="h-4 w-4 mr-1" /> View
             </Button>
             <Button
-              size="sm"
-              className={`flex-1 ${added ? "bg-green-600 hover:bg-green-700" : ""}`}
+              size="icon"
+              className={`shrink-0 ${added ? "bg-green-600 hover:bg-green-700" : "bg-blue-600 hover:bg-blue-700"}`}
               onClick={handleAdd}
               disabled={(sizes.length > 0 && !selectedSize) || (features.length > 0 && !selectedFeature)}
+              title="Add to Cart"
             >
-              {added ? <Check className="h-4 w-4 mr-1" /> : <ShoppingCart className="h-4 w-4 mr-1" />}
-              {added ? "Added!" : "Add"}
+              {added ? <Check className="h-5 w-5" /> : <ShoppingCart className="h-5 w-5" />}
             </Button>
           </div>
         </CardContent>

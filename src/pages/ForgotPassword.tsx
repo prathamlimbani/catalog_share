@@ -99,7 +99,7 @@ const ForgotPassword = () => {
                         </div>
                         <CardTitle className="text-2xl">Enter OTP & New Password</CardTitle>
                         <CardDescription>
-                            We sent a 6-digit code to <strong>{email}</strong>
+                            We sent a reset code to <strong>{email}</strong>
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -110,9 +110,9 @@ const ForgotPassword = () => {
                                     id="otp"
                                     value={otp}
                                     onChange={(e) => setOtp(e.target.value)}
-                                    placeholder="Enter 6-digit code"
+                                    placeholder="Enter reset code"
                                     required
-                                    maxLength={6}
+                                    maxLength={8}
                                     className="text-center text-lg tracking-widest"
                                 />
                             </div>

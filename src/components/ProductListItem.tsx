@@ -116,10 +116,10 @@ const ProductListItem = ({ product }: { product: Product }) => {
                         disabled={isOutOfStock}
                         onClick={() => !isOutOfStock && setSelectedSize(s)}
                         className={`px-2 py-0.5 text-xs rounded border transition-colors ${isOutOfStock
-                            ? "opacity-40 cursor-not-allowed line-through bg-muted text-muted-foreground border-border"
-                            : selectedSize === s
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "bg-card text-foreground border-border hover:border-primary"
+                          ? "opacity-40 cursor-not-allowed line-through bg-muted text-muted-foreground border-border"
+                          : selectedSize === s
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-card text-foreground border-border hover:border-primary"
                           }`}
                       >
                         {displaySize}
@@ -140,13 +140,13 @@ const ProductListItem = ({ product }: { product: Product }) => {
               </div>
 
               <Button
-                size="sm"
-                className={added ? "bg-green-600 hover:bg-green-700" : ""}
+                size="icon"
+                className={`shrink-0 ${added ? "bg-green-600 hover:bg-green-700" : "bg-blue-600 hover:bg-blue-700"}`}
                 onClick={handleAdd}
                 disabled={(sizes.length > 0 && !selectedSize) || (features.length > 0 && !selectedFeature)}
+                title="Add to Cart"
               >
-                {added ? <Check className="h-4 w-4 mr-1" /> : <ShoppingCart className="h-4 w-4 mr-1" />}
-                {added ? "Added!" : "Add"}
+                {added ? <Check className="h-5 w-5" /> : <ShoppingCart className="h-5 w-5" />}
               </Button>
             </div>
           </div>
