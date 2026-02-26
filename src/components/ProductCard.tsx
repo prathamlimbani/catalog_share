@@ -77,13 +77,13 @@ const ProductCard = ({ product }: { product: Product }) => {
                 <>
                   <button
                     onClick={(e) => { e.stopPropagation(); prevImage(); }}
-                    className="absolute left-1 top-1/2 -translate-y-1/2 bg-background/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute left-1 top-1/2 -translate-y-1/2 bg-background/80 rounded-full p-1.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); nextImage(); }}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 bg-background/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 bg-background/80 rounded-full p-1.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </button>
@@ -95,7 +95,7 @@ const ProductCard = ({ product }: { product: Product }) => {
                 </>
               )}
               {/* View button */}
-              <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="absolute top-3 right-3 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                 <Button size="icon" variant="secondary" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setViewOpen(true); }}>
                   <Eye className="h-4 w-4" />
                 </Button>
@@ -160,10 +160,10 @@ const ProductCard = ({ product }: { product: Product }) => {
                         disabled={isOutOfStock}
                         onClick={() => !isOutOfStock && setSelectedSize(s)}
                         className={`px-2.5 py-1 text-xs rounded-md border transition-colors ${isOutOfStock
-                            ? "opacity-40 cursor-not-allowed line-through bg-muted text-muted-foreground border-border"
-                            : selectedSize === s
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "bg-card text-foreground border-border hover:border-primary"
+                          ? "opacity-40 cursor-not-allowed line-through bg-muted text-muted-foreground border-border"
+                          : selectedSize === s
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-card text-foreground border-border hover:border-primary"
                           }`}
                       >
                         {displaySize}

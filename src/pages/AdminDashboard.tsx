@@ -264,12 +264,12 @@ const AdminDashboard = () => {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
           <h1 className="text-3xl font-bold">{company.name}</h1>
           <p className="text-muted-foreground">Manage your products</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
           <ThemeToggle />
           <CompanyEditDialog company={company} />
           <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
@@ -388,20 +388,24 @@ const AdminDashboard = () => {
       {/* Shareable Link */}
       <Card className="mb-6">
         <CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <LinkIcon className="h-5 w-5 text-primary flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium mb-1">Your Store Link</p>
-              <p className="text-xs text-muted-foreground truncate">{storeUrl}</p>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <LinkIcon className="h-5 w-5 text-primary flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium mb-1">Your Store Link</p>
+                <p className="text-xs text-muted-foreground truncate">{storeUrl}</p>
+              </div>
             </div>
-            <Button size="sm" variant="outline" onClick={copyLink}>
-              <Copy className="h-4 w-4 mr-1" /> Copy
-            </Button>
-            <Button size="sm" variant="outline" asChild>
-              <a href={storeUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-4 w-4 mr-1" /> Open
-              </a>
-            </Button>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={copyLink}>
+                <Copy className="h-4 w-4 mr-1" /> Copy
+              </Button>
+              <Button size="sm" variant="outline" asChild>
+                <a href={storeUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-4 w-4 mr-1" /> Open
+                </a>
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -447,23 +451,25 @@ const AdminDashboard = () => {
         <div className="grid gap-3">
           {products.map((p) => (
             <Card key={p.id} className={!p.in_stock ? "opacity-60" : ""}>
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className="w-14 h-14 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                  {p.image_url ? (
-                    <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center"><Package className="h-6 w-6 opacity-20" /></div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-semibold truncate">{p.name}</h3>
-                    {p.is_trending && <Badge className="bg-primary text-primary-foreground text-xs">Trending</Badge>}
-                    {!p.in_stock && <Badge variant="destructive" className="text-xs">Out of Stock</Badge>}
+              <CardContent className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="w-14 h-14 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                    {p.image_url ? (
+                      <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center"><Package className="h-6 w-6 opacity-20" /></div>
+                    )}
                   </div>
-                  <p className="text-sm text-muted-foreground">{p.category || "No category"} · {p.size || "No size"} · {(p.images?.length || 0)} photos</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold truncate">{p.name}</h3>
+                      {p.is_trending && <Badge className="bg-primary text-primary-foreground text-xs">Trending</Badge>}
+                      {!p.in_stock && <Badge variant="destructive" className="text-xs">Out of Stock</Badge>}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{p.category || "No category"} · {p.size || "No size"} · {(p.images?.length || 0)} photos</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 justify-end">
                   <div className="flex items-center gap-1">
                     <Switch checked={p.in_stock} onCheckedChange={(v) => toggleStockMutation.mutate({ id: p.id, in_stock: v })} />
                     <span className="text-xs text-muted-foreground hidden sm:inline">{p.in_stock ? "In Stock" : "Out"}</span>

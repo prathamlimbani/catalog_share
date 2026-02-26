@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Link } from "react-router-dom";
-import { ArrowRight, Store, Share2, MessageSquare, Shield, Zap, Users, Star, Send, CheckCircle } from "lucide-react";
+import { ArrowRight, Store, Share2, MessageSquare, Shield, Zap, Users, Star, Send, CheckCircle, Menu, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -113,6 +113,7 @@ const Landing = () => {
   const [surveySubmitted, setSurveySubmitted] = useState(false);
   const [surveyLoading, setSurveyLoading] = useState(false);
   const [suggestion, setSuggestion] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleAnswer = (questionId: string, answer: string) => {
     setAnswers((prev) => ({ ...prev, [questionId]: answer }));
@@ -155,15 +156,16 @@ const Landing = () => {
   const currentQ = SURVEY_QUESTIONS[surveyStep];
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen overflow-x-hidden max-w-[100vw]">
       {/* Header — Glassy */}
-      <header className="border-b border-border/50 bg-background/60 backdrop-blur-xl backdrop-saturate-150 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-          <Link to="/" className="flex items-center gap-2">
-            <Store className="h-6 w-6 text-primary" />
-            <span className="font-bold text-lg text-foreground">CatalogShare</span>
+      <header className="border-b border-border/50 bg-background/60 backdrop-blur-xl backdrop-saturate-150 sticky top-0 z-50 w-full max-w-[100vw] overflow-hidden">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 flex items-center justify-between h-14 sm:h-16">
+          <Link to="/" className="flex items-center gap-2 flex-shrink min-w-0">
+            <Store className="h-5 w-5 sm:h-6 sm:w-6 text-primary flex-shrink-0" />
+            <span className="font-bold text-base sm:text-lg text-foreground truncate">CatalogShare</span>
           </Link>
-          <div className="flex items-center gap-3">
+          {/* Desktop nav */}
+          <div className="hidden md:flex items-center gap-3">
             <ThemeToggle />
             <Button variant="ghost" className="text-foreground" asChild>
               <Link to="/about">About</Link>
@@ -171,11 +173,22 @@ const Landing = () => {
             <Button variant="ghost" className="text-foreground" asChild>
               <Link to="/login">Login</Link>
             </Button>
-            <Button asChild>
-              <Link to="/register">Get Started</Link>
+          </div>
+          {/* Mobile nav toggle */}
+          <div className="flex md:hidden items-center gap-1 flex-shrink-0">
+            <ThemeToggle />
+            <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
           </div>
         </div>
+        {/* Mobile dropdown */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-border/50 bg-background/95 backdrop-blur-xl p-4 space-y-2 animate-fade-in">
+            <Link to="/about" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-foreground">About</Link>
+            <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-foreground">Login</Link>
+          </div>
+        )}
       </header>
 
       {/* Hero with animated sky */}
@@ -407,6 +420,7 @@ const Landing = () => {
         </div>
         <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-background to-transparent" />
       </section>
+
 
       {/* CTA */}
       <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">

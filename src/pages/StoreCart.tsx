@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, Minus, Send, ShoppingCart, Store, StickyNote } from "lucide-react";
+import { Trash2, Plus, Minus, Send, ShoppingCart, Store, StickyNote, Menu, X } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import useStoreTheme from "@/hooks/useStoreTheme";
@@ -18,6 +18,7 @@ const StoreCart = () => {
   const { items, removeFromCart, updateQuantity, clearCart, totalItems } = useCart();
   const [customerName, setCustomerName] = useState("");
   const [customNote, setCustomNote] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Apply company color theme
   useStoreTheme(company?.theme_primary || null, company?.theme_accent || null);
@@ -55,23 +56,33 @@ const StoreCart = () => {
   return (
     <div className="min-h-screen">
       {/* Navbar */}
-      <nav className="sticky top-0 z-50 bg-card/80 backdrop-blur-md border-b">
+      <nav className="sticky top-0 z-50 bg-card/80 backdrop-blur-md border-b overflow-x-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <Link to={`/store/${slug}`} className="flex items-center gap-2">
+          <div className="flex items-center justify-between h-16 min-w-0">
+            <Link to={`/store/${slug}`} className="flex items-center gap-2 min-w-0 flex-shrink-0">
               {company.logo_url ? (
-                <img src={company.logo_url} alt={company.name} className="h-10 w-auto" />
+                <img src={company.logo_url} alt={company.name} className="h-10 w-auto flex-shrink-0" />
               ) : (
-                <Store className="h-6 w-6 text-primary" />
+                <Store className="h-6 w-6 text-primary flex-shrink-0" />
               )}
-              <span className="font-bold text-lg hidden sm:block">{company.name}</span>
+              <span className="font-bold text-lg hidden sm:block truncate">{company.name}</span>
             </Link>
-            <div className="flex items-center gap-4">
-              <Link to={`/store/${slug}/products`} className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Products</Link>
-              <Link to={`/store/${slug}/about`} className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">About</Link>
+            <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
+              <Link to={`/store/${slug}/products`} className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:block">Products</Link>
+              <Link to={`/store/${slug}/about`} className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:block">About</Link>
+              <Button variant="ghost" size="icon" className="sm:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+                {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </Button>
             </div>
           </div>
         </div>
+        {mobileMenuOpen && (
+          <div className="sm:hidden border-t bg-card p-4 space-y-2 animate-fade-in">
+            <Link to={`/store/${slug}`} onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium">Home</Link>
+            <Link to={`/store/${slug}/products`} onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium">Products</Link>
+            <Link to={`/store/${slug}/about`} onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium">About</Link>
+          </div>
+        )}
       </nav>
 
       <div className="max-w-3xl mx-auto px-4 py-8">

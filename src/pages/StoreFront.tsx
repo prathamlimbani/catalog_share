@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowRight, TrendingUp, Package, Store, ShoppingCart, Star, MessageSquare } from "lucide-react";
+import { ArrowRight, TrendingUp, Package, Store, ShoppingCart, Star, MessageSquare, Menu, X } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import ThemeToggle from "@/components/ThemeToggle";
 import useStoreTheme from "@/hooks/useStoreTheme";
@@ -33,6 +33,7 @@ const StoreFront = () => {
   const [surveyHoveredStar, setSurveyHoveredStar] = useState(0);
   const [surveySending, setSurveySending] = useState(false);
   const [surveyDone, setSurveyDone] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const { data: trending, isLoading: trendingLoading } = useQuery({
     queryKey: ["store-trending", company?.id],
@@ -111,18 +112,18 @@ const StoreFront = () => {
   return (
     <div className="min-h-screen">
       {/* Store Navbar */}
-      <nav className="sticky top-0 z-50 bg-card/80 backdrop-blur-md border-b">
+      <nav className="sticky top-0 z-50 bg-card/80 backdrop-blur-md border-b overflow-x-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <Link to={`/store/${slug}`} className="flex items-center gap-2">
+          <div className="flex items-center justify-between h-16 min-w-0">
+            <Link to={`/store/${slug}`} className="flex items-center gap-2 min-w-0 flex-shrink-0">
               {company.logo_url ? (
-                <img src={company.logo_url} alt={company.name} className="h-10 w-auto" />
+                <img src={company.logo_url} alt={company.name} className="h-10 w-auto flex-shrink-0" />
               ) : (
-                <Store className="h-6 w-6 text-primary" />
+                <Store className="h-6 w-6 text-primary flex-shrink-0" />
               )}
-              <span className="font-bold text-lg hidden sm:block">{company.name}</span>
+              <span className="font-bold text-lg hidden sm:block truncate">{company.name}</span>
             </Link>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
               <Link to={`/store/${slug}/products`} className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:block">Products</Link>
               <Link to={`/store/${slug}/about`} className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:block">About</Link>
               <ThemeToggle />
@@ -136,9 +137,19 @@ const StoreFront = () => {
                   </span>
                 )}
               </Link>
+              <Button variant="ghost" size="icon" className="sm:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+                {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </Button>
             </div>
           </div>
         </div>
+        {mobileMenuOpen && (
+          <div className="sm:hidden border-t bg-card p-4 space-y-2 animate-fade-in">
+            <Link to={`/store/${slug}`} onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium">Home</Link>
+            <Link to={`/store/${slug}/products`} onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium">Products</Link>
+            <Link to={`/store/${slug}/about`} onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium">About</Link>
+          </div>
+        )}
       </nav>
 
       {/* Hero */}
@@ -337,9 +348,14 @@ const StoreFront = () => {
                 {company.phone && <p className="text-sm text-muted-foreground">WhatsApp: {company.phone}</p>}
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Powered by <Link to="/" className="text-primary hover:underline">CatalogShare</Link>
-            </p>
+            <div className="flex flex-col items-center sm:items-end gap-2">
+              <Button variant="outline" size="sm" asChild>
+                <Link to={`/store/${slug}/about`}>About Us</Link>
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Powered by <Link to="/" className="text-primary hover:underline">CatalogShare</Link>
+              </p>
+            </div>
           </div>
         </div>
       </footer>
