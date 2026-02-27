@@ -92,7 +92,7 @@ export const AdminLayout = ({
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 lg:pl-64 flex flex-col min-h-screen">
+            <main className="flex-1 lg:pl-64 flex flex-col min-h-screen min-w-0 w-full">
                 {/* Header */}
                 <header className="sticky top-0 z-10 bg-card border-b h-16 sm:h-20 px-4 sm:px-8 flex items-center justify-between gap-4">
                     <div className="flex flex-1 items-center gap-3 min-w-0">
