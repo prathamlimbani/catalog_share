@@ -176,7 +176,7 @@ const Landing = () => {
       <header className="border-b border-border/50 bg-background/60 backdrop-blur-xl backdrop-saturate-150 sticky top-0 z-50 w-full max-w-[100vw] overflow-hidden">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 flex items-center justify-between h-14 sm:h-16">
           <Link to="/" className="flex items-center gap-2 flex-shrink min-w-0">
-            <img src="/logo.png" alt="CatalogShare Logo" className="h-10 sm:h-12 w-auto object-contain flex-shrink-0" />
+            <img src="/logo.png" alt="CatalogShare Logo" className="h-14 sm:h-16 w-auto object-contain flex-shrink-0" />
           </Link>
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-3">
@@ -453,7 +453,7 @@ const Landing = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <img src="/logo.png" alt="CatalogShare Logo" className="h-8 w-auto object-contain" />
+              <img src="/logo.png" alt="CatalogShare Logo" className="h-10 sm:h-12 w-auto object-contain" />
             </div>
             <div className="text-sm text-muted-foreground flex gap-4">
               <Link to="/about" className="hover:text-foreground transition-colors">About</Link>
