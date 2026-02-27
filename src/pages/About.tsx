@@ -44,8 +44,7 @@ const About = () => {
       <header className="border-b bg-card/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2">
-            <Store className="h-6 w-6 text-primary" />
-            <span className="font-bold text-lg">CatalogShare</span>
+            <img src="/logo.png" alt="CatalogShare Logo" className="h-10 sm:h-12 w-auto object-contain flex-shrink-0" />
           </Link>
           <div className="flex items-center gap-3">
             <ThemeToggle />
@@ -219,8 +218,7 @@ const About = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <Store className="h-5 w-5 text-primary" />
-              <span className="font-bold">CatalogShare</span>
+              <img src="/logo.png" alt="CatalogShare Logo" className="h-8 sm:h-10 w-auto object-contain" />
             </div>
             <p className="text-xs text-muted-foreground">
               © {new Date().getFullYear()} CatalogShare · Built by Pratham Limbani ·{" "}
