@@ -472,11 +472,11 @@ const AdminDashboard = () => {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold">Categories</h2>
           </div>
-          <div className="flex flex-wrap gap-2.5">
+          <div className="flex overflow-x-auto pb-2 gap-2.5 scrollbar-hide snap-x">
             <Button
               variant={selectedCategory === null ? "default" : "outline"}
               size="sm"
-              className={`rounded-full h-auto px-4 py-1.5 transition-all text-sm font-medium ${selectedCategory === null ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-background hover:bg-muted'}`}
+              className={`rounded-full h-auto px-4 py-1.5 transition-all text-sm font-medium whitespace-nowrap shrink-0 snap-start ${selectedCategory === null ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-background hover:bg-muted'}`}
               onClick={() => setSelectedCategory(null)}
             >
               All Products
@@ -484,7 +484,7 @@ const AdminDashboard = () => {
             {existingCategories.map((cat) => (
               <div
                 key={cat}
-                className={`group flex items-center gap-1.5 border rounded-full px-4 py-1.5 shadow-sm hover:shadow-md transition-all cursor-pointer ${selectedCategory === cat ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border/60"
+                className={`group flex items-center gap-1.5 border rounded-full px-4 py-1.5 shadow-sm hover:shadow-md transition-all cursor-pointer whitespace-nowrap shrink-0 snap-start ${selectedCategory === cat ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border/60"
                   }`}
                 onClick={() => setSelectedCategory(cat === selectedCategory ? null : cat)}
               >
@@ -577,8 +577,8 @@ const AdminDashboard = () => {
             <div className="grid gap-4">
               {filteredProducts.map((p) => (
                 <Card key={p.id} className={`overflow-hidden border-border transition-all hover:shadow-md bg-card ${!p.in_stock ? "opacity-60 grayscale-[0.2]" : ""}`}>
-                  <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
-                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                  <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4 w-full">
+                    <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 w-full">
                       <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-muted flex-shrink-0 border shadow-sm">
                         {p.image_url ? (
                           <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
@@ -601,8 +601,8 @@ const AdminDashboard = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-4 sm:gap-6 justify-between sm:justify-end mt-2 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-0 border-border/50">
-                      <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-3 sm:gap-6 justify-between sm:justify-end mt-2 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-0 border-border/50 w-full sm:w-auto shrink-0">
+                      <div className="flex items-center gap-2">
                         <Switch
                           checked={p.in_stock}
                           onCheckedChange={(v) => toggleStockMutation.mutate({ id: p.id, in_stock: v })}

@@ -95,7 +95,7 @@ export const AdminLayout = ({
             <main className="flex-1 lg:pl-64 flex flex-col min-h-screen">
                 {/* Header */}
                 <header className="sticky top-0 z-10 bg-card border-b h-16 sm:h-20 px-4 sm:px-8 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex flex-1 items-center gap-3 min-w-0">
                         {/* Mobile Nav Trigger */}
                         <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
                             <SheetTrigger asChild>
@@ -109,11 +109,11 @@ export const AdminLayout = ({
                         </Sheet>
 
                         {/* Company Info */}
-                        <div className="flex items-center gap-3 min-w-0 truncate">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                             {company?.logo_url && (
                                 <img src={company.logo_url} alt="Logo" className="w-8 h-8 rounded-full object-cover shrink-0" />
                             )}
-                            <h1 className="text-xl sm:text-2xl font-bold truncate">{company?.name || 'Dashboard'}</h1>
+                            <h1 className="text-lg sm:text-2xl font-bold truncate block w-full">{company?.name || 'Dashboard'}</h1>
                         </div>
                     </div>
 
