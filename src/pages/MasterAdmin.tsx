@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { LogOut, Store, Phone, Mail, MapPin, FileText, ExternalLink, Trash2, MessageSquare, Star, ClipboardList, BarChart3, Download } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { exportMasterDataToExcel } from "@/lib/exportUtils";
 
 const MasterAdmin = () => {
   const navigate = useNavigate();
@@ -192,12 +193,27 @@ const MasterAdmin = () => {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
         <div>
           <h1 className="text-3xl font-bold">Master Admin Panel</h1>
           <p className="text-muted-foreground">Manage companies, suggestions & surveys</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200"
+            onClick={async () => {
+              try {
+                toast.loading("Gathering platform data...", { id: "master-export-toast" });
+                await exportMasterDataToExcel();
+                toast.success("Master Excel file downloaded successfully!", { id: "master-export-toast" });
+              } catch (err) {
+                toast.error("Failed to export master data.", { id: "master-export-toast" });
+              }
+            }}
+          >
+            <Download className="h-4 w-4 mr-2" /> Export All Data
+          </Button>
           <ThemeToggle />
           <Button variant="outline" onClick={handleLogout}>
             <LogOut className="h-4 w-4 mr-2" /> Logout
