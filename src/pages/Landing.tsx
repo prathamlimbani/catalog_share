@@ -212,7 +212,7 @@ const Landing = () => {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-36 text-center relative z-10">
           <div className="inline-flex items-center gap-2 bg-white/20 dark:bg-white/10 backdrop-blur-sm border border-white/30 dark:border-white/20 rounded-full px-4 py-1.5 text-sm mb-6 animate-fade-in-up">
             <Zap className="h-3.5 w-3.5 text-yellow-500 dark:text-yellow-400" />
-            <span className="text-slate-800 dark:text-white/80">Free for wholesalers</span>
+            <span className="text-slate-800 dark:text-white/80">Specifically built for wholesalers & WhatsApp Business</span>
           </div>
           <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold tracking-tight mb-6 animate-fade-in-up">
             <span className="text-white drop-shadow-lg dark:drop-shadow-none">Your Wholesale Catalog,</span>
@@ -220,9 +220,9 @@ const Landing = () => {
               One Link Away
             </span>
           </h1>
-          <p className="text-lg sm:text-xl text-slate-700/80 dark:text-white/60 mb-10 max-w-2xl mx-auto animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
+          <p className="text-lg sm:text-xl text-slate-800 dark:text-white/80 font-medium mb-10 max-w-2xl mx-auto animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
             Create your online product catalog in minutes. Share a single link with customers.
-            Receive orders directly on WhatsApp. Built for wholesalers.
+            Receive orders directly on WhatsApp.
           </p>
           <div className="flex flex-wrap gap-4 justify-center animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
             <Button size="lg" className="bg-indigo-500 hover:bg-indigo-600 text-white shadow-lg shadow-indigo-500/25" asChild>
@@ -295,22 +295,22 @@ const Landing = () => {
         <SkyBackground />
         <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-20 relative z-10">
           <div className="text-center mb-8">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-3 text-white drop-shadow-lg">Quick Survey</h2>
-            <p className="text-slate-200 dark:text-white/60">Help us improve — takes less than 30 seconds!</p>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-3 text-slate-900 dark:text-white drop-shadow-lg dark:drop-shadow-none">Quick Survey</h2>
+            <p className="text-slate-800 dark:text-white/80 font-medium">Help us improve — takes less than 30 seconds!</p>
           </div>
 
           {surveySubmitted ? (
-            <Card className="bg-white/20 dark:bg-white/10 backdrop-blur-md border-white/30 dark:border-white/20">
+            <Card className="bg-white/60 dark:bg-white/10 backdrop-blur-md border-white/50 dark:border-white/20 shadow-xl shadow-black/5 dark:shadow-none">
               <CardContent className="p-8 text-center">
                 <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle className="h-8 w-8 text-green-400" />
+                  <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
                 </div>
-                <h3 className="text-xl font-bold text-white mb-2">Thank You!</h3>
-                <p className="text-white/70">Your response has been recorded. We appreciate your feedback!</p>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Thank You!</h3>
+                <p className="text-slate-700 dark:text-white/70">Your response has been recorded. We appreciate your feedback!</p>
               </CardContent>
             </Card>
           ) : (
-            <Card className="bg-white/20 dark:bg-white/10 backdrop-blur-md border-white/30 dark:border-white/20">
+            <Card className="bg-white/60 dark:bg-white/10 backdrop-blur-md border-white/50 dark:border-white/20 shadow-xl shadow-black/5 dark:shadow-none">
               <CardContent className="p-6 sm:p-8">
                 {/* Progress */}
                 <div className="flex gap-1 mb-6">
@@ -325,18 +325,18 @@ const Landing = () => {
 
                 {/* Name Input */}
                 <div className="mb-5">
-                  <Label className="text-white/90 text-sm mb-2 block">Your Name</Label>
+                  <Label className="text-slate-900 dark:text-white/90 text-sm mb-2 block font-medium">Your Name</Label>
                   <Input
                     value={surveyName}
                     onChange={(e) => setSurveyName(e.target.value)}
                     placeholder="Enter your name"
-                    className="bg-white/10 border-white/20 text-white placeholder:text-white/40"
+                    className="bg-white/50 dark:bg-white/10 border-white/40 dark:border-white/20 text-slate-900 dark:text-white placeholder:text-slate-500 dark:placeholder:text-white/40 shadow-sm"
                   />
                 </div>
 
                 {/* Questions */}
                 <div className="mb-6">
-                  <h3 className="font-semibold text-white mb-4">
+                  <h3 className="font-semibold text-slate-900 dark:text-white mb-4">
                     {surveyStep + 1}. {currentQ.question}
                   </h3>
 
@@ -362,7 +362,7 @@ const Landing = () => {
                         ))}
                       </div>
                       {rating > 0 && (
-                        <p className="text-center text-white/60 text-sm">
+                        <p className="text-center text-slate-600 dark:text-white/60 text-sm font-medium">
                           {rating === 5 ? "Amazing! ⭐" : rating === 4 ? "Great! 👍" : rating === 3 ? "Good 👌" : rating === 2 ? "Needs improvement" : "We'll do better"}
                         </p>
                       )}
@@ -372,10 +372,10 @@ const Landing = () => {
                       {(currentQ as { id: string; question: string; options: string[] }).options.map((opt) => (
                         <button
                           key={opt}
-                          onClick={() => handleAnswer(currentQ.id, opt)}
-                          className={`p-3 rounded-xl text-sm font-medium text-left transition-all border ${answers[currentQ.id] === opt
-                            ? "bg-indigo-500 border-indigo-400 text-white shadow-lg shadow-indigo-500/25"
-                            : "bg-white/5 border-white/20 text-white/80 hover:bg-white/10 hover:border-white/30"
+                          onClick={() => handleAnswer((currentQ as any).id, opt)}
+                          className={`p-3 rounded-xl text-sm font-medium text-left transition-all border shadow-sm ${answers[(currentQ as any).id] === opt
+                            ? "bg-indigo-500 border-indigo-400 text-white shadow-md shadow-indigo-500/25"
+                            : "bg-white/40 dark:bg-white/5 border-white/50 dark:border-white/20 text-slate-700 dark:text-white/80 hover:bg-white/60 dark:hover:bg-white/10 hover:border-white/60 dark:hover:border-white/30"
                             }`}
                         >
                           {opt}
@@ -385,24 +385,23 @@ const Landing = () => {
                   )}
                 </div>
 
-                {/* Navigation */}
                 <div className="flex items-center justify-between">
                   <div className="flex gap-2">
                     {surveyStep > 0 && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-white/60 hover:text-white hover:bg-white/10"
+                        className="text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/10 bg-white/30 dark:bg-transparent"
                         onClick={() => setSurveyStep((s) => s - 1)}
                       >
                         ← Back
                       </Button>
                     )}
-                    {surveyStep < SURVEY_QUESTIONS.length - 1 && answers[currentQ.id] && (
+                    {surveyStep < SURVEY_QUESTIONS.length - 1 && answers[(currentQ as any).id] && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-white/60 hover:text-white hover:bg-white/10"
+                        className="text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/10 bg-white/30 dark:bg-transparent"
                         onClick={() => setSurveyStep((s) => s + 1)}
                       >
                         Next →
@@ -410,12 +409,12 @@ const Landing = () => {
                     )}
                   </div>
                   {surveyStep === SURVEY_QUESTIONS.length - 1 && (
-                    <div className="flex-1 flex flex-col items-end gap-3">
+                    <div className="flex-1 flex flex-col items-end gap-3 mt-4 sm:mt-0">
                       <Input
                         value={suggestion}
                         onChange={(e) => setSuggestion(e.target.value)}
                         placeholder="Any suggestions? (optional)"
-                        className="bg-white/10 border-white/20 text-white placeholder:text-white/40 text-sm"
+                        className="bg-white/50 dark:bg-white/10 border-white/40 dark:border-white/20 text-slate-900 dark:text-white placeholder:text-slate-500 dark:placeholder:text-white/40 text-sm shadow-sm"
                       />
                       <Button
                         onClick={handleSubmitSurvey}
