@@ -67,7 +67,7 @@ const AdminDashboard = () => {
     checkAuth();
   }, [navigate]);
 
-  const storeUrl = company ? `https://catalogshare.online/store/${company.slug}` : "";
+  const storeUrl = company ? `https://catalogshare.online/store/${encodeURIComponent(company.slug)}` : "";
 
   const copyLink = () => {
     navigator.clipboard.writeText(storeUrl);
