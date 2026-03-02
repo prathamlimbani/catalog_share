@@ -24,9 +24,9 @@ const CompanyEditDialog = ({ company }: { company: Company }) => {
     theme_primary: company.theme_primary || "25 95% 53%",
     theme_accent: company.theme_accent || "25 95% 95%",
     contact_name_1: company.contact_name_1 || "",
-    contact_phone_1: company.contact_phone_1 || "",
+    contact_phone_1: company.contact_phone_1 || "+91",
     contact_name_2: company.contact_name_2 || "",
-    contact_phone_2: company.contact_phone_2 || "",
+    contact_phone_2: company.contact_phone_2 || "+91",
     google_maps_url: company.google_maps_url || "",
   });
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -66,9 +66,9 @@ const CompanyEditDialog = ({ company }: { company: Company }) => {
           theme_primary: form.theme_primary,
           theme_accent: form.theme_accent,
           contact_name_1: form.contact_name_1.trim() || null,
-          contact_phone_1: form.contact_phone_1.replace(/\s+/g, '') || null,
+          contact_phone_1: form.contact_phone_1.replace(/\s+/g, '') === '+91' ? null : form.contact_phone_1.replace(/\s+/g, '') || null,
           contact_name_2: form.contact_name_2.trim() || null,
-          contact_phone_2: form.contact_phone_2.replace(/\s+/g, '') || null,
+          contact_phone_2: form.contact_phone_2.replace(/\s+/g, '') === '+91' ? null : form.contact_phone_2.replace(/\s+/g, '') || null,
           google_maps_url: form.google_maps_url.trim() || null,
         })
         .eq("id", company.id);
@@ -96,9 +96,9 @@ const CompanyEditDialog = ({ company }: { company: Company }) => {
           theme_primary: company.theme_primary || "25 95% 53%",
           theme_accent: company.theme_accent || "25 95% 95%",
           contact_name_1: company.contact_name_1 || "",
-          contact_phone_1: company.contact_phone_1 || "",
+          contact_phone_1: company.contact_phone_1 || "+91",
           contact_name_2: company.contact_name_2 || "",
-          contact_phone_2: company.contact_phone_2 || "",
+          contact_phone_2: company.contact_phone_2 || "+91",
           google_maps_url: company.google_maps_url || "",
         });
         setLogoPreview(company.logo_url);

@@ -99,9 +99,14 @@ const StoreAbout = () => {
                     )}
                     <h1 className="text-3xl sm:text-4xl font-bold mb-3 animate-fade-in-up delay-100">About {company.name}</h1>
                     {company.address && (
-                        <p className="text-muted-foreground flex items-center justify-center gap-2">
+                        <p className="text-muted-foreground flex items-center justify-center gap-2 mb-2">
                             <MapPin className="h-4 w-4 flex-shrink-0" />
                             {company.address}
+                        </p>
+                    )}
+                    {company.gst_number && (
+                        <p className="text-muted-foreground font-medium flex justify-center">
+                            GST IN: {company.gst_number}
                         </p>
                     )}
                 </div>

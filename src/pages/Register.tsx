@@ -29,9 +29,9 @@ const Register = () => {
   const [themePrimary, setThemePrimary] = useState("25 95% 53%");
   const [themeAccent, setThemeAccent] = useState("25 95% 95%");
   const [contactName1, setContactName1] = useState("");
-  const [contactPhone1, setContactPhone1] = useState("");
+  const [contactPhone1, setContactPhone1] = useState("+91");
   const [contactName2, setContactName2] = useState("");
-  const [contactPhone2, setContactPhone2] = useState("");
+  const [contactPhone2, setContactPhone2] = useState("+91");
   const [googleMapsUrl, setGoogleMapsUrl] = useState("");
 
   const generateSlug = (name: string) => {
@@ -113,9 +113,9 @@ const Register = () => {
         theme_primary: themePrimary,
         theme_accent: themeAccent,
         contact_name_1: contactName1.trim() || null,
-        contact_phone_1: contactPhone1.replace(/\s+/g, '') || null,
+        contact_phone_1: contactPhone1.replace(/\s+/g, '') === '+91' ? null : contactPhone1.replace(/\s+/g, '') || null,
         contact_name_2: contactName2.trim() || null,
-        contact_phone_2: contactPhone2.replace(/\s+/g, '') || null,
+        contact_phone_2: contactPhone2.replace(/\s+/g, '') === '+91' ? null : contactPhone2.replace(/\s+/g, '') || null,
         google_maps_url: googleMapsUrl.trim() || null,
       });
 
