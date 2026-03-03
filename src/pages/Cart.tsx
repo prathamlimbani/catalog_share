@@ -25,15 +25,15 @@ const Cart = () => {
       return;
     }
 
-    let message = `🛒 *Order to Sri Vijayalaxmi Enterprise*\n`;
-    message += `👤 *From: ${customerName.trim()}*\n\n`;
+    let message = `• *Order to Sri Vijayalaxmi Enterprise*\n`;
+    message += `• *From: ${customerName.trim()}*\n\n`;
     items.forEach((item, idx) => {
       message += `${idx + 1}. *${item.product.name}*\n`;
       if (item.selectedSize) message += `   Size: ${item.selectedSize}\n`;
       if (item.selectedFeature) message += `   Option: ${item.selectedFeature}\n`;
       message += `   Qty: ${item.quantity}\n\n`;
     });
-    message += `Please confirm this order. Thank you!`;
+    message += `Please confirm this order.\n\nThank you, visit again!\n${window.location.origin}`;
 
     // Strip any non-numeric characters
     const formattedPhone = WHATSAPP_NUMBER.replace(/\D/g, '');

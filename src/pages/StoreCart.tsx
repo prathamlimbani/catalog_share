@@ -36,8 +36,8 @@ const StoreCart = () => {
     if (items.length === 0) { toast.error("Your cart is empty!"); return; }
     if (!customerName.trim()) { toast.error("Please enter your name or company name."); return; }
 
-    let message = `🛒 *Order to ${company.name}*\n`;
-    message += `👤 *From: ${customerName.trim()}*\n\n`;
+    let message = `• *Order to ${company.name}*\n`;
+    message += `• *From: ${customerName.trim()}*\n\n`;
     items.forEach((item, idx) => {
       message += `${idx + 1}. *${item.product.name}*\n`;
       if (item.selectedSize) message += `   Size: ${item.selectedSize}\n`;
@@ -47,7 +47,7 @@ const StoreCart = () => {
     if (customNote.trim()) {
       message += `📝 *Special Note:*\n${customNote.trim()}\n\n`;
     }
-    message += `Please confirm this order. Thank you!`;
+    message += `Please confirm this order.\n\nThank you, visit again!\n${window.location.origin}/store/${slug}`;
 
     // Strip anything that isn't a digit (like '+', ' ', '-') from the phone number
     const formattedPhone = company.phone?.replace(/\D/g, '') || '';
