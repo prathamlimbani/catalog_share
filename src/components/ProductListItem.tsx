@@ -119,37 +119,80 @@ const ProductListItem = ({ product }: { product: Product }) => {
               )}
               {/* Size after feature */}
               {sizes.length > 0 && (features.length === 0 || selectedFeature) && (
-                <div className="flex flex-wrap gap-1">
-                  {sizes.map((s) => {
-                    const isOutOfStock = s.startsWith("~") || s.endsWith("~");
-                    const displaySize = s.replace(/~/g, "").trim();
-                    return (
-                      <button
-                        key={s}
-                        disabled={isOutOfStock}
-                        onClick={() => !isOutOfStock && setSelectedSize(s)}
-                        className={`px-2 py-0.5 text-xs rounded border transition-colors ${isOutOfStock
-                          ? "opacity-40 cursor-not-allowed line-through bg-muted text-muted-foreground border-border"
-                          : selectedSize === s
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-card text-foreground border-border hover:border-primary"
-                          }`}
-                      >
-                        {displaySize}
-                      </button>
-                    );
-                  })}
-                </div>
+                sizes.length === 1 ? (
+                  <div className="flex items-center h-8 px-3 text-xs border border-input rounded-md bg-background text-foreground font-medium">
+                    {sizes[0].replace(/~/g, "").trim()}
+                  </div>
+                ) : sizes.length > 3 ? (
+                  <Select value={selectedSize || ""} onValueChange={setSelectedSize}>
+                    <SelectTrigger className="h-8 text-xs w-24 sm:w-28">
+                      <SelectValue placeholder="Size" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card z-50">
+                      {sizes.map((s) => {
+                        const isOutOfStock = s.startsWith("~") || s.endsWith("~");
+                        const displaySize = s.replace(/~/g, "").trim();
+                        return (
+                          <SelectItem
+                            key={s}
+                            value={s}
+                            disabled={isOutOfStock}
+                            className={`text-xs ${isOutOfStock ? "opacity-50 line-through" : ""}`}
+                          >
+                            {displaySize}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="flex flex-wrap gap-1">
+                    {sizes.map((s) => {
+                      const isOutOfStock = s.startsWith("~") || s.endsWith("~");
+                      const displaySize = s.replace(/~/g, "").trim();
+                      return (
+                        <button
+                          key={s}
+                          disabled={isOutOfStock}
+                          onClick={() => !isOutOfStock && setSelectedSize(s)}
+                          className={`px-2 py-0.5 h-8 text-xs rounded-md border transition-colors ${isOutOfStock
+                            ? "opacity-40 cursor-not-allowed line-through bg-muted text-muted-foreground border-border"
+                            : selectedSize === s
+                              ? "bg-primary text-primary-foreground border-primary font-medium"
+                              : "bg-background text-foreground border-input hover:border-primary font-medium"
+                            }`}
+                        >
+                          {displaySize}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )
               )}
 
               <div className="flex items-center gap-1">
                 <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => setQuantity(Math.max(1, quantity - 1))}>
                   <Minus className="h-3 w-3" />
                 </Button>
-                <span className="w-6 text-center font-medium text-sm">{quantity}</span>
+                {product.allow_custom_quantity ? (
+                  <div className="flex items-center">
+                    <input
+                      type="number"
+                      min="1"
+                      value={quantity}
+                      onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-10 h-7 text-center font-medium text-xs border border-input rounded bg-background text-foreground"
+                    />
+                  </div>
+                ) : (
+                  <span className="w-6 text-center font-medium text-sm">{quantity}</span>
+                )}
                 <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => setQuantity(quantity + 1)}>
                   <Plus className="h-3 w-3" />
                 </Button>
+                {product.quantity_unit && (
+                  <span className="text-xs text-muted-foreground font-medium ml-0.5">{product.quantity_unit}</span>
+                )}
               </div>
 
               <Button

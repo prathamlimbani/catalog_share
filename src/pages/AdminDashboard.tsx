@@ -25,6 +25,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tables } from "@/integrations/supabase/types";
 import { AdminLayout } from "@/components/AdminLayout";
 import { exportDataToExcel } from "@/lib/exportUtils";
+import { AnalyticsDialog } from "@/components/AnalyticsDialog";
 
 type Product = Tables<"products">;
 
@@ -57,6 +58,8 @@ const AdminDashboard = () => {
     image_url: "",
     images: [] as string[],
     feature_sizes: {} as Record<string, string>,
+    allow_custom_quantity: false,
+    quantity_unit: "",
   });
 
   useEffect(() => {
@@ -149,6 +152,8 @@ const AdminDashboard = () => {
         category: data.category.trim() || null,
         is_trending: data.is_trending,
         in_stock: data.in_stock,
+        allow_custom_quantity: data.allow_custom_quantity,
+        quantity_unit: data.quantity_unit.trim() || null,
         image_url: allImages[0] || data.image_url.trim() || null,
         images: allImages,
         feature_sizes: featuresList.length > 0 ? featureSizesJson : {},
@@ -224,7 +229,7 @@ const AdminDashboard = () => {
   });
 
   const resetForm = () => {
-    setForm({ name: "", description: "", size: "", features: "", price: "", category: "", is_trending: false, in_stock: true, image_url: "", images: [], feature_sizes: {} });
+    setForm({ name: "", description: "", size: "", features: "", price: "", category: "", is_trending: false, in_stock: true, allow_custom_quantity: false, quantity_unit: "", image_url: "", images: [], feature_sizes: {} });
     setEditing(null);
     setShowNewCategory(false);
     setNewCategory("");
@@ -248,6 +253,8 @@ const AdminDashboard = () => {
       category: p.category || "",
       is_trending: p.is_trending,
       in_stock: p.in_stock,
+      allow_custom_quantity: p.allow_custom_quantity || false,
+      quantity_unit: p.quantity_unit || "",
       image_url: p.image_url || "",
       images: p.images || [],
       feature_sizes: fsForm,
@@ -259,8 +266,46 @@ const AdminDashboard = () => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const uploadedUrls: string[] = [];
+
+    // Compress images > 3MB
+    const compressImage = async (file: File): Promise<File> => {
+      if (file.size <= 3 * 1024 * 1024) return file;
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+          const img = new Image();
+          img.src = event.target?.result as string;
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            if (width > 2048 || height > 2048) {
+              const ratio = Math.min(2048 / width, 2048 / height);
+              width *= ratio;
+              height *= ratio;
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0, width, height);
+            canvas.toBlob((blob) => {
+              if (blob) {
+                resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+              } else {
+                resolve(file); // fallback
+              }
+            }, 'image/jpeg', 0.8);
+          };
+          img.onerror = () => resolve(file);
+        };
+        reader.onerror = () => resolve(file);
+      });
+    };
+
     for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+      toast.info(`Processing image ${i + 1} of ${files.length}...`);
+      const file = await compressImage(files[i]);
       const ext = file.name.split(".").pop();
       const path = `${company?.id}/${Date.now()}-${i}.${ext}`;
       const { error } = await supabase.storage.from("product-images").upload(path, file);
@@ -351,7 +396,10 @@ const AdminDashboard = () => {
             </CardContent>
           </Card>
 
-          <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+          <div className="flex flex-col sm:flex-row gap-3 shrink-0">
+            {/* Analytics Dialog */}
+            {company?.id && <AnalyticsDialog companyId={company.id} />}
+
             {/* The old Product Adding dialog */}
             <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
               <DialogTrigger asChild>
@@ -444,6 +492,22 @@ const AdminDashboard = () => {
                         ))}
                       </div>
                     )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Quantity Settings</Label>
+                    <div className="flex flex-col gap-3 p-3 border rounded-lg bg-muted/30">
+                      <div className="flex items-center gap-3">
+                        <Switch checked={form.allow_custom_quantity} onCheckedChange={(v) => setForm({ ...form, allow_custom_quantity: v })} />
+                        <Label>Allow manual text input for quantity (e.g. typing 100 instead of clicking +)</Label>
+                      </div>
+                      {form.allow_custom_quantity && (
+                        <div className="space-y-1.5 pt-1 pl-11">
+                          <Label className="text-xs text-muted-foreground">Quantity Unit Label (optional)</Label>
+                          <Input value={form.quantity_unit} onChange={(e) => setForm({ ...form, quantity_unit: e.target.value })} placeholder="e.g. kg, box, pc" className="h-8 max-w-[200px]" />
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-6">
@@ -577,7 +641,7 @@ const AdminDashboard = () => {
             <div className="grid gap-4">
               {filteredProducts.map((p) => (
                 <Card key={p.id} className={`overflow-hidden border-border transition-all hover:shadow-md bg-card ${!p.in_stock ? "opacity-60 grayscale-[0.2]" : ""}`}>
-                  <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4 w-full">
+                  <CardContent onClick={() => startEdit(p)} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4 w-full cursor-pointer hover:bg-muted/50 transition-colors">
                     <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 w-full">
                       <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-muted flex-shrink-0 border shadow-sm">
                         {p.image_url ? (
@@ -594,7 +658,7 @@ const AdminDashboard = () => {
                         <div className="flex items-center text-sm text-muted-foreground flex-wrap gap-x-2 gap-y-1 font-medium">
                           {p.category ? <Badge variant="secondary" className="bg-secondary/50 font-semibold">{p.category}</Badge> : <span className="italic text-muted-foreground/50">No Category</span>}
                           <span className="text-muted-foreground/40">•</span>
-                          <span>{p.size || "No size"}</span>
+                          <span>{p.size || <span className="text-primary hover:underline">Click to see info</span>}</span>
                           <span className="text-muted-foreground/40">•</span>
                           <span>{(p.images?.length || 0)} photo{p.images?.length !== 1 && 's'}</span>
                         </div>
@@ -606,15 +670,16 @@ const AdminDashboard = () => {
                         <Switch
                           checked={p.in_stock}
                           onCheckedChange={(v) => toggleStockMutation.mutate({ id: p.id, in_stock: v })}
+                          onClick={(e) => e.stopPropagation()}
                           className="data-[state=checked]:bg-primary"
                         />
                         <span className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">{p.in_stock ? "In Stock" : "Out"}</span>
                       </div>
                       <div className="flex items-center gap-1 bg-secondary/50 p-1 rounded-lg">
-                        <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-background shadow-sm hover:text-foreground text-muted-foreground transition-colors" onClick={() => startEdit(p)}>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-background shadow-sm hover:text-foreground text-muted-foreground transition-colors" onClick={(e) => { e.stopPropagation(); startEdit(p); }}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-destructive/10 text-destructive/70 hover:text-destructive transition-colors" onClick={() => { if (confirm("Are you sure you want to delete this product?")) deleteMutation.mutate(p.id); }}>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-destructive/10 text-destructive/70 hover:text-destructive transition-colors" onClick={(e) => { e.stopPropagation(); if (confirm("Are you sure you want to delete this product?")) deleteMutation.mutate(p.id); }}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>

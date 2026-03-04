@@ -212,15 +212,28 @@ const ProductCard = ({ product }: { product: Product }) => {
             )}
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Quantity</label>
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Quantity</label>
+                {product.quantity_unit && <span className="text-xs font-medium text-muted-foreground mt-0.5">{product.quantity_unit}</span>}
+              </div>
               <div className="flex items-center">
-                <Button size="icon" variant="outline" className="h-8 w-8 rounded-l-lg rounded-r-none border-r-0 bg-background text-foreground" onClick={() => setQuantity(Math.max(1, quantity - 1))}>
+                <Button size="icon" variant="outline" className="h-8 w-8 rounded-l-lg rounded-r-none border-r-0 bg-background text-foreground shrink-0" onClick={() => setQuantity(Math.max(1, quantity - 1))}>
                   <Minus className="h-3 w-3" />
                 </Button>
-                <div className="h-8 w-12 flex items-center justify-center font-semibold text-sm border-y border-input bg-background text-foreground">
-                  {quantity}
-                </div>
-                <Button size="icon" variant="outline" className="h-8 w-8 rounded-r-lg rounded-l-none border-l-0 bg-background text-foreground" onClick={() => setQuantity(quantity + 1)}>
+                {product.allow_custom_quantity ? (
+                  <input
+                    type="number"
+                    min="1"
+                    value={quantity}
+                    onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="h-8 w-14 flex items-center justify-center text-center font-semibold text-sm border border-y-input border-x-0 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 z-10"
+                  />
+                ) : (
+                  <div className="h-8 w-12 flex items-center justify-center font-semibold text-sm border-y border-input bg-background text-foreground">
+                    {quantity}
+                  </div>
+                )}
+                <Button size="icon" variant="outline" className="h-8 w-8 rounded-r-lg rounded-l-none border-l-0 bg-background text-foreground shrink-0" onClick={() => setQuantity(quantity + 1)}>
                   <Plus className="h-3 w-3" />
                 </Button>
               </div>
