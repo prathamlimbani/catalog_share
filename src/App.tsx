@@ -22,6 +22,7 @@ const MasterAdmin = lazy(() => import("./pages/MasterAdmin"));
 const StoreProducts = lazy(() => import("./pages/StoreProducts"));
 const StoreCart = lazy(() => import("./pages/StoreCart"));
 const StoreAbout = lazy(() => import("./pages/StoreAbout"));
+const Billing = lazy(() => import("./pages/Billing"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -56,6 +57,7 @@ const App = () => (
               <Route path="/register" element={<Register />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/dashboard" element={<AdminDashboard />} />
+              <Route path="/billing" element={<Billing />} />
 
               {/* Master admin */}
               <Route path="/master-login" element={<MasterLogin />} />

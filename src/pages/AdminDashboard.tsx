@@ -20,12 +20,13 @@ import {
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { Plus, Trash2, Package, Edit, X, Upload, Pencil, Check, Link as LinkIcon, Copy, ExternalLink, Store, Filter, SlidersHorizontal, ArrowUpDown } from "lucide-react";
+import { Plus, Trash2, Package, Edit, X, Upload, Pencil, Check, Link as LinkIcon, Copy, ExternalLink, Store, Filter, SlidersHorizontal, ArrowUpDown, Crown } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tables } from "@/integrations/supabase/types";
 import { AdminLayout } from "@/components/AdminLayout";
 import { exportDataToExcel } from "@/lib/exportUtils";
 import { AnalyticsDialog } from "@/components/AnalyticsDialog";
+import { SubscriptionDialog, getPlanLimit, getPlanName } from "@/components/SubscriptionDialog";
 
 type Product = Tables<"products">;
 
@@ -372,6 +373,60 @@ const AdminDashboard = () => {
     >
       <div className="max-w-5xl mx-auto space-y-8">
 
+        {/* Subscription Banner */}
+        {company && (() => {
+          const currentPlan = (company as any).subscription_plan || "free";
+          const planLimit = getPlanLimit(currentPlan);
+          const productCount = products?.length || 0;
+          const usagePercent = Math.min(100, Math.round((productCount / planLimit) * 100));
+          const isNearLimit = usagePercent >= 80;
+          const isAtLimit = productCount >= planLimit;
+          const expiresAt = (company as any).subscription_expires_at;
+
+          return (
+            <Card className={`border-0 shadow-sm overflow-hidden ${isAtLimit ? "bg-red-500/5 ring-1 ring-red-500/20" : isNearLimit ? "bg-amber-500/5 ring-1 ring-amber-500/20" : "bg-gradient-to-r from-primary/5 to-purple-500/5"}`}>
+              <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className={`p-2.5 rounded-xl ${currentPlan === 'pro' ? 'bg-purple-500/10' : currentPlan === 'growth' ? 'bg-blue-500/10' : 'bg-emerald-500/10'}`}>
+                    <Crown className={`h-5 w-5 ${currentPlan === 'pro' ? 'text-purple-500' : currentPlan === 'growth' ? 'text-blue-500' : 'text-emerald-500'}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-bold text-sm">{getPlanName(currentPlan)}</span>
+                      {expiresAt && currentPlan !== 'free' && (
+                        <span className="text-xs text-muted-foreground">· Expires {new Date(expiresAt).toLocaleDateString()}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-2 bg-muted rounded-full max-w-[200px] overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${isAtLimit ? 'bg-red-500' : isNearLimit ? 'bg-amber-500' : 'bg-primary'}`}
+                          style={{ width: `${usagePercent}%` }}
+                        />
+                      </div>
+                      <span className={`text-xs font-semibold ${isAtLimit ? 'text-red-500' : isNearLimit ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                        {productCount}/{planLimit === 9999 ? '∞' : planLimit} products
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                {currentPlan !== 'pro' && (
+                  <SubscriptionDialog
+                    companyId={company.id}
+                    companyName={company.name}
+                    companyEmail={company.email}
+                    currentPlan={currentPlan}
+                  >
+                    <Button size="sm" className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-lg shadow-sm shrink-0">
+                      <Crown className="h-4 w-4 mr-1.5" /> Upgrade Plan
+                    </Button>
+                  </SubscriptionDialog>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })()}
+
         {/* Shareable Link & Quick Actions */}
         <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
           <Card className="flex-1 bg-secondary/30 border-0 shadow-sm relative overflow-hidden">
@@ -401,132 +456,141 @@ const AdminDashboard = () => {
             {company?.id && <AnalyticsDialog companyId={company.id} />}
 
             {/* The old Product Adding dialog */}
-            <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-              <DialogTrigger asChild>
-                <Button className="h-full py-4 px-6 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm w-full sm:w-auto font-medium text-base rounded-xl transition-all">
-                  <Plus className="h-5 w-5 mr-2" /> Add Product
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>{editing ? "Edit Product" : "Add New Product"}</DialogTitle>
-                </DialogHeader>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!form.name.trim()) return toast.error("Product name is required.");
-                    const finalForm = showNewCategory ? { ...form, category: newCategory } : form;
-                    saveMutation.mutate(finalForm);
-                  }}
-                  className="space-y-4"
-                >
-                  <div className="space-y-2">
-                    <Label>Name *</Label>
-                    <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Description</Label>
-                    <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Price (optional)</Label>
-                    <Input type="number" step="0.01" min="0" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="Leave empty if not applicable" />
-                  </div>
+            {(() => {
+              const currentPlan = (company as any)?.subscription_plan || "free";
+              const planLimit = getPlanLimit(currentPlan);
+              const productCount = products?.length || 0;
+              const isAtLimit = productCount >= planLimit;
 
-                  <div className="space-y-2">
-                    <Label>Category</Label>
-                    <Select value={showNewCategory ? "__new__" : (form.category || undefined)} onValueChange={handleCategorySelect}>
-                      <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                      <SelectContent className="bg-card z-50">
-                        {existingCategories.map((cat) => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
-                        <SelectItem value="__new__">+ Add New Category</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {showNewCategory && <Input value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="Enter new category name" autoFocus />}
-                  </div>
+              return (
+                <Dialog open={dialogOpen} onOpenChange={(open) => { if (isAtLimit && !editing && open) { toast.error(`You've reached the ${getPlanName(currentPlan)} limit of ${planLimit} products. Upgrade to add more!`); return; } setDialogOpen(open); if (!open) resetForm(); }}>
+                  <DialogTrigger asChild>
+                    <Button className={`h-full py-4 px-6 shadow-sm w-full sm:w-auto font-medium text-base rounded-xl transition-all ${isAtLimit ? 'bg-muted text-muted-foreground hover:bg-muted' : 'bg-primary hover:bg-primary/90 text-primary-foreground'}`}>
+                      <Plus className="h-5 w-5 mr-2" /> {isAtLimit ? 'Limit Reached' : 'Add Product'}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>{editing ? "Edit Product" : "Add New Product"}</DialogTitle>
+                    </DialogHeader>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!form.name.trim()) return toast.error("Product name is required.");
+                        const finalForm = showNewCategory ? { ...form, category: newCategory } : form;
+                        saveMutation.mutate(finalForm);
+                      }}
+                      className="space-y-4"
+                    >
+                      <div className="space-y-2">
+                        <Label>Name *</Label>
+                        <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Description</Label>
+                        <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Price (optional)</Label>
+                        <Input type="number" step="0.01" min="0" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="Leave empty if not applicable" />
+                      </div>
 
-                  <div className="space-y-2">
-                    <Label>Options / Variants (comma-separated)</Label>
-                    <Input value={form.features} onChange={(e) => setForm({ ...form, features: e.target.value })} placeholder="Red, Blue, Green" />
-                  </div>
+                      <div className="space-y-2">
+                        <Label>Category</Label>
+                        <Select value={showNewCategory ? "__new__" : (form.category || undefined)} onValueChange={handleCategorySelect}>
+                          <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                          <SelectContent className="bg-card z-50">
+                            {existingCategories.map((cat) => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                            <SelectItem value="__new__">+ Add New Category</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {showNewCategory && <Input value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="Enter new category name" autoFocus />}
+                      </div>
 
-                  {(() => {
-                    const featuresList = typeof form.features === "string" ? form.features.split(",").map((f) => f.trim()).filter(Boolean) : (form.features as string[]);
-                    if (featuresList.length === 0) return null;
-                    return (
-                      <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
-                        <Label className="text-sm font-medium">Sizes per Variant</Label>
-                        <p className="text-xs text-muted-foreground">Enter available sizes for each variant</p>
-                        {featuresList.map((feat) => (
-                          <div key={feat} className="flex items-center gap-2">
-                            <Badge variant="secondary" className="text-xs min-w-[60px] justify-center">{feat}</Badge>
-                            <Input
-                              value={form.feature_sizes[feat] || ""}
-                              onChange={(e) => setForm({ ...form, feature_sizes: { ...form.feature_sizes, [feat]: e.target.value } })}
-                              placeholder={`Sizes for ${feat}`}
-                              className="h-8 text-xs"
-                            />
+                      <div className="space-y-2">
+                        <Label>Options / Variants (comma-separated)</Label>
+                        <Input value={form.features} onChange={(e) => setForm({ ...form, features: e.target.value })} placeholder="Red, Blue, Green" />
+                      </div>
+
+                      {(() => {
+                        const featuresList = typeof form.features === "string" ? form.features.split(",").map((f) => f.trim()).filter(Boolean) : (form.features as string[]);
+                        if (featuresList.length === 0) return null;
+                        return (
+                          <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
+                            <Label className="text-sm font-medium">Sizes per Variant</Label>
+                            <p className="text-xs text-muted-foreground">Enter available sizes for each variant</p>
+                            {featuresList.map((feat) => (
+                              <div key={feat} className="flex items-center gap-2">
+                                <Badge variant="secondary" className="text-xs min-w-[60px] justify-center">{feat}</Badge>
+                                <Input
+                                  value={form.feature_sizes[feat] || ""}
+                                  onChange={(e) => setForm({ ...form, feature_sizes: { ...form.feature_sizes, [feat]: e.target.value } })}
+                                  placeholder={`Sizes for ${feat}`}
+                                  className="h-8 text-xs"
+                                />
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
+                        );
+                      })()}
 
-                  <div className="space-y-2">
-                    <Label>Product Images</Label>
-                    <div className="flex items-center gap-2">
-                      <label className="flex items-center gap-2 px-4 py-2 border border-input rounded-md cursor-pointer hover:bg-accent text-sm">
-                        <Upload className="h-4 w-4" /> Upload Images
-                        <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
-                      </label>
-                    </div>
-                    {form.images.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {form.images.map((url, i) => (
-                          <div key={i} className="relative group">
-                            <img src={url} alt={`Product ${i + 1}`} className="w-16 h-16 rounded-lg object-cover" />
-                            <button type="button" onClick={() => removeImage(url)} className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Quantity Settings</Label>
-                    <div className="flex flex-col gap-3 p-3 border rounded-lg bg-muted/30">
-                      <div className="flex items-center gap-3">
-                        <Switch checked={form.allow_custom_quantity} onCheckedChange={(v) => setForm({ ...form, allow_custom_quantity: v })} />
-                        <Label>Allow manual text input for quantity (e.g. typing 100 instead of clicking +)</Label>
-                      </div>
-                      {form.allow_custom_quantity && (
-                        <div className="space-y-1.5 pt-1 pl-11">
-                          <Label className="text-xs text-muted-foreground">Quantity Unit Label (optional)</Label>
-                          <Input value={form.quantity_unit} onChange={(e) => setForm({ ...form, quantity_unit: e.target.value })} placeholder="e.g. kg, box, pc" className="h-8 max-w-[200px]" />
+                      <div className="space-y-2">
+                        <Label>Product Images</Label>
+                        <div className="flex items-center gap-2">
+                          <label className="flex items-center gap-2 px-4 py-2 border border-input rounded-md cursor-pointer hover:bg-accent text-sm">
+                            <Upload className="h-4 w-4" /> Upload Images
+                            <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
+                          </label>
                         </div>
-                      )}
-                    </div>
-                  </div>
+                        {form.images.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {form.images.map((url, i) => (
+                              <div key={i} className="relative group">
+                                <img src={url} alt={`Product ${i + 1}`} className="w-16 h-16 rounded-lg object-cover" />
+                                <button type="button" onClick={() => removeImage(url)} className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
 
-                  <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-3">
-                      <Switch checked={form.is_trending} onCheckedChange={(v) => setForm({ ...form, is_trending: v })} />
-                      <Label>Trending</Label>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Switch checked={form.in_stock} onCheckedChange={(v) => setForm({ ...form, in_stock: v })} />
-                      <Label>In Stock</Label>
-                    </div>
-                  </div>
+                      <div className="space-y-2">
+                        <Label>Quantity Settings</Label>
+                        <div className="flex flex-col gap-3 p-3 border rounded-lg bg-muted/30">
+                          <div className="flex items-center gap-3">
+                            <Switch checked={form.allow_custom_quantity} onCheckedChange={(v) => setForm({ ...form, allow_custom_quantity: v })} />
+                            <Label>Allow manual text input for quantity (e.g. typing 100 instead of clicking +)</Label>
+                          </div>
+                          {form.allow_custom_quantity && (
+                            <div className="space-y-1.5 pt-1 pl-11">
+                              <Label className="text-xs text-muted-foreground">Quantity Unit Label (optional)</Label>
+                              <Input value={form.quantity_unit} onChange={(e) => setForm({ ...form, quantity_unit: e.target.value })} placeholder="e.g. kg, box, pc" className="h-8 max-w-[200px]" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
 
-                  <Button type="submit" className="w-full" disabled={saveMutation.isPending}>
-                    {saveMutation.isPending ? "Saving..." : editing ? "Update Product" : "Add Product"}
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
+                      <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-3">
+                          <Switch checked={form.is_trending} onCheckedChange={(v) => setForm({ ...form, is_trending: v })} />
+                          <Label>Trending</Label>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Switch checked={form.in_stock} onCheckedChange={(v) => setForm({ ...form, in_stock: v })} />
+                          <Label>In Stock</Label>
+                        </div>
+                      </div>
+
+                      <Button type="submit" className="w-full" disabled={saveMutation.isPending}>
+                        {saveMutation.isPending ? "Saving..." : editing ? "Update Product" : "Add Product"}
+                      </Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              );
+            })()}
             {/* End of Reverted Add Product Dialog */}
           </div>
         </div>
@@ -704,7 +768,7 @@ const AdminDashboard = () => {
           )}
         </div>
       </div>
-    </AdminLayout>
+    </AdminLayout >
   );
 };
 

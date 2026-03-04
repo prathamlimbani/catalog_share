@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Store, Package, LogOut, Menu, Search, User, Pencil } from "lucide-react";
+import { Store, Package, LogOut, Menu, Search, User, Pencil, Crown, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -70,6 +70,22 @@ export const AdminLayout = ({
                             Edit Company
                         </button>
                     </CompanyEditDialog>
+                )}
+
+                {company && (
+                    <Link
+                        to="/billing"
+                        className={cn(
+                            "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors font-medium",
+                            location.pathname === "/billing"
+                                ? "bg-primary/10 text-primary"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        )}
+                        onClick={() => setMobileMenuOpen(false)}
+                    >
+                        <CreditCard className="h-5 w-5" />
+                        Billing
+                    </Link>
                 )}
             </div>
             <div className="p-4 border-t">

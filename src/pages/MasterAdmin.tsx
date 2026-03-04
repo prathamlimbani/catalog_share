@@ -9,17 +9,19 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { LogOut, Store, Phone, Mail, MapPin, FileText, ExternalLink, Trash2, MessageSquare, Star, ClipboardList, BarChart3, Download } from "lucide-react";
+import { LogOut, Store, Phone, Mail, MapPin, FileText, ExternalLink, Trash2, MessageSquare, Star, ClipboardList, BarChart3, Download, Crown } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { exportMasterDataToExcel } from "@/lib/exportUtils";
+import { downloadInvoice } from "@/pages/Billing";
+import { getPlanName } from "@/components/SubscriptionDialog";
 
 const MasterAdmin = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [confirmText, setConfirmText] = useState("");
-  const [activeTab, setActiveTab] = useState<"companies" | "suggestions" | "surveys" | "analytics">("companies");
+  const [activeTab, setActiveTab] = useState<"companies" | "suggestions" | "surveys" | "analytics" | "subscriptions">("companies");
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | "all">("all");
 
   useEffect(() => {
@@ -189,6 +191,7 @@ const MasterAdmin = () => {
     { key: "suggestions" as const, label: "Suggestions", icon: MessageSquare, count: suggestions?.length || 0 },
     { key: "surveys" as const, label: "Surveys", icon: ClipboardList, count: surveys?.length || 0 },
     { key: "analytics" as const, label: "Analytics", icon: BarChart3, count: 0 },
+    { key: "subscriptions" as const, label: "Subscriptions", icon: Crown, count: companies?.length || 0 },
   ];
 
   return (
@@ -603,6 +606,136 @@ const MasterAdmin = () => {
             </div>
           )}
         </div>
+      )}
+
+      {/* Subscriptions Tab */}
+      {activeTab === "subscriptions" && (
+        <>
+          {isLoading ? (
+            <p className="text-muted-foreground">Loading subscription data...</p>
+          ) : companies && companies.length > 0 ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <p className="text-sm text-muted-foreground">Free</p>
+                    <p className="text-2xl font-bold">{companies.filter((c: any) => !c.subscription_plan || c.subscription_plan === 'free').length}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <p className="text-sm text-blue-500 font-medium">Growth</p>
+                    <p className="text-2xl font-bold text-blue-500">{companies.filter((c: any) => c.subscription_plan === 'growth').length}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <p className="text-sm text-purple-500 font-medium">Pro</p>
+                    <p className="text-2xl font-bold text-purple-500">{companies.filter((c: any) => c.subscription_plan === 'pro').length}</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid gap-3">
+                {companies.map((company: any) => {
+                  const plan = company.subscription_plan || 'free';
+                  const expiresAt = company.subscription_expires_at;
+                  const isExpired = expiresAt && new Date(expiresAt) < new Date();
+
+                  return (
+                    <Card key={company.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <div className="flex items-center gap-3 min-w-0">
+                            {company.logo_url ? (
+                              <img src={company.logo_url} alt={company.name} className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                            ) : (
+                              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                                <Store className="h-4 w-4 text-primary" />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <h3 className="font-bold text-sm truncate">{company.name}</h3>
+                              <p className="text-xs text-muted-foreground">{company.email}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Badge
+                              className={`text-xs font-bold ${plan === 'pro'
+                                ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                                : plan === 'growth'
+                                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                  : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                                }`}
+                            >
+                              {plan.toUpperCase()}
+                            </Badge>
+                            {expiresAt && plan !== 'free' && (
+                              <span className={`text-xs ${isExpired ? 'text-red-500 font-bold' : 'text-muted-foreground'}`}>
+                                {isExpired ? 'EXPIRED' : `Expires ${new Date(expiresAt).toLocaleDateString()}`}
+                              </span>
+                            )}
+                            {plan !== 'free' && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10 h-7 px-2"
+                                onClick={async () => {
+                                  if (!confirm(`Reset ${company.name} to Free plan?`)) return;
+                                  try {
+                                    await supabase.from("companies").update({ subscription_plan: "free", subscription_expires_at: null }).eq("id", company.id);
+                                    queryClient.invalidateQueries({ queryKey: ["all-companies"] });
+                                    toast.success(`${company.name} reset to Free plan`);
+                                  } catch (err: any) {
+                                    toast.error(err.message);
+                                  }
+                                }}
+                              >
+                                <Trash2 className="h-3 w-3 mr-1" /> Reset
+                              </Button>
+                            )}
+                            {plan !== 'free' && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-xs text-primary hover:text-primary hover:bg-primary/10 h-7 px-2"
+                                onClick={async () => {
+                                  try {
+                                    const { data, error } = await (supabase as any)
+                                      .from("subscriptions")
+                                      .select("*")
+                                      .eq("company_id", company.id)
+                                      .order("created_at", { ascending: false })
+                                      .limit(1);
+                                    if (error) throw error;
+                                    if (!data || data.length === 0) {
+                                      toast.error("No payment found for this company.");
+                                      return;
+                                    }
+                                    downloadInvoice(data[0], company);
+                                  } catch (err: any) {
+                                    toast.error(err.message);
+                                  }
+                                }}
+                              >
+                                <Download className="h-3 w-3 mr-1" /> Invoice
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-20 text-muted-foreground">
+              <Crown className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p>No companies registered yet.</p>
+            </div>
+          )}
+        </>
       )}
 
       {/* Delete confirmation dialog */}

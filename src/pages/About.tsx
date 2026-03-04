@@ -90,6 +90,71 @@ const About = () => {
         </div>
       </section>
 
+      {/* Our Plans Section */}
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="text-center mb-10">
+          <h2 className="text-2xl sm:text-3xl font-bold mb-3">Our Plans</h2>
+          <p className="text-muted-foreground max-w-xl mx-auto">
+            Choose a plan that fits your business. Start free, upgrade when you grow.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          {/* Free Plan */}
+          <Card className="border-border/50 bg-card/50 backdrop-blur-sm relative overflow-hidden">
+            <CardContent className="p-6 text-center">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
+                <Store className="h-6 w-6 text-emerald-500" />
+              </div>
+              <h3 className="font-bold text-lg mb-1">Free Plan</h3>
+              <p className="text-2xl font-extrabold text-emerald-600 mb-4">FREE</p>
+              <ul className="text-sm text-muted-foreground space-y-2 text-left">
+                <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-emerald-500 shrink-0" /> Up to 40 Products</li>
+                <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-emerald-500 shrink-0" /> Basic Listing</li>
+                <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-emerald-500 shrink-0" /> Standard Support</li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          {/* Growth Plan */}
+          <Card className="border-border/50 bg-card/50 backdrop-blur-sm relative overflow-hidden">
+            <CardContent className="p-6 text-center">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center mx-auto mb-4">
+                <Store className="h-6 w-6 text-blue-500" />
+              </div>
+              <h3 className="font-bold text-lg mb-1">Growth Plan</h3>
+              <p className="text-2xl font-extrabold mb-4">₹199<span className="text-sm font-normal text-muted-foreground">/month</span></p>
+              <ul className="text-sm text-muted-foreground space-y-2 text-left">
+                <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-blue-500 shrink-0" /> Up to 300 Products</li>
+                <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-blue-500 shrink-0" /> Better Visibility</li>
+                <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-blue-500 shrink-0" /> Standard Support</li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          {/* Pro Plan */}
+          <Card className="border-primary/30 bg-card/50 backdrop-blur-sm relative overflow-hidden ring-1 ring-purple-500/20">
+            <div className="absolute top-0 right-0 bg-purple-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-bl-lg">
+              POPULAR
+            </div>
+            <CardContent className="p-6 text-center">
+              <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center mx-auto mb-4">
+                <Store className="h-6 w-6 text-purple-500" />
+              </div>
+              <h3 className="font-bold text-lg mb-1">Pro Plan</h3>
+              <p className="text-2xl font-extrabold mb-4">₹349<span className="text-sm font-normal text-muted-foreground">/month</span></p>
+              <ul className="text-sm text-muted-foreground space-y-2 text-left">
+                <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-purple-500 shrink-0" /> 500+ Products</li>
+                <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-purple-500 shrink-0" /> Priority Support</li>
+                <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-purple-500 shrink-0" /> Featured Listing</li>
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
+        <p className="text-center text-xs text-muted-foreground mt-6">
+          🔒 All payments are secure via Razorpay · GPay · Visa · Mastercard
+        </p>
+      </section>
+
       {/* Vision & Story */}
       <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid md:grid-cols-2 gap-8">
