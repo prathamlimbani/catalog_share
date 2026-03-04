@@ -683,11 +683,12 @@ const MasterAdmin = () => {
                                 onClick={async () => {
                                   if (!confirm(`Reset ${company.name} to Free plan?`)) return;
                                   try {
-                                    await supabase.from("companies").update({ subscription_plan: "free", subscription_expires_at: null }).eq("id", company.id);
+                                    const { error } = await supabase.rpc("admin_reset_subscription", { target_company_id: company.id });
+                                    if (error) throw error;
                                     queryClient.invalidateQueries({ queryKey: ["all-companies"] });
                                     toast.success(`${company.name} reset to Free plan`);
                                   } catch (err: any) {
-                                    toast.error(err.message);
+                                    toast.error(err.message || "Failed to reset subscription");
                                   }
                                 }}
                               >
