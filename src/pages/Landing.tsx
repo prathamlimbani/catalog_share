@@ -457,7 +457,6 @@ const Landing = () => {
             </div>
             <div className="text-sm text-muted-foreground flex gap-4">
               <Link to="/about" className="hover:text-foreground transition-colors">About</Link>
-              <Link to="/master-login" className="hover:text-foreground transition-colors">Admin</Link>
             </div>
           </div>
           <div className="mt-4 pt-4 border-t text-center">

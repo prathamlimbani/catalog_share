@@ -137,7 +137,6 @@ const Index = () => {
               </div>
             </div>
             <div className="text-sm text-muted-foreground">
-              <Link to="/admin" className="hover:text-foreground transition-colors">Admin</Link>
             </div>
           </div>
         </div>
