@@ -38,6 +38,7 @@ const StoreProducts = () => {
       return data;
     },
     enabled: !!company,
+    staleTime: 2 * 60 * 1000, // 2 min cache
   });
 
   if (companyLoading) {

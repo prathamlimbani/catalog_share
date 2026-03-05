@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ShoppingCart, Check, Plus, Minus, ChevronLeft, ChevronRight, Eye } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import ProductViewDialog from "@/components/ProductViewDialog";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -270,4 +270,4 @@ const ProductCard = ({ product }: { product: Product }) => {
   );
 };
 
-export default ProductCard;
+export default memo(ProductCard);

@@ -70,6 +70,7 @@ const StoreFront = () => {
       return data;
     },
     enabled: !!company,
+    staleTime: 2 * 60 * 1000, // 2 min cache
   });
 
   const { data: latestRaw, isLoading: latestLoading } = useQuery({
@@ -86,6 +87,7 @@ const StoreFront = () => {
       return data;
     },
     enabled: !!company,
+    staleTime: 2 * 60 * 1000, // 2 min cache
   });
 
   const trending = useMemo(() => {
