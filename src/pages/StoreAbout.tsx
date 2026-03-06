@@ -2,7 +2,7 @@ import { useParams, Link } from "react-router-dom";
 import { useCompanyBySlug } from "@/hooks/useCompany";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Store, Phone, MapPin, ArrowLeft, ShoppingCart, User, Menu, X } from "lucide-react";
+import { Store, Phone, MapPin, ArrowLeft, ShoppingCart, User, Menu, X, CreditCard, QrCode } from "lucide-react";
 import useStoreTheme from "@/hooks/useStoreTheme";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useCart } from "@/contexts/CartContext";
@@ -34,6 +34,7 @@ const StoreAbout = () => {
 
     const hasContactInfo = company.contact_name_1 || company.contact_name_2 || company.contact_phone_1 || company.contact_phone_2;
     const hasMapUrl = company.google_maps_url;
+    const hasUpiInfo = company.upi_id || company.upi_qr_url;
 
     // Extract embed URL from Google Maps share link
     const getEmbedUrl = (url: string) => {
@@ -82,7 +83,7 @@ const StoreAbout = () => {
                     </div>
                 </div>
                 {mobileMenuOpen && (
-                    <div className="sm:hidden border-t bg-card p-4 space-y-2 animate-fade-in">
+                    <div className="sm:hidden border-t bg-card p-4 space-y-2 animate-fade-in shadow-lg absolute w-full left-0">
                         <Link to={`/store/${slug}`} onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium">Home</Link>
                         <Link to={`/store/${slug}/products`} onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium">Products</Link>
                         <Link to={`/store/${slug}/about`} onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium">About</Link>
@@ -207,6 +208,37 @@ const StoreAbout = () => {
                                             Open in Google Maps
                                         </Button>
                                     </a>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    )}
+
+                    {/* UPI Payment Info */}
+                    {hasUpiInfo && (
+                        <div className="space-y-4">
+                            <h2 className="text-xl font-bold mb-4">Payment Info</h2>
+                            <Card className="overflow-hidden group hover:border-primary/50 transition-colors">
+                                <CardContent className="p-6">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                            <CreditCard className="h-5 w-5 text-primary" />
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold">UPI Payment</p>
+                                        </div>
+                                    </div>
+                                    {company.upi_id && (
+                                        <div className="mb-4">
+                                            <p className="text-sm text-muted-foreground mb-1">UPI ID</p>
+                                            <p className="font-medium text-foreground bg-muted px-3 py-2 rounded-md select-all">{company.upi_id}</p>
+                                        </div>
+                                    )}
+                                    {company.upi_qr_url && (
+                                        <div className="flex flex-col items-center">
+                                            <p className="text-sm text-muted-foreground mb-2">Scan to Pay</p>
+                                            <img src={company.upi_qr_url} alt="UPI QR Code" className="w-48 h-48 object-contain rounded-lg border p-2 bg-white" />
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         </div>

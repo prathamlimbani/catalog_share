@@ -34,6 +34,8 @@ export type Database = {
           contact_name_2: string | null
           contact_phone_2: string | null
           google_maps_url: string | null
+          upi_id: string | null
+          upi_qr_url: string | null
           subscription_plan: string
           subscription_expires_at: string | null
         }
@@ -56,6 +58,8 @@ export type Database = {
           contact_name_2?: string | null
           contact_phone_2?: string | null
           google_maps_url?: string | null
+          upi_id?: string | null
+          upi_qr_url?: string | null
           subscription_plan?: string
           subscription_expires_at?: string | null
         }
@@ -78,6 +82,8 @@ export type Database = {
           contact_name_2?: string | null
           contact_phone_2?: string | null
           google_maps_url?: string | null
+          upi_id?: string | null
+          upi_qr_url?: string | null
           subscription_plan?: string
           subscription_expires_at?: string | null
         }

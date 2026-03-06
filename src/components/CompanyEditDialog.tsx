@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Settings, Upload } from "lucide-react";
+import { Settings, Upload, QrCode } from "lucide-react";
 import { Tables } from "@/integrations/supabase/types";
 import ColorThemePicker from "@/components/ColorThemePicker";
 
@@ -28,7 +28,10 @@ const CompanyEditDialog = ({ company }: { company: Company }) => {
     contact_name_2: company.contact_name_2 || "",
     contact_phone_2: company.contact_phone_2 || "+91",
     google_maps_url: company.google_maps_url || "",
+    upi_id: company.upi_id || "",
   });
+  const [qrFile, setQrFile] = useState<File | null>(null);
+  const [qrPreview, setQrPreview] = useState<string | null>(company.upi_qr_url || null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(company.logo_url);
 
@@ -37,6 +40,14 @@ const CompanyEditDialog = ({ company }: { company: Company }) => {
     if (file) {
       setLogoFile(file);
       setLogoPreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleQrSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setQrFile(file);
+      setQrPreview(URL.createObjectURL(file));
     }
   };
 
@@ -52,6 +63,18 @@ const CompanyEditDialog = ({ company }: { company: Company }) => {
         if (uploadError) throw uploadError;
         const { data: urlData } = supabase.storage.from("product-images").getPublicUrl(path);
         logoUrl = urlData.publicUrl;
+      }
+
+      let qrUrl = company.upi_qr_url;
+      if (qrFile) {
+        const ext = qrFile.name.split(".").pop();
+        const path = `qr/${company.owner_id}.${ext}`;
+        const { error: qrUploadError } = await supabase.storage
+          .from("product-images")
+          .upload(path, qrFile, { upsert: true });
+        if (qrUploadError) throw qrUploadError;
+        const { data: qrUrlData } = supabase.storage.from("product-images").getPublicUrl(path);
+        qrUrl = qrUrlData.publicUrl;
       }
 
       const { error } = await supabase
@@ -70,6 +93,8 @@ const CompanyEditDialog = ({ company }: { company: Company }) => {
           contact_name_2: form.contact_name_2.trim() || null,
           contact_phone_2: form.contact_phone_2.replace(/\s+/g, '') === '+91' ? null : form.contact_phone_2.replace(/\s+/g, '') || null,
           google_maps_url: form.google_maps_url.trim() || null,
+          upi_id: form.upi_id.trim() || null,
+          upi_qr_url: qrUrl,
         })
         .eq("id", company.id);
       if (error) throw error;
@@ -79,6 +104,7 @@ const CompanyEditDialog = ({ company }: { company: Company }) => {
       toast.success("Company details updated!");
       setOpen(false);
       setLogoFile(null);
+      setQrFile(null);
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -100,9 +126,12 @@ const CompanyEditDialog = ({ company }: { company: Company }) => {
           contact_name_2: company.contact_name_2 || "",
           contact_phone_2: company.contact_phone_2 || "+91",
           google_maps_url: company.google_maps_url || "",
+          upi_id: company.upi_id || "",
         });
         setLogoPreview(company.logo_url);
         setLogoFile(null);
+        setQrPreview(company.upi_qr_url || null);
+        setQrFile(null);
       }
     }}>
       <DialogTrigger asChild>
@@ -178,6 +207,23 @@ const CompanyEditDialog = ({ company }: { company: Company }) => {
             <div className="space-y-2 mt-3">
               <Label>Google Maps Link</Label>
               <Input value={form.google_maps_url} onChange={(e) => setForm({ ...form, google_maps_url: e.target.value })} placeholder="Paste your Google Maps share link" />
+            </div>
+            <div className="space-y-2 mt-3">
+              <Label>UPI ID <span className="text-muted-foreground text-xs">(optional)</span></Label>
+              <Input value={form.upi_id} onChange={(e) => setForm({ ...form, upi_id: e.target.value })} placeholder="e.g. yourname@upi" />
+            </div>
+            <div className="space-y-2 mt-3">
+              <Label>UPI QR Code <span className="text-muted-foreground text-xs">(optional)</span></Label>
+              <div className="flex items-center gap-3">
+                {qrPreview && (
+                  <img src={qrPreview} alt="QR Code" className="w-16 h-16 rounded-lg object-contain border" />
+                )}
+                <label className="flex items-center gap-2 px-4 py-2 border border-input rounded-md cursor-pointer hover:bg-accent text-sm">
+                  <QrCode className="h-4 w-4" />
+                  {qrFile ? "Change QR" : "Upload QR"}
+                  <input type="file" accept="image/*" onChange={handleQrSelect} className="hidden" />
+                </label>
+              </div>
             </div>
           </div>
           <Button type="submit" className="w-full" disabled={updateMutation.isPending}>

@@ -1,11 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
   <defs>
-    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#f97316"/>
-      <stop offset="100%" style="stop-color:#f59e0b"/>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a6fb5"/>
+      <stop offset="100%" style="stop-color:#0d5a9e"/>
     </linearGradient>
   </defs>
-  <rect width="32" height="32" rx="8" fill="url(#g)"/>
-  <path d="M8 10h10c1 0 2 1 2 2v8c0 1-1 2-2 2H8c-1 0-2-1-2-2v-8c0-1 1-2 2-2zm0 2v8h10v-8H8z" fill="white" opacity="0.95"/>
-  <path d="M21 8l5 5-5 5" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+  <!-- Blue book background -->
+  <rect width="32" height="32" rx="6" fill="url(#bg)"/>
+  <!-- Book pages (green and orange tabs) -->
+  <rect x="24" y="4" width="3" height="24" rx="1" fill="#4CAF50" opacity="0.9"/>
+  <rect x="27" y="6" width="2.5" height="20" rx="1" fill="#FF9800" opacity="0.85"/>
+  <!-- Paper airplane -->
+  <path d="M6 22 L16 10 L22 16 Z" fill="white" opacity="0.95"/>
+  <path d="M6 22 L16 10 L12 17 Z" fill="#b8d4e8" opacity="0.8"/>
+  <!-- Wind lines -->
+  <path d="M4 19 Q7 18 9 19" stroke="#87CEEB" stroke-width="1" fill="none" opacity="0.7"/>
+  <path d="M3 21 Q6 20 9 21" stroke="#87CEEB" stroke-width="1" fill="none" opacity="0.6"/>
+  <path d="M5 23 Q7 22 9 23" stroke="#87CEEB" stroke-width="0.8" fill="none" opacity="0.5"/>
 </svg>
