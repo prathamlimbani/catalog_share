@@ -159,7 +159,7 @@ const StoreFront = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Store Navbar */}
-      <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b overflow-x-hidden transition-colors">
+      <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 min-w-0 gap-4">
             <Link to={`/store/${slug}`} className="flex items-center gap-2 min-w-0 flex-shrink-0">
@@ -210,7 +210,7 @@ const StoreFront = () => {
 
         {/* Mobile menu dropdown */}
         {mobileMenuOpen && (
-          <div className="sm:hidden border-t bg-card p-4 space-y-4 animate-fade-in shadow-lg absolute w-full left-0">
+          <div className="sm:hidden border-t bg-card p-4 space-y-4 animate-fade-in shadow-lg absolute w-full left-0 top-full">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input

@@ -69,7 +69,7 @@ const StoreCart = () => {
   return (
     <div className="min-h-screen">
       {/* Navbar */}
-      <nav className="sticky top-0 z-50 bg-card/80 backdrop-blur-md border-b overflow-x-hidden">
+      <nav className="sticky top-0 z-50 bg-card/80 backdrop-blur-md border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 min-w-0">
             <Link to={`/store/${slug}`} className="flex items-center gap-2 min-w-0 flex-shrink-0">
@@ -90,7 +90,7 @@ const StoreCart = () => {
           </div>
         </div>
         {mobileMenuOpen && (
-          <div className="sm:hidden border-t bg-card p-4 space-y-2 animate-fade-in">
+          <div className="sm:hidden border-t bg-card p-4 space-y-2 animate-fade-in shadow-lg absolute w-full left-0 top-full">
             <Link to={`/store/${slug}`} onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium">Home</Link>
             <Link to={`/store/${slug}/products`} onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium">Products</Link>
             <Link to={`/store/${slug}/about`} onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium">About</Link>
