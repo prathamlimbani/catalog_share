@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Store, Package, LogOut, Menu, Search, User, Pencil, Crown, CreditCard } from "lucide-react";
+import { Store, Package, LogOut, Menu, Search, User, Pencil, Crown, CreditCard, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -87,6 +87,15 @@ export const AdminLayout = ({
                         Billing
                     </Link>
                 )}
+
+                <a
+                    href="mailto:catalogshare123@gmail.com?subject=custome%20care%20support"
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl transition-colors font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                    onClick={() => setMobileMenuOpen(false)}
+                >
+                    <Mail className="h-5 w-5" />
+                    Customer Support
+                </a>
             </div>
             <div className="p-4 border-t">
                 <button
