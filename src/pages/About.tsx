@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Store, Heart, Linkedin, Globe, Send, AlertTriangle, Sparkles, Code2, ArrowLeft } from "lucide-react";
+import { Store, Heart, Linkedin, Globe, Send, AlertTriangle, Sparkles, Code2, ArrowLeft, Mail } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 
 const About = () => {
@@ -231,6 +231,26 @@ const About = () => {
           <Globe className="h-5 w-5" />
           hostingsignal.in
         </a>
+      </section>
+
+      {/* Customer Care Section */}
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-center">
+        <div className="bg-primary/5 rounded-2xl p-8 sm:p-12 border border-primary/10">
+          <h2 className="text-2xl sm:text-3xl font-bold mb-4">Customer Care Support</h2>
+          <p className="text-muted-foreground mb-6 max-w-xl mx-auto">
+            Need assistance or have any queries? Our dedicated support team is here to help you out. Click below to reach out directly to us!
+          </p>
+          <Button asChild size="lg" className="rounded-full gap-2 px-8">
+            <a href="mailto:catalogshare123@gmail.com?subject=custome%20care%20support">
+              <Mail className="h-5 w-5" />
+              Contact Customer Care
+            </a>
+          </Button>
+          <div className="mt-4 inline-flex items-center justify-center gap-2 text-sm text-muted-foreground bg-background rounded-full px-4 py-2 shadow-sm border">
+            <span>Direct Email:</span>
+            <span className="font-semibold text-foreground">catalogshare123@gmail.com</span>
+          </div>
+        </div>
       </section>
 
       {/* Suggestion Box */}

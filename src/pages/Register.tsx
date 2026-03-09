@@ -7,12 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Store, Upload, Mail } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import ColorThemePicker from "@/components/ColorThemePicker";
 
 const Register = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState<"signup" | "company">("signup");
   const [loading, setLoading] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   // Auth fields
   const [email, setEmail] = useState("");
@@ -46,6 +48,10 @@ const Register = () => {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!agreedToTerms) {
+      toast.error("You must agree to the Terms and Conditions to continue");
+      return;
+    }
     if (password !== confirmPassword) {
       toast.error("Passwords do not match");
       return;
@@ -154,6 +160,31 @@ const Register = () => {
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirm Password</Label>
                 <Input id="confirmPassword" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Re-enter password" required minLength={6} />
+              </div>
+              <div className="space-y-4 pt-2">
+                <div className="space-y-2">
+                  <Label>Terms and Conditions</Label>
+                  <div className="h-32 w-full overflow-y-auto rounded-md border p-4 text-xs text-muted-foreground bg-muted/30">
+                    <h4 className="font-semibold text-foreground mb-2 text-sm">Platform Terms of Service</h4>
+                    <p className="mb-2">Welcome to CatalogShare. By creating an account, you agree to the following terms and conditions:</p>
+                    <p className="mb-2">1. <strong>Platform Independence:</strong> CatalogShare is a platform offering catalog creation services. You are solely responsible for the content you upload.</p>
+                    <p className="mb-2">2. <strong>Under Development:</strong> Please note that this platform is currently under active development. You may encounter bugs, service interruptions, or incomplete features.</p>
+                    <p className="mb-2 text-foreground font-semibold">3. <strong>No Refund Policy:</strong> As this service is in active development and provides immediate value through digital infrastructure, all purchases and subscription funds are strictly non-refundable.</p>
+                    <p className="mb-2">4. <strong>Data Privacy:</strong> We respect your privacy but reserve the right to modify our service offerings at any time.</p>
+                    <p className="mb-2">5. <strong>Account Termination:</strong> We reserve the right to suspend or terminate accounts that violate our community guidelines or engage in fraudulent activities.</p>
+                    <p>By proceeding, you acknowledge that you have read and understood these terms.</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="terms"
+                    checked={agreedToTerms}
+                    onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)}
+                  />
+                  <Label htmlFor="terms" className="text-sm font-medium leading-none cursor-pointer">
+                    I agree to the Terms and Conditions
+                  </Label>
+                </div>
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Creating Account..." : "Create Account"}
