@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { LogOut, Store, Phone, Mail, MapPin, FileText, ExternalLink, Trash2, MessageSquare, Star, ClipboardList, BarChart3, Download, Crown } from "lucide-react";
+import { LogOut, Store, Phone, Mail, MapPin, FileText, ExternalLink, Trash2, MessageSquare, Star, ClipboardList, BarChart3, Download, Crown, ChevronDown, Zap, Sparkles } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { exportMasterDataToExcel } from "@/lib/exportUtils";
@@ -23,6 +24,7 @@ const MasterAdmin = () => {
   const [confirmText, setConfirmText] = useState("");
   const [activeTab, setActiveTab] = useState<"companies" | "suggestions" | "surveys" | "analytics" | "subscriptions">("companies");
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | "all">("all");
+  const [planChangeTarget, setPlanChangeTarget] = useState<{ id: string; name: string; newPlan: string } | null>(null);
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -675,26 +677,55 @@ const MasterAdmin = () => {
                                 {isExpired ? 'EXPIRED' : `Expires ${new Date(expiresAt).toLocaleDateString()}`}
                               </span>
                             )}
-                            {plan !== 'free' && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10 h-7 px-2"
-                                onClick={async () => {
-                                  if (!confirm(`Reset ${company.name} to Free plan?`)) return;
-                                  try {
-                                    const { error } = await supabase.rpc("admin_reset_subscription", { target_company_id: company.id });
-                                    if (error) throw error;
-                                    queryClient.invalidateQueries({ queryKey: ["all-companies"] });
-                                    toast.success(`${company.name} reset to Free plan`);
-                                  } catch (err: any) {
-                                    toast.error(err.message || "Failed to reset subscription");
-                                  }
-                                }}
-                              >
-                                <Trash2 className="h-3 w-3 mr-1" /> Reset
-                              </Button>
-                            )}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs h-7 px-2 gap-1"
+                                >
+                                  <Crown className="h-3 w-3" /> Plan <ChevronDown className="h-3 w-3" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-40">
+                                <DropdownMenuItem
+                                  className={`text-xs gap-2 ${plan === 'free' ? 'font-bold bg-muted' : ''}`}
+                                  disabled={plan === 'free'}
+                                  onClick={() => {
+                                    if (plan === 'free') return;
+                                    setPlanChangeTarget({ id: company.id, name: company.name, newPlan: 'free' });
+                                  }}
+                                >
+                                  <Zap className="h-3.5 w-3.5 text-emerald-500" />
+                                  Free Plan
+                                  {plan === 'free' && <span className="ml-auto text-[10px] text-muted-foreground">✓</span>}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className={`text-xs gap-2 ${plan === 'growth' ? 'font-bold bg-muted' : ''}`}
+                                  disabled={plan === 'growth'}
+                                  onClick={() => {
+                                    if (plan === 'growth') return;
+                                    setPlanChangeTarget({ id: company.id, name: company.name, newPlan: 'growth' });
+                                  }}
+                                >
+                                  <Sparkles className="h-3.5 w-3.5 text-blue-500" />
+                                  Growth Plan
+                                  {plan === 'growth' && <span className="ml-auto text-[10px] text-muted-foreground">✓</span>}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className={`text-xs gap-2 ${plan === 'pro' ? 'font-bold bg-muted' : ''}`}
+                                  disabled={plan === 'pro'}
+                                  onClick={() => {
+                                    if (plan === 'pro') return;
+                                    setPlanChangeTarget({ id: company.id, name: company.name, newPlan: 'pro' });
+                                  }}
+                                >
+                                  <Crown className="h-3.5 w-3.5 text-purple-500" />
+                                  Pro Plan
+                                  {plan === 'pro' && <span className="ml-auto text-[10px] text-muted-foreground">✓</span>}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                             {plan !== 'free' && (
                               <Button
                                 size="sm"
@@ -738,6 +769,48 @@ const MasterAdmin = () => {
           )}
         </>
       )}
+
+      {/* Plan Change confirmation dialog */}
+      <Dialog open={!!planChangeTarget} onOpenChange={(open) => { if (!open) setPlanChangeTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Subscription Plan</DialogTitle>
+            <DialogDescription>
+              You are about to change <strong>{planChangeTarget?.name}</strong>'s plan to{" "}
+              <strong className={planChangeTarget?.newPlan === 'pro' ? 'text-purple-600' : planChangeTarget?.newPlan === 'growth' ? 'text-blue-600' : 'text-emerald-600'}>
+                {planChangeTarget?.newPlan === 'free' ? 'Free Plan' : planChangeTarget?.newPlan === 'growth' ? 'Growth Plan' : 'Pro Plan'}
+              </strong>.
+              {planChangeTarget?.newPlan !== 'free' && ' This plan will be active for 30 days.'}
+              {planChangeTarget?.newPlan === 'free' && ' The subscription expiry will be removed.'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setPlanChangeTarget(null)}>Cancel</Button>
+            <Button
+              className={planChangeTarget?.newPlan === 'pro' ? 'bg-purple-600 hover:bg-purple-700 text-white' : planChangeTarget?.newPlan === 'growth' ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}
+              onClick={async () => {
+                if (!planChangeTarget) return;
+                try {
+                  const { error } = await (supabase as any).rpc("admin_set_subscription", {
+                    target_company_id: planChangeTarget.id,
+                    new_plan: planChangeTarget.newPlan,
+                  });
+                  if (error) throw error;
+                  await queryClient.invalidateQueries({ queryKey: ["all-companies"] });
+                  await queryClient.refetchQueries({ queryKey: ["all-companies"] });
+                  const planLabel = planChangeTarget.newPlan === 'free' ? 'Free Plan' : planChangeTarget.newPlan === 'growth' ? 'Growth Plan' : 'Pro Plan';
+                  toast.success(`${planChangeTarget.name} set to ${planLabel}`);
+                  setPlanChangeTarget(null);
+                } catch (err: any) {
+                  toast.error(err.message || "Failed to update plan");
+                }
+              }}
+            >
+              Confirm Change
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete confirmation dialog */}
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setConfirmText(""); } }}>
