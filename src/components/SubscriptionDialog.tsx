@@ -170,7 +170,7 @@ export function SubscriptionDialog({ companyId, companyName, companyEmail, curre
 
                     if (compError) throw compError;
 
-                    // Send invoice email via edge function (fire-and-forget)
+                    // Send invoice email to the company (fire-and-forget)
                     supabase.functions.invoke("send-emails", {
                         body: {
                             type: "invoice",
@@ -183,6 +183,19 @@ export function SubscriptionDialog({ companyId, companyName, companyEmail, curre
                             expiresAt: expiresAt.toISOString(),
                         },
                     }).catch((e: any) => console.warn("Invoice email failed (non-blocking):", e));
+
+                    // Send admin notification to catalogshare123@gmail.com
+                    supabase.functions.invoke("send-emails", {
+                        body: {
+                            type: "admin_new_subscription",
+                            to: companyEmail,
+                            companyName,
+                            companyEmail,
+                            planName: plan.name,
+                            amount: amountInPaise,
+                            expiresAt: expiresAt.toISOString(),
+                        },
+                    }).catch((e: any) => console.warn("Admin subscription email failed (non-blocking):", e));
 
                     // Refresh data
                     queryClient.invalidateQueries({ queryKey: ["current-company"] });

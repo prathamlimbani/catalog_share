@@ -127,7 +127,7 @@ const Register = () => {
 
       if (error) throw error;
 
-      // Send welcome email (fire-and-forget, non-blocking)
+      // Send welcome email to the company (fire-and-forget)
       supabase.functions.invoke("send-emails", {
         body: {
           type: "welcome",
@@ -135,6 +135,16 @@ const Register = () => {
           companyName: companyName.trim(),
         },
       }).catch((e: any) => console.warn("Welcome email failed (non-blocking):", e));
+
+      // Send admin notification to catalogshare123@gmail.com
+      supabase.functions.invoke("send-emails", {
+        body: {
+          type: "admin_new_company",
+          to: email.trim(),         // companyEmail passed as `to` so admin HTML can show it
+          companyName: companyName.trim(),
+          companyEmail: email.trim(),
+        },
+      }).catch((e: any) => console.warn("Admin new-company email failed (non-blocking):", e));
 
       toast.success("Company created! Welcome to your dashboard.");
       navigate("/dashboard");

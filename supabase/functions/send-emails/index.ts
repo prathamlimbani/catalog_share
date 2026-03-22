@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = "CatalogShare <noreply@catalogshare.online>";
 const REPLY_TO = "catalogshare123@gmail.com";
+const ADMIN_EMAIL = "catalogshare123@gmail.com";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,10 +11,10 @@ const corsHeaders = {
 };
 
 interface EmailPayload {
-  type: "welcome" | "invoice" | "expiry_reminder";
+  type: "welcome" | "invoice" | "expiry_reminder" | "admin_new_company" | "admin_new_subscription";
   to: string;
   companyName: string;
-  // invoice fields
+  // invoice / subscription fields
   planName?: string;
   amount?: number; // in paise
   paymentId?: string;
@@ -21,6 +22,8 @@ interface EmailPayload {
   startsAt?: string;
   // expiry reminder fields
   daysLeft?: number;
+  // admin fields
+  companyEmail?: string;
 }
 
 function welcomeEmailHtml(companyName: string): string {
@@ -196,6 +199,94 @@ function expiryReminderEmailHtml(payload: EmailPayload): string {
 </html>`;
 }
 
+function adminNewCompanyHtml(companyName: string, companyEmail: string): string {
+  const now = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" });
+  return `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>New Company Joined</title></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:'Segoe UI',system-ui,sans-serif;">
+  <div style="max-width:520px;margin:40px auto;background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#10b981,#059669);padding:28px 32px;">
+      <h1 style="color:white;margin:0;font-size:22px;font-weight:800;">🎉 New Company Joined!</h1>
+      <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:13px;">CatalogShare Admin Alert</p>
+    </div>
+    <div style="padding:28px 32px;">
+      <p style="font-size:15px;color:#111827;margin:0 0 20px;">A new company has registered on CatalogShare.</p>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+        <tr style="background:#f9fafb;">
+          <td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #e5e7eb;">Company Name</td>
+          <td style="padding:12px 16px;font-weight:700;font-size:13px;border-bottom:1px solid #e5e7eb;">${companyName}</td>
+        </tr>
+        <tr>
+          <td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #e5e7eb;">Email</td>
+          <td style="padding:12px 16px;font-size:13px;border-bottom:1px solid #e5e7eb;">${companyEmail}</td>
+        </tr>
+        <tr style="background:#f9fafb;">
+          <td style="padding:12px 16px;color:#6b7280;font-size:13px;">Joined At</td>
+          <td style="padding:12px 16px;font-size:13px;">${now} IST</td>
+        </tr>
+      </table>
+      <div style="margin-top:20px;">
+        <a href="https://www.catalogshare.online/master" style="display:inline-block;background:linear-gradient(135deg,#10b981,#059669);color:white;text-decoration:none;padding:10px 24px;border-radius:50px;font-weight:700;font-size:13px;">View in Master Admin →</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+function adminNewSubscriptionHtml(companyName: string, companyEmail: string, planName: string, amount: number, expiresAt: string): string {
+  const amountStr = (amount / 100).toFixed(0);
+  const expiryDate = new Date(expiresAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  const now = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" });
+  return `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>New Subscription</title></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:'Segoe UI',system-ui,sans-serif;">
+  <div style="max-width:520px;margin:40px auto;background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#6366f1,#a855f7);padding:28px 32px;">
+      <h1 style="color:white;margin:0;font-size:22px;font-weight:800;">💰 New Subscription!</h1>
+      <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:13px;">CatalogShare Admin Alert</p>
+    </div>
+    <div style="padding:28px 32px;">
+      <p style="font-size:15px;color:#111827;margin:0 0 20px;">A company has purchased a subscription plan.</p>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+        <tr style="background:#f9fafb;">
+          <td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #e5e7eb;">Company</td>
+          <td style="padding:12px 16px;font-weight:700;font-size:13px;border-bottom:1px solid #e5e7eb;">${companyName}</td>
+        </tr>
+        <tr>
+          <td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #e5e7eb;">Email</td>
+          <td style="padding:12px 16px;font-size:13px;border-bottom:1px solid #e5e7eb;">${companyEmail}</td>
+        </tr>
+        <tr style="background:#f9fafb;">
+          <td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #e5e7eb;">Plan</td>
+          <td style="padding:12px 16px;font-weight:700;font-size:13px;border-bottom:1px solid #e5e7eb;color:#6366f1;">${planName}</td>
+        </tr>
+        <tr>
+          <td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #e5e7eb;">Amount Paid</td>
+          <td style="padding:12px 16px;font-weight:800;font-size:16px;border-bottom:1px solid #e5e7eb;color:#059669;">₹${amountStr}</td>
+        </tr>
+        <tr style="background:#f9fafb;">
+          <td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #e5e7eb;">Valid Until</td>
+          <td style="padding:12px 16px;font-size:13px;border-bottom:1px solid #e5e7eb;">${expiryDate}</td>
+        </tr>
+        <tr>
+          <td style="padding:12px 16px;color:#6b7280;font-size:13px;">Purchased At</td>
+          <td style="padding:12px 16px;font-size:13px;">${now} IST</td>
+        </tr>
+      </table>
+      <div style="margin-top:20px;">
+        <a href="https://www.catalogshare.online/master" style="display:inline-block;background:linear-gradient(135deg,#6366f1,#a855f7);color:white;text-decoration:none;padding:10px 24px;border-radius:50px;font-weight:700;font-size:13px;">View in Master Admin →</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -221,6 +312,7 @@ serve(async (req) => {
 
     let subject = "";
     let html = "";
+    let recipientEmail = to; // default: send to the company email
 
     switch (type) {
       case "welcome":
@@ -234,6 +326,16 @@ serve(async (req) => {
       case "expiry_reminder":
         subject = `⏰ Your CatalogShare Plan Expires in ${payload.daysLeft ?? 7} Day${(payload.daysLeft ?? 7) === 1 ? "" : "s"}`;
         html = expiryReminderEmailHtml(payload);
+        break;
+      case "admin_new_company":
+        subject = `🎉 New Company Joined: ${companyName}`;
+        html = adminNewCompanyHtml(companyName, payload.companyEmail || to);
+        recipientEmail = ADMIN_EMAIL; // override: send to admin
+        break;
+      case "admin_new_subscription":
+        subject = `💰 New Subscription: ${companyName} → ${payload.planName}`;
+        html = adminNewSubscriptionHtml(companyName, payload.companyEmail || to, payload.planName || "Unknown", payload.amount || 0, payload.expiresAt || "");
+        recipientEmail = ADMIN_EMAIL; // override: send to admin
         break;
       default:
         return new Response(JSON.stringify({ error: "Invalid email type" }), {
@@ -250,7 +352,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         from: FROM_EMAIL,
-        to: [to],
+        to: [recipientEmail],
         reply_to: REPLY_TO,
         subject,
         html,
