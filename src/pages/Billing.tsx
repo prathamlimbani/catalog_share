@@ -181,6 +181,32 @@ const Billing = () => {
     const expiresAt = (company as any)?.subscription_expires_at;
     const isExpired = expiresAt && new Date(expiresAt) < new Date();
 
+    // Auto-send expiry reminder email if plan expires within 7 days
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => {
+        if (!company || !expiresAt || currentPlan === "free" || isExpired) return;
+
+        const msUntilExpiry = new Date(expiresAt).getTime() - Date.now();
+        const daysLeft = Math.ceil(msUntilExpiry / (1000 * 60 * 60 * 24));
+
+        if (daysLeft > 7) return;
+
+        // Only send once per browser session to avoid spam
+        const reminderSentKey = `expiry_reminder_sent_${company.id}`;
+        if (sessionStorage.getItem(reminderSentKey)) return;
+        sessionStorage.setItem(reminderSentKey, "1");
+
+        supabase.functions.invoke("send-emails", {
+            body: {
+                type: "expiry_reminder",
+                to: company.email,
+                companyName: company.name,
+                expiresAt,
+                daysLeft,
+            },
+        }).catch((e: any) => console.warn("Expiry reminder email failed (non-blocking):", e));
+    }, [company, expiresAt, currentPlan, isExpired]);
+
     const getStatusIcon = (status: string) => {
         if (status === "active") return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
         if (status === "expired") return <XCircle className="h-4 w-4 text-red-500" />;

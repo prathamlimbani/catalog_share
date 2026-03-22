@@ -170,11 +170,24 @@ export function SubscriptionDialog({ companyId, companyName, companyEmail, curre
 
                     if (compError) throw compError;
 
+                    // Send invoice email via edge function (fire-and-forget)
+                    supabase.functions.invoke("send-emails", {
+                        body: {
+                            type: "invoice",
+                            to: companyEmail,
+                            companyName,
+                            planName: plan.name,
+                            amount: amountInPaise,
+                            paymentId: response.razorpay_payment_id || null,
+                            startsAt: now.toISOString(),
+                            expiresAt: expiresAt.toISOString(),
+                        },
+                    }).catch((e: any) => console.warn("Invoice email failed (non-blocking):", e));
+
                     // Refresh data
                     queryClient.invalidateQueries({ queryKey: ["current-company"] });
 
-                    toast.success(`🎉 Successfully upgraded to ${plan.name}!`);
-                    setOpen(false);
+                    toast.success(`🎉 Successfully upgraded to ${plan.name}! Invoice sent to your email.`);
                 } catch (err: any) {
                     console.error("Failed to record subscription:", err);
                     toast.error("Payment received but failed to activate plan. Please contact support.");
@@ -192,6 +205,12 @@ export function SubscriptionDialog({ companyId, companyName, companyEmail, curre
             toast.error(`Payment failed: ${response.error.description}`);
             setLoading(false);
         });
+
+        // IMPORTANT: Close the Dialog BEFORE opening Razorpay.
+        // The Radix UI Dialog overlay captures pointer events (pointer-events: all),
+        // which blocks clicks inside the Razorpay iframe popup.
+        // Closing the Dialog removes the overlay from the DOM so Razorpay works normally.
+        setOpen(false);
         razorpay.open();
         setLoading(false);
     };

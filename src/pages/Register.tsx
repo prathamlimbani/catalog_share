@@ -126,6 +126,16 @@ const Register = () => {
       });
 
       if (error) throw error;
+
+      // Send welcome email (fire-and-forget, non-blocking)
+      supabase.functions.invoke("send-emails", {
+        body: {
+          type: "welcome",
+          to: email.trim(),
+          companyName: companyName.trim(),
+        },
+      }).catch((e: any) => console.warn("Welcome email failed (non-blocking):", e));
+
       toast.success("Company created! Welcome to your dashboard.");
       navigate("/dashboard");
     } catch (error: any) {
