@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { LogOut, Store, Phone, Mail, MapPin, FileText, ExternalLink, Trash2, MessageSquare, Star, ClipboardList, BarChart3, Download, Crown, ChevronDown, Zap, Sparkles } from "lucide-react";
+import { LogOut, Store, Phone, Mail, MapPin, FileText, ExternalLink, Trash2, MessageSquare, Star, ClipboardList, BarChart3, Download, Crown, ChevronDown, Zap, Sparkles, Send } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { exportMasterDataToExcel } from "@/lib/exportUtils";
@@ -25,6 +25,7 @@ const MasterAdmin = () => {
   const [activeTab, setActiveTab] = useState<"companies" | "suggestions" | "surveys" | "analytics" | "subscriptions">("companies");
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | "all">("all");
   const [planChangeTarget, setPlanChangeTarget] = useState<{ id: string; name: string; newPlan: string } | null>(null);
+  const [bulkEmailSending, setBulkEmailSending] = useState(false);
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -638,6 +639,49 @@ const MasterAdmin = () => {
                 </Card>
               </div>
 
+              {/* Bulk email button */}
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800"
+                  disabled={bulkEmailSending}
+                  onClick={async () => {
+                    if (!companies || companies.length === 0) return;
+                    setBulkEmailSending(true);
+                    toast.loading(`Sending plan status emails to ${companies.length} companies...`, { id: "bulk-email-toast" });
+                    let sent = 0;
+                    let failed = 0;
+                    for (const company of companies) {
+                      const plan = (company as any).subscription_plan || 'free';
+                      const planLabel = plan === 'pro' ? 'Pro Plan' : plan === 'growth' ? 'Growth Plan' : 'Free Plan';
+                      try {
+                        await supabase.functions.invoke("send-emails", {
+                          body: {
+                            type: "plan_status",
+                            to: company.email,
+                            companyName: company.name,
+                            planName: planLabel,
+                            expiresAt: (company as any).subscription_expires_at || null,
+                          },
+                        });
+                        sent++;
+                      } catch {
+                        failed++;
+                      }
+                    }
+                    setBulkEmailSending(false);
+                    if (failed === 0) {
+                      toast.success(`✅ Plan status emails sent to all ${sent} companies!`, { id: "bulk-email-toast" });
+                    } else {
+                      toast.warning(`Sent ${sent}, failed ${failed} emails.`, { id: "bulk-email-toast" });
+                    }
+                  }}
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  {bulkEmailSending ? "Sending..." : "Email All Companies Plan Status"}
+                </Button>
+              </div>
+
               <div className="grid gap-3">
                 {companies.map((company: any) => {
                   const plan = company.subscription_plan || 'free';
@@ -791,6 +835,11 @@ const MasterAdmin = () => {
               onClick={async () => {
                 if (!planChangeTarget) return;
                 try {
+                  // Capture current plan before change
+                  const targetCompany = companies?.find((c: any) => c.id === planChangeTarget.id);
+                  const previousPlan = targetCompany?.subscription_plan || 'free';
+                  const previousPlanLabel = previousPlan === 'pro' ? 'Pro Plan' : previousPlan === 'growth' ? 'Growth Plan' : 'Free Plan';
+
                   const { error } = await (supabase as any).rpc("admin_set_subscription", {
                     target_company_id: planChangeTarget.id,
                     new_plan: planChangeTarget.newPlan,
@@ -800,6 +849,25 @@ const MasterAdmin = () => {
                   await queryClient.refetchQueries({ queryKey: ["all-companies"] });
                   const planLabel = planChangeTarget.newPlan === 'free' ? 'Free Plan' : planChangeTarget.newPlan === 'growth' ? 'Growth Plan' : 'Pro Plan';
                   toast.success(`${planChangeTarget.name} set to ${planLabel}`);
+
+                  // Send plan change email with PDF bill to company + admin (fire-and-forget)
+                  const now = new Date();
+                  const expiresAt = planChangeTarget.newPlan === 'free' ? null : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+                  supabase.functions.invoke("send-emails", {
+                    body: {
+                      type: "admin_plan_change",
+                      to: targetCompany?.email || "",
+                      companyName: planChangeTarget.name,
+                      companyEmail: targetCompany?.email || "",
+                      planName: planLabel,
+                      previousPlan: previousPlanLabel,
+                      amount: 0,
+                      paymentId: `ADMIN-${Math.floor(now.getTime() / 1000)}`,
+                      startsAt: now.toISOString(),
+                      expiresAt: expiresAt,
+                    },
+                  }).catch((e: any) => console.warn("Plan change email failed (non-blocking):", e));
+
                   setPlanChangeTarget(null);
                 } catch (err: any) {
                   toast.error(err.message || "Failed to update plan");
