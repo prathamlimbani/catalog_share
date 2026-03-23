@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { LogOut, Store, Phone, Mail, MapPin, FileText, ExternalLink, Trash2, MessageSquare, Star, ClipboardList, BarChart3, Download, Crown, ChevronDown, Zap, Sparkles, Send } from "lucide-react";
+import { LogOut, Store, Phone, Mail, MapPin, FileText, ExternalLink, Trash2, MessageSquare, Star, ClipboardList, BarChart3, Download, Crown, ChevronDown, Zap, Sparkles, Send, BookOpen, CheckCircle2 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { exportMasterDataToExcel } from "@/lib/exportUtils";
@@ -168,6 +168,18 @@ const MasterAdmin = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["all-suggestions"] });
       toast.success("Suggestion deleted.");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const updateSuggestionStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { error } = await (supabase as any).from("suggestions").update({ status }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_data: any, variables: { id: string; status: string }) => {
+      queryClient.invalidateQueries({ queryKey: ["all-suggestions"] });
+      toast.success(`Suggestion marked as ${variables.status}.`);
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -368,32 +380,67 @@ const MasterAdmin = () => {
             <p className="text-muted-foreground">Loading suggestions...</p>
           ) : suggestions && suggestions.length > 0 ? (
             <div className="grid gap-3">
-              {suggestions.map((s) => (
-                <Card key={s.id}>
+              {suggestions.map((s) => {
+                const status = (s as any).status || 'new';
+                return (
+                <Card key={s.id} className={status === 'solved' ? 'opacity-60' : ''}>
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <MessageSquare className="h-4 w-4 text-primary flex-shrink-0" />
                           <h3 className="font-semibold text-sm">{s.name}</h3>
+                          {status === 'read' && (
+                            <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-[10px] px-1.5 py-0">
+                              <BookOpen className="h-3 w-3 mr-0.5" /> Read
+                            </Badge>
+                          )}
+                          {status === 'solved' && (
+                            <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-[10px] px-1.5 py-0">
+                              <CheckCircle2 className="h-3 w-3 mr-0.5" /> Solved
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-sm text-muted-foreground whitespace-pre-wrap">{s.message}</p>
                         <p className="text-xs text-muted-foreground mt-2">
                           {new Date(s.created_at).toLocaleDateString()} at {new Date(s.created_at).toLocaleTimeString()}
                         </p>
                       </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 text-destructive flex-shrink-0"
-                        onClick={() => deleteSuggestionMutation.mutate(s.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {status !== 'read' && status !== 'solved' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs text-blue-600 border-blue-200 hover:bg-blue-50 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-900/20"
+                            onClick={() => updateSuggestionStatusMutation.mutate({ id: s.id, status: 'read' })}
+                          >
+                            <BookOpen className="h-3 w-3 mr-1" /> Read
+                          </Button>
+                        )}
+                        {status !== 'solved' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs text-green-600 border-green-200 hover:bg-green-50 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/20"
+                            onClick={() => updateSuggestionStatusMutation.mutate({ id: s.id, status: 'solved' })}
+                          >
+                            <CheckCircle2 className="h-3 w-3 mr-1" /> Solved
+                          </Button>
+                        )}
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-destructive"
+                          onClick={() => deleteSuggestionMutation.mutate(s.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-20 text-muted-foreground">
@@ -655,7 +702,7 @@ const MasterAdmin = () => {
                       const plan = (company as any).subscription_plan || 'free';
                       const planLabel = plan === 'pro' ? 'Pro Plan' : plan === 'growth' ? 'Growth Plan' : 'Free Plan';
                       try {
-                        await supabase.functions.invoke("send-emails", {
+                        const { data, error } = await supabase.functions.invoke("send-emails", {
                           body: {
                             type: "plan_status",
                             to: company.email,
@@ -664,8 +711,15 @@ const MasterAdmin = () => {
                             expiresAt: (company as any).subscription_expires_at || null,
                           },
                         });
-                        sent++;
-                      } catch {
+                        if (error) {
+                          console.error(`Email failed for ${company.name}:`, error);
+                          failed++;
+                        } else {
+                          console.log(`Email sent to ${company.name}:`, data);
+                          sent++;
+                        }
+                      } catch (e) {
+                        console.error(`Email exception for ${company.name}:`, e);
                         failed++;
                       }
                     }

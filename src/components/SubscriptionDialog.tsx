@@ -59,7 +59,7 @@ const PLANS: Plan[] = [
         price: 349,
         priceLabel: "₹349/month",
         productLimit: 9999,
-        features: ["500+ Products", "Priority Support", "Featured Listing"],
+        features: ["500+ Products", "Custom Branding with Logo & Domain", "Priority Support", "Featured Listing"],
         icon: <Crown className="h-5 w-5" />,
         popular: true,
         gradient: "from-purple-500/10 to-pink-500/10",

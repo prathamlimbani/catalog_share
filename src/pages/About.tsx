@@ -144,6 +144,7 @@ const About = () => {
               <p className="text-2xl font-extrabold mb-4">₹349<span className="text-sm font-normal text-muted-foreground">/month</span></p>
               <ul className="text-sm text-muted-foreground space-y-2 text-left">
                 <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-purple-500 shrink-0" /> 500+ Products</li>
+                <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-purple-500 shrink-0" /> Custom Branding with Logo & Domain</li>
                 <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-purple-500 shrink-0" /> Priority Support</li>
                 <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-purple-500 shrink-0" /> Featured Listing</li>
               </ul>

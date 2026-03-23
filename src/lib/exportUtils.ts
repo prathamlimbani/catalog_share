@@ -195,9 +195,9 @@ export const exportMasterDataToExcel = async () => {
                 sizesDetails = "None";
             }
 
-            // Extract company name from the joined table if present
-            const companyName = p.companies ? (p.companies as any).name : "Unknown Company";
-            const companySlug = p.companies ? (p.companies as any).slug : "N/A";
+            // Extract company name from the joined table if present; fallback to companiesData lookup
+            const companyName = p.companies ? (p.companies as any).name : (companiesData?.find((c: any) => c.id === p.company_id)?.name || "N/A");
+            const companySlug = p.companies ? (p.companies as any).slug : (companiesData?.find((c: any) => c.id === p.company_id)?.slug || "N/A");
 
             return {
                 "Product ID": p.id,
@@ -234,7 +234,7 @@ export const exportMasterDataToExcel = async () => {
 
         // Sheet 4: All Analytics Events
         const analyticsFormatted = (analyticsData || []).map(a => {
-            const companyName = a.companies ? (a.companies as any).name : "Unknown Company";
+            const companyName = a.companies ? (a.companies as any).name : (companiesData?.find((c: any) => c.id === a.company_id)?.name || "N/A");
             return {
                 "Event ID": a.id,
                 "Company": companyName,
