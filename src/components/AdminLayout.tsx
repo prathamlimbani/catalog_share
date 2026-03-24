@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import ThemeToggle from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 import CompanyEditDialog from "@/components/CompanyEditDialog";
+import { CustomerSupportDialog } from "@/components/CustomerSupportDialog";
 
 interface AdminLayoutProps {
     children: React.ReactNode;
@@ -88,14 +89,14 @@ export const AdminLayout = ({
                     </Link>
                 )}
 
-                <a
-                    href="mailto:catalogshare123@gmail.com?subject=custome%20care%20support"
-                    className="flex items-center gap-3 px-4 py-3 rounded-xl transition-colors font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-                    onClick={() => setMobileMenuOpen(false)}
-                >
-                    <Mail className="h-5 w-5" />
-                    Customer Support
-                </a>
+                <CustomerSupportDialog plan={company?.subscription_plan || "free"} onOpenChange={(open) => { if (open) setMobileMenuOpen(false); }}>
+                    <button
+                        className="flex items-center gap-3 px-4 py-3 w-full text-left rounded-xl transition-colors font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                        <Mail className="h-5 w-5" />
+                        Customer Support
+                    </button>
+                </CustomerSupportDialog>
             </div>
             <div className="p-4 border-t">
                 <button

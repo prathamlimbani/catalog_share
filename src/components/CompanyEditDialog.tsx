@@ -183,6 +183,7 @@ const CompanyEditDialog = ({ company }: { company: Company }) => {
           <ColorThemePicker
             selectedPrimary={form.theme_primary}
             onSelect={(primary, accent) => setForm({ ...form, theme_primary: primary, theme_accent: accent })}
+            plan={(company as any).subscription_plan || "free"}
           />
           <div className="border-t pt-4 mt-2">
             <h3 className="font-semibold text-sm mb-3">About / Contact Page</h3>

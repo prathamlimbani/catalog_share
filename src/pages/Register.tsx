@@ -264,6 +264,7 @@ const Register = () => {
             <ColorThemePicker
               selectedPrimary={themePrimary}
               onSelect={(primary, accent) => { setThemePrimary(primary); setThemeAccent(accent); }}
+              plan="free"
             />
             <div className="border-t pt-4 mt-2">
               <h3 className="font-semibold text-sm mb-3">About / Contact Page (optional)</h3>

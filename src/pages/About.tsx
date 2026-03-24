@@ -113,6 +113,7 @@ const About = () => {
               <ul className="text-sm text-muted-foreground space-y-2 text-left">
                 <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-blue-500 shrink-0" /> Up to 300 Products</li>
                 <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-blue-500 shrink-0" /> Better Visibility</li>
+                <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-blue-500 shrink-0" /> Premium Themes</li>
                 <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-blue-500 shrink-0" /> Standard Support</li>
               </ul>
             </CardContent>
@@ -132,7 +133,8 @@ const About = () => {
               <ul className="text-sm text-muted-foreground space-y-2 text-left">
                 <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-purple-500 shrink-0" /> 500+ Products</li>
                 <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-purple-500 shrink-0" /> Custom Branding with Logo & Domain</li>
-                <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-purple-500 shrink-0" /> Priority Support</li>
+                <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-purple-500 shrink-0" /> Premium Themes</li>
+                <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-purple-500 shrink-0" /> Priority & Call Support</li>
                 <li className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-purple-500 shrink-0" /> Featured Listing</li>
               </ul>
             </CardContent>
