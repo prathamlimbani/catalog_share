@@ -75,20 +75,7 @@ const About = () => {
         </div>
       </section>
 
-      {/* Development Notice */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 -mt-4 relative z-20">
-        <div className="flex items-start gap-3 p-4 rounded-xl border border-yellow-500/30 bg-yellow-500/5 backdrop-blur-sm">
-          <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="font-semibold text-sm text-yellow-500">Platform in Development</p>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              CatalogShare is currently in its development phase. You might encounter minor bugs or
-              unfinished features. We're working hard to make it perfect — thank you for being with
-              us on this journey! 🚀
-            </p>
-          </div>
-        </div>
-      </section>
+
 
       {/* Our Plans Section */}
       <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
