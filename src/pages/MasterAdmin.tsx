@@ -146,14 +146,15 @@ const MasterAdmin = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (companyId: string) => {
-      const { error: prodErr } = await supabase.from("products").delete().eq("company_id", companyId);
-      if (prodErr) throw prodErr;
-      const { error } = await supabase.from("companies").delete().eq("id", companyId);
+      const { data, error } = await supabase.functions.invoke("delete-company", {
+        body: { companyId },
+      });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["all-companies"] });
-      toast.success("Company and all its products deleted.");
+      toast.success("Company, products, and user account deleted.");
       setDeleteTarget(null);
       setConfirmText("");
     },
