@@ -4,8 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Hook that checks for an existing Supabase session on mount.
- * If a valid session exists, auto-redirects the user to their dashboard.
- * Returns `checking` boolean so login pages can show a spinner while resolving.
+ * If the user is fully set up (master admin or has a company), redirect them
+ * away from auth pages. If they are logged in but have no company yet, do NOT
+ * redirect — they are mid-registration and should stay on /register.
+ * Returns `checking` boolean so login/register pages can show a spinner while resolving.
  */
 export const useAuthRedirect = () => {
     const [checking, setChecking] = useState(true);
@@ -34,7 +36,7 @@ export const useAuthRedirect = () => {
                     return;
                 }
 
-                // Check if has a company
+                // Check if has a company — only redirect if fully set up
                 const { data: companies } = await supabase
                     .from("companies")
                     .select("slug")
@@ -44,10 +46,12 @@ export const useAuthRedirect = () => {
                 if (companies && companies.length > 0) {
                     navigate("/dashboard", { replace: true });
                 } else {
-                    navigate("/register", { replace: true });
+                    // Logged in but no company yet → stay on current page
+                    // (user is likely mid-registration on /register)
+                    setChecking(false);
                 }
             } catch {
-                // Session check failed — just show login form
+                // Session check failed — just show the page
                 setChecking(false);
             }
         };
