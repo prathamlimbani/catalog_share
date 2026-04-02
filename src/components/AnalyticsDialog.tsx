@@ -35,7 +35,7 @@ export function AnalyticsDialog({ companyId }: AnalyticsDialogProps) {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline" className="h-full py-4 px-6 bg-card hover:bg-muted text-foreground font-medium text-base rounded-xl transition-all shadow-sm w-full sm:w-auto">
+                <Button variant="ghost" className="h-full py-4 px-6 bg-secondary/30 hover:bg-secondary/50 text-foreground font-medium text-base rounded-xl transition-all shadow-sm w-full sm:w-auto border-0">
                     <BarChart3 className="h-5 w-5 sm:mr-2" />
                     <span className="hidden sm:inline">Analytics</span>
                 </Button>

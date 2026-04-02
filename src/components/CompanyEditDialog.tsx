@@ -12,7 +12,7 @@ import ColorThemePicker from "@/components/ColorThemePicker";
 
 type Company = Tables<"companies">;
 
-const CompanyEditDialog = ({ company }: { company: Company }) => {
+const CompanyEditDialog = ({ company, children }: { company: Company, children?: React.ReactNode }) => {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
@@ -135,9 +135,11 @@ const CompanyEditDialog = ({ company }: { company: Company }) => {
       }
     }}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Settings className="h-4 w-4 mr-2" /> Edit Company
-        </Button>
+        {children || (
+          <Button variant="outline" size="sm">
+            <Settings className="h-4 w-4 mr-2" /> Edit Company
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>

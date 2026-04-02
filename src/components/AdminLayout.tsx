@@ -40,11 +40,17 @@ export const AdminLayout = ({
 
     const NavLinks = () => (
         <>
-            <div className="flex items-center gap-3 px-6 py-6 border-b">
-                <div className="bg-primary text-primary-foreground p-1.5 rounded-md">
-                    <Store className="h-5 w-5" />
-                </div>
-                <span className="font-bold text-xl">AdminPanel</span>
+            <div className="flex items-center gap-3 px-6 py-6 border-b h-[88px]">
+                {company?.logo_url ? (
+                    <img src={company.logo_url} alt="Logo" className="max-h-12 w-full object-contain object-left shrink-0" />
+                ) : (
+                    <>
+                        <div className="bg-primary text-primary-foreground p-1.5 rounded-md">
+                            <Store className="h-5 w-5" />
+                        </div>
+                        <span className="font-bold text-xl">AdminPanel</span>
+                    </>
+                )}
             </div>
             <div className="flex-1 py-6 px-4 space-y-2">
                 <Link
