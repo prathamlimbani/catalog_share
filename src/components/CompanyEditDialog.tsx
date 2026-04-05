@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,9 +12,24 @@ import ColorThemePicker from "@/components/ColorThemePicker";
 
 type Company = Tables<"companies">;
 
-const CompanyEditDialog = ({ company, children }: { company: Company, children?: React.ReactNode }) => {
+interface CompanyEditDialogProps {
+  company: Company;
+  children?: React.ReactNode;
+  externalOpen?: boolean;
+  onExternalOpenChange?: (open: boolean) => void;
+}
+
+const CompanyEditDialog = ({ company, children, externalOpen, onExternalOpenChange }: CompanyEditDialogProps) => {
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+
+  // Determine if we're in externally controlled mode
+  const isExternallyControlled = externalOpen !== undefined;
+  const open = isExternallyControlled ? externalOpen : internalOpen;
+  const setOpen = isExternallyControlled
+    ? (v: boolean) => onExternalOpenChange?.(v)
+    : setInternalOpen;
+
   const [form, setForm] = useState({
     name: company.name,
     phone: company.phone,
@@ -34,6 +49,31 @@ const CompanyEditDialog = ({ company, children }: { company: Company, children?:
   const [qrPreview, setQrPreview] = useState<string | null>(company.upi_qr_url || null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(company.logo_url);
+
+  // Sync form when dialog opens
+  useEffect(() => {
+    if (open) {
+      setForm({
+        name: company.name,
+        phone: company.phone,
+        email: company.email,
+        address: company.address || "",
+        gst_number: company.gst_number || "",
+        theme_primary: company.theme_primary || "25 95% 53%",
+        theme_accent: company.theme_accent || "25 95% 95%",
+        contact_name_1: company.contact_name_1 || "",
+        contact_phone_1: company.contact_phone_1 || "+91",
+        contact_name_2: company.contact_name_2 || "",
+        contact_phone_2: company.contact_phone_2 || "+91",
+        google_maps_url: company.google_maps_url || "",
+        upi_id: company.upi_id || "",
+      });
+      setLogoPreview(company.logo_url);
+      setLogoFile(null);
+      setQrPreview(company.upi_qr_url || null);
+      setQrFile(null);
+    }
+  }, [open, company]);
 
   const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -110,37 +150,12 @@ const CompanyEditDialog = ({ company, children }: { company: Company, children?:
   });
 
   return (
-    <Dialog open={open} onOpenChange={(v) => {
-      setOpen(v);
-      if (v) {
-        setForm({
-          name: company.name,
-          phone: company.phone,
-          email: company.email,
-          address: company.address || "",
-          gst_number: company.gst_number || "",
-          theme_primary: company.theme_primary || "25 95% 53%",
-          theme_accent: company.theme_accent || "25 95% 95%",
-          contact_name_1: company.contact_name_1 || "",
-          contact_phone_1: company.contact_phone_1 || "+91",
-          contact_name_2: company.contact_name_2 || "",
-          contact_phone_2: company.contact_phone_2 || "+91",
-          google_maps_url: company.google_maps_url || "",
-          upi_id: company.upi_id || "",
-        });
-        setLogoPreview(company.logo_url);
-        setLogoFile(null);
-        setQrPreview(company.upi_qr_url || null);
-        setQrFile(null);
-      }
-    }}>
-      <DialogTrigger asChild>
-        {children || (
-          <Button variant="outline" size="sm">
-            <Settings className="h-4 w-4 mr-2" /> Edit Company
-          </Button>
-        )}
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={setOpen}>
+      {children && (
+        <DialogTrigger asChild>
+          {children}
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Company Details</DialogTitle>

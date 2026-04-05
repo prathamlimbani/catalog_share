@@ -4,27 +4,30 @@ import { Button } from "@/components/ui/button";
 import { Mail, Phone, Lock } from "lucide-react";
 
 interface CustomerSupportDialogProps {
-    children: React.ReactNode;
+    children?: React.ReactNode;
     plan: string;
-    onOpenChange?: (open: boolean) => void;
+    externalOpen?: boolean;
+    onExternalOpenChange?: (open: boolean) => void;
 }
 
-export function CustomerSupportDialog({ children, plan, onOpenChange }: CustomerSupportDialogProps) {
-    const [open, setOpen] = useState(false);
+export function CustomerSupportDialog({ children, plan, externalOpen, onExternalOpenChange }: CustomerSupportDialogProps) {
+    const [internalOpen, setInternalOpen] = useState(false);
     const isPro = plan === "pro";
 
-    const handleOpenChange = (v: boolean) => {
-        setOpen(v);
-        if (onOpenChange) {
-            onOpenChange(v);
-        }
-    };
+    // Determine if we're in externally controlled mode
+    const isExternallyControlled = externalOpen !== undefined;
+    const open = isExternallyControlled ? externalOpen : internalOpen;
+    const setOpen = isExternallyControlled
+        ? (v: boolean) => onExternalOpenChange?.(v)
+        : setInternalOpen;
 
     return (
-        <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogTrigger asChild>
-                {children}
-            </DialogTrigger>
+        <Dialog open={open} onOpenChange={setOpen}>
+            {children && (
+                <DialogTrigger asChild>
+                    {children}
+                </DialogTrigger>
+            )}
             <DialogContent className="sm:max-w-sm">
                 <DialogHeader>
                     <DialogTitle className="text-center text-xl font-bold">Customer Support</DialogTitle>

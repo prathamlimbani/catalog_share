@@ -27,6 +27,8 @@ export const AdminLayout = ({
 }: AdminLayoutProps) => {
     const location = useLocation();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [editDialogOpen, setEditDialogOpen] = useState(false);
+    const [supportDialogOpen, setSupportDialogOpen] = useState(false);
     const navigate = useNavigate();
 
     const getInitials = (name: string) => {
@@ -36,6 +38,17 @@ export const AdminLayout = ({
             .join("")
             .substring(0, 2)
             .toUpperCase() : "AA";
+    };
+
+    const handleEditCompanyClick = () => {
+        setMobileMenuOpen(false);
+        // Small delay to let Sheet close animation start before dialog opens
+        setTimeout(() => setEditDialogOpen(true), 150);
+    };
+
+    const handleSupportClick = () => {
+        setMobileMenuOpen(false);
+        setTimeout(() => setSupportDialogOpen(true), 150);
     };
 
     const NavLinks = () => (
@@ -68,14 +81,13 @@ export const AdminLayout = ({
                 </Link>
 
                 {company && (
-                    <CompanyEditDialog company={company}>
-                        <button
-                            className="flex items-center gap-3 px-4 py-3 w-full text-left rounded-xl transition-colors font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-                        >
-                            <Pencil className="h-5 w-5" />
-                            Edit Company
-                        </button>
-                    </CompanyEditDialog>
+                    <button
+                        onClick={handleEditCompanyClick}
+                        className="flex items-center gap-3 px-4 py-3 w-full text-left rounded-xl transition-colors font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                        <Pencil className="h-5 w-5" />
+                        Edit Company
+                    </button>
                 )}
 
                 {company && (
@@ -94,14 +106,13 @@ export const AdminLayout = ({
                     </Link>
                 )}
 
-                <CustomerSupportDialog plan={company?.subscription_plan || "free"}>
-                    <button
-                        className="flex items-center gap-3 px-4 py-3 w-full text-left rounded-xl transition-colors font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-                    >
-                        <Mail className="h-5 w-5" />
-                        Customer Support
-                    </button>
-                </CustomerSupportDialog>
+                <button
+                    onClick={handleSupportClick}
+                    className="flex items-center gap-3 px-4 py-3 w-full text-left rounded-xl transition-colors font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                    <Mail className="h-5 w-5" />
+                    Customer Support
+                </button>
             </div>
             <div className="p-4 border-t">
                 <button
@@ -190,6 +201,20 @@ export const AdminLayout = ({
                     {children}
                 </div>
             </main>
+
+            {/* Dialogs rendered at top level — outside Sheet */}
+            {company && (
+                <CompanyEditDialog
+                    company={company}
+                    externalOpen={editDialogOpen}
+                    onExternalOpenChange={setEditDialogOpen}
+                />
+            )}
+            <CustomerSupportDialog
+                plan={company?.subscription_plan || "free"}
+                externalOpen={supportDialogOpen}
+                onExternalOpenChange={setSupportDialogOpen}
+            />
         </div>
     );
 };
