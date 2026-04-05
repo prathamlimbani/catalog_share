@@ -70,7 +70,6 @@ export const AdminLayout = ({
                 {company && (
                     <CompanyEditDialog company={company}>
                         <button
-                            onClick={() => setMobileMenuOpen(false)}
                             className="flex items-center gap-3 px-4 py-3 w-full text-left rounded-xl transition-colors font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
                         >
                             <Pencil className="h-5 w-5" />
@@ -95,7 +94,7 @@ export const AdminLayout = ({
                     </Link>
                 )}
 
-                <CustomerSupportDialog plan={company?.subscription_plan || "free"} onOpenChange={(open) => { if (open) setMobileMenuOpen(false); }}>
+                <CustomerSupportDialog plan={company?.subscription_plan || "free"}>
                     <button
                         className="flex items-center gap-3 px-4 py-3 w-full text-left rounded-xl transition-colors font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
                     >
