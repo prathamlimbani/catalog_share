@@ -1,6 +1,6 @@
 # 📦 CatalogShare — Digitize Your Wholesale Catalog
 
-**Live:** [catalogshare.online](https://catalogshare.online)
+**Live:** [catalogshare.online](https://catalogshare.online) [suchiketu.tech](https://sychisetu.tech)
 
 CatalogShare is a web platform that helps **wholesalers and distributors** create an **online product catalog** and share it with their customers through a **single link**. Customers can browse products, add items to their cart, and place orders directly via **WhatsApp** — no app downloads, no sign-ups required for buyers.
 
