@@ -93,8 +93,8 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
           className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden print:shadow-none print:border-none print:rounded-none"
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white px-8 py-6 print:bg-slate-800">
-            <div className="flex items-start justify-between">
+          <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white px-4 sm:px-8 py-5 sm:py-6 print:bg-slate-800">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 sm:gap-4">
               <div className="flex items-center gap-4">
                 {company?.logo_url && (
                   <img
@@ -114,7 +114,7 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
                   )}
                 </div>
               </div>
-              <div className="text-right">
+              <div className="text-left sm:text-right">
                 <h2 className="text-3xl font-extrabold tracking-tight opacity-90">
                   ESTIMATE
                 </h2>
@@ -129,7 +129,7 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
           </div>
 
           {/* Bill To */}
-          <div className="px-8 py-6 border-b border-gray-100">
+          <div className="px-4 sm:px-8 py-5 sm:py-6 border-b border-gray-100">
             <div>
               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
                 Bill To
@@ -151,8 +151,8 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
           </div>
 
           {/* Items Table */}
-          <div className="px-8 py-6">
-            <table className="w-full text-sm">
+          <div className="px-4 sm:px-8 py-5 sm:py-6 overflow-x-auto">
+            <table className="w-full text-sm min-w-[600px]">
               <thead>
                 <tr className="border-b-2 border-gray-800">
                   <th className="text-left py-3 px-2 font-bold text-gray-800 w-10">
@@ -220,9 +220,9 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
           </div>
 
           {/* Totals */}
-          <div className="px-8 pb-6">
+          <div className="px-4 sm:px-8 pb-6">
             <div className="flex justify-end">
-              <div className="w-72">
+              <div className="w-full sm:w-72">
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between py-1">
                     <span className="text-gray-600">Subtotal</span>
@@ -273,7 +273,7 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
                     </div>
                   )}
 
-                  <div className="flex justify-between py-3 mt-1 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-lg px-4 -mx-2">
+                  <div className="flex justify-between py-3 mt-1 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-lg px-4">
                     <span className="font-bold text-base">Final Amount</span>
                     <span className="font-extrabold text-lg">
                       {formatCurrency(invoice.final_amount)}
@@ -286,7 +286,7 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
 
           {/* Notes */}
           {invoice.notes && (
-            <div className="px-8 pb-6">
+            <div className="px-4 sm:px-8 pb-6">
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                 <h4 className="text-xs font-bold text-amber-700 uppercase tracking-widest mb-1">
                   Notes
@@ -299,7 +299,7 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
           )}
 
           {/* Footer */}
-          <div className="mt-8 pt-6 border-t border-gray-200 text-center px-8">
+          <div className="mt-8 pt-6 border-t border-gray-200 text-center px-4 sm:px-8">
             <p className="text-xs text-gray-400 mt-1">
               This is a computer-generated estimate and does not require a
               signature.
