@@ -12,7 +12,7 @@ const corsHeaders = {
 };
 
 interface EmailPayload {
-  type: "welcome" | "invoice" | "expiry_reminder" | "admin_new_company" | "admin_new_subscription" | "admin_plan_change" | "plan_status";
+  type: "welcome" | "invoice" | "expiry_reminder" | "admin_new_company" | "admin_new_subscription" | "admin_plan_change" | "plan_status" | "plan_downgraded" | "admin_plan_downgraded";
   to: string;
   companyName: string;
   // invoice / subscription fields
@@ -540,6 +540,103 @@ function planStatusEmailHtml(companyName: string, currentPlan: string, expiresAt
 </html>`;
 }
 
+function planDowngradedEmailHtml(companyName: string, previousPlan: string): string {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your CatalogShare Plan Has Been Downgraded</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:'Segoe UI',system-ui,sans-serif;">
+  <div style="max-width:600px;margin:40px auto;background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#dc2626,#ef4444);padding:40px 32px;text-align:center;">
+      <img src="https://www.catalogshare.online/logo.png" alt="CatalogShare" style="height:48px;border-radius:10px;background:white;padding:6px;margin-bottom:12px;" />
+      <h1 style="color:white;margin:0;font-size:24px;font-weight:800;">⚠️ Plan Downgraded</h1>
+      <p style="color:rgba(255,255,255,0.9);margin:8px 0 0;font-size:14px;">Your subscription has been moved to the Free Plan</p>
+    </div>
+    <div style="padding:36px 32px;">
+      <p style="font-size:16px;color:#111827;margin:0 0 16px;">Hi <strong>${companyName}</strong>,</p>
+      <div style="background:#fef2f2;border:2px solid #fecaca;border-radius:12px;padding:20px;margin:0 0 24px;text-align:center;">
+        <p style="margin:0 0 8px;font-size:14px;color:#374151;">Your previous plan</p>
+        <p style="margin:0 0 8px;font-size:28px;font-weight:800;color:#dc2626;">${previousPlan}</p>
+        <p style="margin:0;font-size:14px;font-weight:600;color:#dc2626;">has expired and been downgraded to <strong>Free Plan</strong></p>
+      </div>
+      <p style="color:#374151;font-size:14px;line-height:1.7;margin:0 0 16px;">
+        We sent you multiple renewal reminders over the past 3 days, but your subscription was not renewed. As a result, your catalog has been automatically moved to the <strong>Free Plan</strong> (limited to 40 products).
+      </p>
+      <p style="color:#374151;font-size:14px;line-height:1.7;margin:0 0 16px;">
+        <strong>What this means:</strong>
+      </p>
+      <ul style="color:#374151;font-size:14px;line-height:2;margin:0 0 24px;padding:0 0 0 20px;">
+        <li>Your product limit is now <strong>40 products</strong></li>
+        <li>Products beyond the limit may be hidden from your catalog</li>
+        <li>Premium features are no longer available</li>
+      </ul>
+      <p style="color:#374151;font-size:14px;line-height:1.7;margin:0 0 24px;">
+        Want to keep growing? Renew your plan now to restore all your products and features! 🚀
+      </p>
+      <a href="https://www.catalogshare.online/billing" style="display:inline-block;background:linear-gradient(135deg,#6366f1,#a855f7);color:white;text-decoration:none;padding:14px 32px;border-radius:50px;font-weight:700;font-size:15px;">
+        Renew My Plan →
+      </a>
+    </div>
+    <div style="background:#f8f9fa;padding:20px 32px;text-align:center;border-top:1px solid #e5e7eb;">
+      <p style="margin:0;color:#6b7280;font-size:12px;">
+        Questions? Contact us at catalogshare123@gmail.com<br>
+        © 2025 CatalogShare · <a href="https://www.catalogshare.online" style="color:#6366f1;text-decoration:none;">catalogshare.online</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+function adminPlanDowngradedHtml(companyName: string, companyEmail: string, previousPlan: string): string {
+  const now = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" });
+  return `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Auto-Downgrade Alert</title></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:'Segoe UI',system-ui,sans-serif;">
+  <div style="max-width:520px;margin:40px auto;background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#dc2626,#ef4444);padding:28px 32px;">
+      <h1 style="color:white;margin:0;font-size:22px;font-weight:800;">⚠️ Auto-Downgrade Alert</h1>
+      <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:13px;">CatalogShare Admin Alert</p>
+    </div>
+    <div style="padding:28px 32px;">
+      <p style="font-size:15px;color:#111827;margin:0 0 20px;">A company's plan has been automatically downgraded to Free after the 3-day grace period expired.</p>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+        <tr style="background:#f9fafb;">
+          <td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #e5e7eb;">Company</td>
+          <td style="padding:12px 16px;font-weight:700;font-size:13px;border-bottom:1px solid #e5e7eb;">${companyName}</td>
+        </tr>
+        <tr>
+          <td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #e5e7eb;">Email</td>
+          <td style="padding:12px 16px;font-size:13px;border-bottom:1px solid #e5e7eb;">${companyEmail}</td>
+        </tr>
+        <tr style="background:#f9fafb;">
+          <td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #e5e7eb;">Previous Plan</td>
+          <td style="padding:12px 16px;font-weight:700;font-size:13px;border-bottom:1px solid #e5e7eb;color:#dc2626;">${previousPlan}</td>
+        </tr>
+        <tr>
+          <td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #e5e7eb;">New Plan</td>
+          <td style="padding:12px 16px;font-weight:700;font-size:13px;border-bottom:1px solid #e5e7eb;color:#10b981;">Free Plan</td>
+        </tr>
+        <tr style="background:#f9fafb;">
+          <td style="padding:12px 16px;color:#6b7280;font-size:13px;">Downgraded At</td>
+          <td style="padding:12px 16px;font-size:13px;">${now} IST</td>
+        </tr>
+      </table>
+      <div style="margin-top:20px;">
+        <a href="https://www.catalogshare.online/master" style="display:inline-block;background:linear-gradient(135deg,#dc2626,#ef4444);color:white;text-decoration:none;padding:10px 24px;border-radius:50px;font-weight:700;font-size:13px;">View in Master Admin →</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -656,6 +753,15 @@ serve(async (req) => {
       case "plan_status":
         subject = `📊 Your CatalogShare Plan: ${payload.planName || 'Free Plan'}`;
         html = planStatusEmailHtml(companyName, payload.planName?.toLowerCase().replace(' plan', '') || 'free', payload.expiresAt);
+        break;
+      case "plan_downgraded":
+        subject = `⚠️ Your ${payload.previousPlan || 'Paid Plan'} Has Been Downgraded — ${companyName}`;
+        html = planDowngradedEmailHtml(companyName, payload.previousPlan || 'Paid Plan');
+        break;
+      case "admin_plan_downgraded":
+        subject = `⚠️ Auto-Downgrade: ${companyName} (${payload.previousPlan || 'Paid'} → Free)`;
+        html = adminPlanDowngradedHtml(companyName, payload.companyEmail || to, payload.previousPlan || 'Paid Plan');
+        recipientEmail = ADMIN_EMAIL;
         break;
       default:
         return new Response(JSON.stringify({ error: "Invalid email type" }), {

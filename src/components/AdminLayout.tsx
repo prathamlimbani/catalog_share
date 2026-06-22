@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Store, Package, LogOut, Menu, Search, User, Pencil, Crown, CreditCard, Mail } from "lucide-react";
+import { Store, Package, LogOut, Menu, Search, User, Pencil, Crown, CreditCard, Mail, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -9,6 +9,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 import CompanyEditDialog from "@/components/CompanyEditDialog";
 import { CustomerSupportDialog } from "@/components/CustomerSupportDialog";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AdminLayoutProps {
     children: React.ReactNode;
@@ -30,6 +31,36 @@ export const AdminLayout = ({
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [supportDialogOpen, setSupportDialogOpen] = useState(false);
     const navigate = useNavigate();
+
+    const currentPlan = company?.subscription_plan || "free";
+    const expiresAt = company?.subscription_expires_at;
+    const isExpired = expiresAt && new Date(expiresAt) < new Date();
+
+    // Auto-send expiry reminder email if plan expires within 3 days
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => {
+        if (!company || !expiresAt || currentPlan === "free" || isExpired) return;
+
+        const msUntilExpiry = new Date(expiresAt).getTime() - Date.now();
+        const daysLeft = Math.ceil(msUntilExpiry / (1000 * 60 * 60 * 24));
+
+        if (daysLeft > 3) return;
+
+        // Only send once per browser session to avoid spam
+        const reminderSentKey = `expiry_reminder_sent_${company.id}`;
+        if (sessionStorage.getItem(reminderSentKey)) return;
+        sessionStorage.setItem(reminderSentKey, "1");
+
+        supabase.functions.invoke("send-emails", {
+            body: {
+                type: "expiry_reminder",
+                to: company.email,
+                companyName: company.name,
+                expiresAt,
+                daysLeft,
+            },
+        }).catch((e: any) => console.warn("Expiry reminder email failed (non-blocking):", e));
+    }, [company, expiresAt, currentPlan, isExpired]);
 
     const getInitials = (name: string) => {
         return name ? name
@@ -92,6 +123,22 @@ export const AdminLayout = ({
 
                 {company && (
                     <Link
+                        to="/invoices"
+                        className={cn(
+                            "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors font-medium",
+                            location.pathname === "/invoices"
+                                ? "bg-primary/10 text-primary"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        )}
+                        onClick={() => setMobileMenuOpen(false)}
+                    >
+                        <FileText className="h-5 w-5" />
+                        Estimates
+                    </Link>
+                )}
+
+                {company && (
+                    <Link
                         to="/billing"
                         className={cn(
                             "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors font-medium",
@@ -127,16 +174,16 @@ export const AdminLayout = ({
     );
 
     return (
-        <div className="min-h-screen bg-secondary/30 flex">
+        <div className="min-h-screen bg-secondary/30 flex print:bg-white print:block">
             {/* Desktop Sidebar */}
-            <aside className="hidden lg:flex flex-col w-64 bg-card border-r fixed inset-y-0 z-20">
+            <aside className="hidden lg:flex flex-col w-64 bg-card border-r fixed inset-y-0 z-20 print:hidden">
                 <NavLinks />
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 lg:pl-64 flex flex-col min-h-screen min-w-0 w-full">
+            <main className="flex-1 lg:pl-64 flex flex-col min-h-screen min-w-0 w-full print:pl-0 print:block">
                 {/* Header */}
-                <header className="sticky top-0 z-10 bg-card border-b h-16 sm:h-20 px-4 sm:px-8 flex items-center justify-between gap-4">
+                <header className="sticky top-0 z-10 bg-card border-b h-16 sm:h-20 px-4 sm:px-8 flex items-center justify-between gap-4 print:hidden">
                     <div className="flex flex-1 items-center gap-3 min-w-0">
                         {/* Mobile Nav Trigger */}
                         <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
@@ -183,7 +230,7 @@ export const AdminLayout = ({
                 </header>
 
                 {/* Mobile Search Bar (visible only on very small screens) */}
-                <div className="p-4 bg-card border-b xs:hidden">
+                <div className="p-4 bg-card border-b xs:hidden print:hidden">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
