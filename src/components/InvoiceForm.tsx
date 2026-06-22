@@ -226,7 +226,7 @@ const InvoiceForm = ({
     </div>
     <div className="space-y-6 max-w-5xl mx-auto print:hidden">
       {/* Header */}
-      <Card className="border-0 shadow-lg bg-gradient-to-r from-slate-50 to-white">
+      <Card className="border-0 shadow-lg bg-gradient-to-r from-slate-50 to-white dark:from-slate-800 dark:to-slate-900">
         <CardContent className="p-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -234,7 +234,7 @@ const InvoiceForm = ({
                 <FileText className="h-6 w-6" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-slate-900">
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
                   {editingInvoice ? "Edit Estimate" : "New Estimate"}
                 </h2>
                 <p className="text-sm text-slate-500 mt-0.5">
@@ -499,7 +499,7 @@ const InvoiceForm = ({
                     type="number"
                     min={0}
                     step="0.01"
-                    value={item.price}
+                    value={item.price === 0 ? "" : item.price}
                     onChange={(e) =>
                       updateItem(index, {
                         price: Math.max(0, Number(e.target.value) || 0),
@@ -605,7 +605,7 @@ const InvoiceForm = ({
                         type="number"
                         min={0}
                         step="0.01"
-                        value={item.price}
+                        value={item.price === 0 ? "" : item.price}
                         onChange={(e) =>
                           updateItem(index, {
                             price: Math.max(
@@ -779,7 +779,7 @@ const InvoiceForm = ({
                   type="number"
                   min={0}
                   step="0.01"
-                  value={discount}
+                  value={discount === 0 ? "" : discount}
                   onChange={(e) =>
                     setDiscount(Math.max(0, Number(e.target.value) || 0))
                   }
@@ -810,7 +810,7 @@ const InvoiceForm = ({
                         const newFinal = Math.max(0, Number(e.target.value) || 0);
                         setDiscount(Math.max(0, grandTotal - newFinal));
                       }}
-                      className="w-32 pl-7 border-slate-300 focus:border-emerald-500 text-right text-lg font-extrabold text-emerald-600 bg-emerald-50/50"
+                      className="w-32 pl-7 border-slate-300 focus:border-emerald-500 text-right text-lg font-extrabold text-emerald-600 bg-emerald-50/50 dark:text-emerald-400 dark:bg-emerald-950/50"
                     />
                   </div>
                 </div>

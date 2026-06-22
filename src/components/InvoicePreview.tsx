@@ -128,36 +128,8 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
             </div>
           </div>
 
-          {/* From / To */}
-          <div className="grid grid-cols-2 gap-8 px-8 py-6 border-b border-gray-100">
-            <div>
-              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
-                From
-              </h3>
-              <p className="text-sm font-semibold text-gray-900">
-                {company?.name}
-              </p>
-              {company?.address && (
-                <p className="text-sm text-gray-600 mt-1 whitespace-pre-line">
-                  {company.address}
-                </p>
-              )}
-              {company?.phone && (
-                <p className="text-sm text-gray-600 mt-1">
-                  Phone: {company.phone}
-                </p>
-              )}
-              {company?.email && (
-                <p className="text-sm text-gray-600">
-                  Email: {company.email}
-                </p>
-              )}
-              {company?.gst_number && (
-                <p className="text-sm text-gray-600">
-                  GST: {company.gst_number}
-                </p>
-              )}
-            </div>
+          {/* Bill To */}
+          <div className="px-8 py-6 border-b border-gray-100">
             <div>
               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
                 Bill To
