@@ -439,8 +439,14 @@ const InvoiceForm = ({
           <div className="space-y-3">
             {items.map((item, index) => {
               const product = products.find(p => p.id === item.product_id);
-              const featureSizes = product ? (product as any).feature_sizes as Record<string, string[]> | null : null;
-              const sizeOptions = featureSizes ? Array.from(new Set(Object.values(featureSizes).flat())) : [];
+              const featureSizes = product ? (product as any).feature_sizes as Record<string, any> | null : null;
+              let sizeOptions: string[] = [];
+              if (featureSizes) {
+                const { __prices, ...rest } = featureSizes;
+                const regularSizes = Array.from(new Set(Object.values(rest).flat())).filter(val => typeof val === 'string') as string[];
+                const priceSizes = Array.isArray(__prices) ? __prices.map((sp: any) => sp.size) : [];
+                sizeOptions = Array.from(new Set([...regularSizes, ...priceSizes]));
+              }
 
               return (
               <div
@@ -467,7 +473,17 @@ const InvoiceForm = ({
                   <div className="relative">
                     <Input
                       value={item.size || ""}
-                      onChange={(e) => updateItem(index, { size: e.target.value })}
+                      onChange={(e) => {
+                        const newSize = e.target.value;
+                        const updates: any = { size: newSize };
+                        if (product && featureSizes && Array.isArray(featureSizes.__prices)) {
+                          const match = featureSizes.__prices.find((sp: any) => sp.size === newSize);
+                          if (match && typeof match.price === 'number') {
+                            updates.price = match.price;
+                          }
+                        }
+                        updateItem(index, updates);
+                      }}
                       list={`size-options-${index}`}
                       className="border-slate-200 focus:border-blue-400 text-center"
                       placeholder="e.g. M, L"
@@ -559,7 +575,17 @@ const InvoiceForm = ({
                       <div className="relative mt-1">
                         <Input
                           value={item.size || ""}
-                          onChange={(e) => updateItem(index, { size: e.target.value })}
+                          onChange={(e) => {
+                            const newSize = e.target.value;
+                            const updates: any = { size: newSize };
+                            if (product && featureSizes && Array.isArray(featureSizes.__prices)) {
+                              const match = featureSizes.__prices.find((sp: any) => sp.size === newSize);
+                              if (match && typeof match.price === 'number') {
+                                updates.price = match.price;
+                              }
+                            }
+                            updateItem(index, updates);
+                          }}
                           list={`mobile-size-options-${index}`}
                           className="border-slate-200 text-center text-sm"
                           placeholder="Size"

@@ -45,6 +45,7 @@ const AdminDashboard = () => {
   // New States for Sorting & Filtering
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<string>("newest"); // newest, oldest, a-z, z-a
+  const [sizePrices, setSizePrices] = useState<{size: string, price: number}[]>([]);
   const [stockFilter, setStockFilter] = useState<string>("all"); // all, in-stock, out-of-stock
 
   const [form, setForm] = useState({
@@ -139,11 +140,14 @@ const AdminDashboard = () => {
     mutationFn: async (data: typeof form) => {
       const allImages = [...data.images];
       const featuresList = data.features ? data.features.split(",").map((f) => f.trim()).filter(Boolean) : [];
-      const featureSizesJson: Record<string, string[]> = {};
+      const featureSizesJson: Record<string, any> = {};
       featuresList.forEach((f) => {
         const sizesStr = data.feature_sizes[f] || "";
         featureSizesJson[f] = sizesStr.split(",").map((s) => s.trim()).filter(Boolean);
       });
+      if (sizePrices.length > 0) {
+        featureSizesJson.__prices = sizePrices.filter(sp => sp.size.trim() !== "");
+      }
       const payload = {
         name: data.name.trim(),
         description: data.description.trim() || null,
@@ -157,7 +161,7 @@ const AdminDashboard = () => {
         quantity_unit: data.quantity_unit.trim() || null,
         image_url: allImages[0] || data.image_url.trim() || null,
         images: allImages,
-        feature_sizes: featuresList.length > 0 ? featureSizesJson : {},
+        feature_sizes: (featuresList.length > 0 || sizePrices.length > 0) ? featureSizesJson : {},
         company_id: company!.id,
       };
       if (editing) {
@@ -231,6 +235,7 @@ const AdminDashboard = () => {
 
   const resetForm = () => {
     setForm({ name: "", description: "", size: "", features: "", price: "", category: "", is_trending: false, in_stock: true, allow_custom_quantity: false, quantity_unit: "", image_url: "", images: [], feature_sizes: {} });
+    setSizePrices([]);
     setEditing(null);
     setShowNewCategory(false);
     setNewCategory("");
@@ -240,11 +245,17 @@ const AdminDashboard = () => {
     setEditing(p);
     const fsRaw = (p as any).feature_sizes as Record<string, string[]> | null;
     const fsForm: Record<string, string> = {};
+    let initialSizePrices: {size: string, price: number}[] = [];
     if (fsRaw) {
       Object.entries(fsRaw).forEach(([k, v]) => {
-        fsForm[k] = Array.isArray(v) ? v.join(", ") : "";
+        if (k === "__prices") {
+          initialSizePrices = v as {size: string, price: number}[];
+        } else {
+          fsForm[k] = Array.isArray(v) ? v.join(", ") : "";
+        }
       });
     }
+    setSizePrices(initialSizePrices);
     setForm({
       name: p.name,
       description: p.description || "",
@@ -533,6 +544,67 @@ const AdminDashboard = () => {
                           </div>
                         );
                       })()}
+
+                      <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label className="text-sm font-medium">Sizes with Specific Prices</Label>
+                            <p className="text-xs text-muted-foreground">E.g. 81x32 = ₹7500</p>
+                          </div>
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => setSizePrices([...sizePrices, {size: "", price: 0}])}
+                            className="h-7 text-xs"
+                          >
+                            <Plus className="h-3 w-3 mr-1" /> Add Size
+                          </Button>
+                        </div>
+                        {sizePrices.length > 0 && (
+                          <div className="space-y-2 mt-3">
+                            {sizePrices.map((sp, idx) => (
+                              <div key={idx} className="flex items-center gap-2">
+                                <Input 
+                                  placeholder="Size (e.g. 81x32)"
+                                  value={sp.size}
+                                  onChange={(e) => {
+                                    const newArr = [...sizePrices];
+                                    newArr[idx].size = e.target.value;
+                                    setSizePrices(newArr);
+                                  }}
+                                  className="h-8 text-xs"
+                                />
+                                <Input 
+                                  type="number"
+                                  min="0"
+                                  placeholder="Price"
+                                  value={sp.price === 0 && sp.size === "" ? "" : sp.price}
+                                  onChange={(e) => {
+                                    const newArr = [...sizePrices];
+                                    newArr[idx].price = Number(e.target.value) || 0;
+                                    setSizePrices(newArr);
+                                  }}
+                                  className="h-8 text-xs w-28"
+                                />
+                                <Button 
+                                  type="button" 
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => {
+                                    const newArr = [...sizePrices];
+                                    newArr.splice(idx, 1);
+                                    setSizePrices(newArr);
+                                  }}
+                                  className="h-8 w-8 text-destructive shrink-0"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
 
                       <div className="space-y-2">
                         <Label>Product Images</Label>
