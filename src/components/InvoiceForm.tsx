@@ -42,12 +42,13 @@ const emptyItem = (): InvoiceItem => ({
 });
 
 const calculateSqft = (sizeString: string): number | null => {
-  const match = sizeString.match(/^\s*([\d.]+)\s*[xX*]\s*([\d.]+)\s*$/);
+  const match = sizeString.match(/^\s*([\d.]+)\s*[xX*]\s*([\d.]+)(?:\s*[xX*]\s*([\d.]+))?\s*$/);
   if (match) {
     const l = parseFloat(match[1]);
     const w = parseFloat(match[2]);
-    if (!isNaN(l) && !isNaN(w)) {
-      return Number(((l * w) / 144).toFixed(2));
+    const n = match[3] ? parseFloat(match[3]) : 1;
+    if (!isNaN(l) && !isNaN(w) && !isNaN(n)) {
+      return Number((((l * w) / 144) * n).toFixed(2));
     }
   }
   return null;
