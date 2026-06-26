@@ -142,6 +142,27 @@ const Invoices = () => {
     setViewMode("edit");
   };
 
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("invoices").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      toast.success("Estimate deleted successfully");
+    },
+    onError: (error: any) => {
+      console.error("Delete error:", error);
+      toast.error("Failed to delete estimate");
+    },
+  });
+
+  const handleDelete = (invoice: any) => {
+    if (window.confirm("Are you sure you want to delete this estimate?")) {
+      deleteMutation.mutate(invoice.id);
+    }
+  };
+
   const handleBack = () => {
     setSelectedInvoice(null);
     setViewMode("list");
@@ -181,6 +202,7 @@ const Invoices = () => {
           onCreateNew={handleCreateNew}
           onView={handleView}
           onEdit={handleEdit}
+          onDelete={handleDelete}
           isLoading={invoicesLoading}
         />
       )}

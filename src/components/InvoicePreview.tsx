@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Printer, Download } from "lucide-react";
+import { ArrowLeft, Printer, Download, FileText } from "lucide-react";
 
 interface InvoicePreviewProps {
   invoice: any;
@@ -21,8 +22,17 @@ const formatDate = (dateStr: string) => {
 };
 
 const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
+  const [isInvoiceMode, setIsInvoiceMode] = useState(false);
+  
   const handlePrint = () => {
     window.print();
+  };
+
+  const handlePrintInvoice = () => {
+    setIsInvoiceMode(true);
+    setTimeout(() => {
+      window.print();
+    }, 100);
   };
 
   const handleDownloadPDF = async () => {
@@ -68,11 +78,20 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
             <Button
               variant="outline"
               size="sm"
-              onClick={handlePrint}
+              onClick={() => { setIsInvoiceMode(false); handlePrint(); }}
               className="gap-2"
             >
               <Printer className="h-4 w-4" />
               Print
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePrintInvoice}
+              className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+            >
+              <FileText className="h-4 w-4" />
+              Invoice
             </Button>
             <Button
               size="sm"
@@ -107,7 +126,7 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
                   <h1 className="text-2xl font-bold tracking-tight">
                     {company?.name || "Company"}
                   </h1>
-                  {company?.gst_number && (
+                  {isInvoiceMode && company?.gst_number && (
                     <p className="text-slate-300 text-sm mt-0.5">
                       GSTIN: {company.gst_number}
                     </p>
@@ -116,7 +135,7 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
               </div>
               <div className="text-left sm:text-right">
                 <h2 className="text-3xl font-extrabold tracking-tight opacity-90">
-                  ESTIMATE
+                  {isInvoiceMode ? "BILL OF SUPPLY" : "ESTIMATE"}
                 </h2>
                 <p className="text-slate-300 text-sm font-medium mt-1">
                   {invoice.invoice_number}

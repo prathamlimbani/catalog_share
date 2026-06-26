@@ -4,13 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Eye, Pencil, FileText, Search, IndianRupee } from "lucide-react";
+import { Plus, Eye, Pencil, FileText, Search, IndianRupee, Trash2 } from "lucide-react";
 
 interface InvoiceHistoryProps {
   invoices: any[];
   onCreateNew: () => void;
   onView: (invoice: any) => void;
   onEdit: (invoice: any) => void;
+  onDelete: (invoice: any) => void;
   isLoading: boolean;
 }
 
@@ -32,6 +33,7 @@ const InvoiceHistory = ({
   onCreateNew,
   onView,
   onEdit,
+  onDelete,
   isLoading,
 }: InvoiceHistoryProps) => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -228,6 +230,14 @@ const InvoiceHistory = ({
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30"
+                            onClick={() => onDelete(invoice)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -297,6 +307,15 @@ const InvoiceHistory = ({
                   >
                     <Pencil className="h-3.5 w-3.5" />
                     Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 gap-1.5 text-xs h-8 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/30"
+                    onClick={() => onDelete(invoice)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete
                   </Button>
                 </div>
               </CardContent>

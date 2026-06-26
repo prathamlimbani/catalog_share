@@ -74,6 +74,7 @@ const InvoiceForm = ({
   const [sgstPercent, setSgstPercent] = useState(0);
   const [cgstPercent, setCgstPercent] = useState(0);
   const [discount, setDiscount] = useState(0);
+  const [discountPercent, setDiscountPercent] = useState<number | "">("");
   const [notes, setNotes] = useState("");
 
   // Pre-fill when editing
@@ -131,6 +132,12 @@ const InvoiceForm = ({
     () => subtotal + sgstAmount + cgstAmount,
     [subtotal, sgstAmount, cgstAmount]
   );
+
+  useEffect(() => {
+    if (discountPercent !== "") {
+      setDiscount(grandTotal * (Number(discountPercent) / 100));
+    }
+  }, [discountPercent, grandTotal]);
 
   const finalAmount = useMemo(
     () => Math.max(0, grandTotal - discount),
@@ -268,12 +275,11 @@ const InvoiceForm = ({
                   Estimate No.
                 </Label>
                 <div className="mt-1">
-                  <Badge
-                    variant="secondary"
-                    className="text-sm font-semibold px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200"
-                  >
-                    {invoiceNumber}
-                  </Badge>
+                  <Input
+                    value={invoiceNumber}
+                    onChange={(e) => setInvoiceNumber(e.target.value)}
+                    className="w-32 h-9 text-sm font-semibold bg-blue-50 text-blue-700 border-blue-200 focus:border-blue-400"
+                  />
                 </div>
               </div>
               <div>
@@ -852,24 +858,45 @@ const InvoiceForm = ({
                   {formatCurrency(grandTotal)}
                 </span>
               </div>
-              <div className="flex items-center justify-between gap-3">
-                <Label
-                  htmlFor="discount"
-                  className="text-sm text-slate-500 whitespace-nowrap"
-                >
-                  Discount (₹)
-                </Label>
-                <Input
-                  id="discount"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={discount === 0 ? "" : discount}
-                  onChange={(e) =>
-                    setDiscount(Math.max(0, Number(e.target.value) || 0))
-                  }
-                  className="w-32 border-slate-200 focus:border-blue-400 text-right"
-                />
+              <div className="flex flex-col gap-2 mt-2">
+                <div className="flex items-center justify-between gap-3">
+                  <Label className="text-sm text-slate-500 whitespace-nowrap">
+                    Discount
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.1"
+                        placeholder="%"
+                        value={discountPercent}
+                        onChange={(e) => {
+                          const val = e.target.value === "" ? "" : Number(e.target.value);
+                          setDiscountPercent(val);
+                        }}
+                        className="w-20 border-slate-200 focus:border-blue-400 text-right pr-6"
+                      />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">%</span>
+                    </div>
+                    <span className="text-slate-300">- or -</span>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">₹</span>
+                      <Input
+                        id="discount"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={discount === 0 ? "" : discount}
+                        onChange={(e) => {
+                          setDiscountPercent("");
+                          setDiscount(Math.max(0, Number(e.target.value) || 0));
+                        }}
+                        className="w-28 pl-6 border-slate-200 focus:border-blue-400 text-right"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
               {discount > 0 && (
                 <div className="flex items-center justify-between text-sm">
@@ -893,6 +920,7 @@ const InvoiceForm = ({
                       value={finalAmount}
                       onChange={(e) => {
                         const newFinal = Math.max(0, Number(e.target.value) || 0);
+                        setDiscountPercent("");
                         setDiscount(Math.max(0, grandTotal - newFinal));
                       }}
                       className="w-32 pl-7 border-slate-300 focus:border-emerald-500 text-right text-lg font-extrabold text-emerald-600 bg-emerald-50/50 dark:text-emerald-400 dark:bg-emerald-950/50"
