@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, FileText, Calendar, Printer } from "lucide-react";
+import { Plus, Trash2, FileText, Calendar, Printer, ArrowLeft } from "lucide-react";
 import { Tables } from "@/integrations/supabase/types";
 import InvoicePreview from "./InvoicePreview";
 
@@ -40,6 +40,18 @@ const emptyItem = (): InvoiceItem => ({
   amount: 0,
   size: "",
 });
+
+const calculateSqft = (sizeString: string): number | null => {
+  const match = sizeString.match(/^\s*([\d.]+)\s*[xX*]\s*([\d.]+)\s*$/);
+  if (match) {
+    const l = parseFloat(match[1]);
+    const w = parseFloat(match[2]);
+    if (!isNaN(l) && !isNaN(w)) {
+      return Number(((l * w) / 144).toFixed(2));
+    }
+  }
+  return null;
+};
 
 const InvoiceForm = ({
   company,
@@ -226,6 +238,12 @@ const InvoiceForm = ({
     </div>
     <div className="space-y-6 max-w-5xl mx-auto print:hidden">
       {/* Header */}
+      <div className="mb-4 flex items-center">
+        <Button variant="ghost" size="sm" onClick={onCancel} className="text-slate-500 hover:text-slate-700 hover:bg-slate-100 -ml-2">
+          <ArrowLeft className="h-4 w-4 mr-1" />
+          Back
+        </Button>
+      </div>
       <Card className="border-0 shadow-lg bg-gradient-to-r from-slate-50 to-white dark:from-slate-800 dark:to-slate-900">
         <CardContent className="p-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -482,6 +500,12 @@ const InvoiceForm = ({
                             updates.price = match.price;
                           }
                         }
+                        if (item.unit === 'sqft') {
+                          const sqft = calculateSqft(newSize);
+                          if (sqft !== null) {
+                            updates.quantity = sqft;
+                          }
+                        }
                         updateItem(index, updates);
                       }}
                       list={`size-options-${index}`}
@@ -505,12 +529,27 @@ const InvoiceForm = ({
                     }
                     className="border-slate-200 focus:border-blue-400 text-center"
                   />
-                  <Input
-                    value={item.unit}
-                    onChange={(e) => updateItem(index, { unit: e.target.value })}
-                    className="border-slate-200 focus:border-blue-400 text-center"
-                    placeholder="pcs"
-                  />
+                  <select
+                    value={item.unit || "pcs"}
+                    onChange={(e) => {
+                      const newUnit = e.target.value;
+                      const updates: any = { unit: newUnit };
+                      if (newUnit === 'sqft') {
+                        const sqft = calculateSqft(item.size || "");
+                        if (sqft !== null) {
+                          updates.quantity = sqft;
+                        }
+                      }
+                      updateItem(index, updates);
+                    }}
+                    className="border-slate-200 focus:border-blue-400 text-center rounded-md border bg-background px-3 py-2 text-sm shadow-sm transition-colors"
+                  >
+                    <option value="pcs">pcs</option>
+                    <option value="sqft">sqft</option>
+                    <option value="box">box</option>
+                    <option value="kg">kg</option>
+                    <option value="meters">meters</option>
+                  </select>
                   <Input
                     type="number"
                     min={0}
@@ -584,6 +623,12 @@ const InvoiceForm = ({
                                 updates.price = match.price;
                               }
                             }
+                            if (item.unit === 'sqft') {
+                              const sqft = calculateSqft(newSize);
+                              if (sqft !== null) {
+                                updates.quantity = sqft;
+                              }
+                            }
                             updateItem(index, updates);
                           }}
                           list={`mobile-size-options-${index}`}
@@ -616,14 +661,27 @@ const InvoiceForm = ({
                     </div>
                     <div>
                       <Label className="text-xs text-slate-400">Unit</Label>
-                      <Input
-                        value={item.unit}
-                        onChange={(e) =>
-                          updateItem(index, { unit: e.target.value })
-                        }
-                        className="mt-1 border-slate-200 text-center text-sm"
-                        placeholder="pcs"
-                      />
+                      <select
+                        value={item.unit || "pcs"}
+                        onChange={(e) => {
+                          const newUnit = e.target.value;
+                          const updates: any = { unit: newUnit };
+                          if (newUnit === 'sqft') {
+                            const sqft = calculateSqft(item.size || "");
+                            if (sqft !== null) {
+                              updates.quantity = sqft;
+                            }
+                          }
+                          updateItem(index, updates);
+                        }}
+                        className="mt-1 w-full rounded-md border border-slate-200 bg-background text-foreground dark:bg-slate-900 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      >
+                        <option value="pcs">pcs</option>
+                        <option value="sqft">sqft</option>
+                        <option value="box">box</option>
+                        <option value="kg">kg</option>
+                        <option value="meters">meters</option>
+                      </select>
                     </div>
                     <div>
                       <Label className="text-xs text-slate-400">Price (₹)</Label>
