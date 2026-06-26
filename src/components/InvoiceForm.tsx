@@ -615,40 +615,42 @@ const InvoiceForm = ({
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                  <div className="grid grid-cols-4 gap-2">
-                    <div>
-                      <Label className="text-xs text-slate-400">Size</Label>
-                      <div className="relative mt-1">
-                        <Input
-                          value={item.size || ""}
-                          onChange={(e) => {
-                            const newSize = e.target.value;
-                            const updates: any = { size: newSize };
-                            if (product && featureSizes && Array.isArray(featureSizes.__prices)) {
-                              const match = featureSizes.__prices.find((sp: any) => sp.size === newSize);
-                              if (match && typeof match.price === 'number') {
-                                updates.price = match.price;
-                              }
+                  
+                  <div>
+                    <Label className="text-xs text-slate-400">Size</Label>
+                    <div className="relative mt-1">
+                      <Input
+                        value={item.size || ""}
+                        onChange={(e) => {
+                          const newSize = e.target.value;
+                          const updates: any = { size: newSize };
+                          if (product && featureSizes && Array.isArray(featureSizes.__prices)) {
+                            const match = featureSizes.__prices.find((sp: any) => sp.size === newSize);
+                            if (match && typeof match.price === 'number') {
+                              updates.price = match.price;
                             }
-                            if (item.unit === 'sqft') {
-                              const sqft = calculateSqft(newSize);
-                              if (sqft !== null) {
-                                updates.quantity = sqft;
-                              }
+                          }
+                          if (item.unit === 'sqft') {
+                            const sqft = calculateSqft(newSize);
+                            if (sqft !== null) {
+                              updates.quantity = sqft;
                             }
-                            updateItem(index, updates);
-                          }}
-                          list={`mobile-size-options-${index}`}
-                          className="border-slate-200 text-center text-sm"
-                          placeholder="Size"
-                        />
-                        {sizeOptions.length > 0 && (
-                          <datalist id={`mobile-size-options-${index}`}>
-                            {sizeOptions.map(opt => <option key={opt} value={opt} />)}
-                          </datalist>
-                        )}
-                      </div>
+                          }
+                          updateItem(index, updates);
+                        }}
+                        list={`mobile-size-options-${index}`}
+                        className="w-full border-slate-200 text-sm"
+                        placeholder="Size (e.g. 44x15.5)"
+                      />
+                      {sizeOptions.length > 0 && (
+                        <datalist id={`mobile-size-options-${index}`}>
+                          {sizeOptions.map(opt => <option key={opt} value={opt} />)}
+                        </datalist>
+                      )}
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
                     <div>
                       <Label className="text-xs text-slate-400">Qty</Label>
                       <Input
