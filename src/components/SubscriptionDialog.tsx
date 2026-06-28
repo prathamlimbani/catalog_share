@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, Crown, Zap, Sparkles } from "lucide-react";
+import { Check, Crown, Zap, Sparkles, Heart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -65,6 +65,18 @@ const PLANS: Plan[] = [
         gradient: "from-purple-500/10 to-pink-500/10",
         buttonLabel: "Upgrade",
         buttonClass: "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white",
+    },
+    {
+        id: "support",
+        name: "Monthly Support Subscription",
+        price: 499,
+        priceLabel: "₹499/month",
+        productLimit: 9999,
+        features: ["Helps improve the platform", "All Pro Features", "Monthly auto pay through Razorpay"],
+        icon: <Heart className="h-5 w-5 text-rose-500" />,
+        gradient: "from-rose-500/10 to-pink-500/10",
+        buttonLabel: "Support Us",
+        buttonClass: "bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white",
     },
 ];
 
@@ -241,12 +253,11 @@ export function SubscriptionDialog({ companyId, companyName, companyEmail, curre
                     </p>
                 </DialogHeader>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 py-4">
                     {PLANS.map((plan) => {
                         const isCurrentPlan = plan.id === currentPlan;
-                        const isDowngrade =
-                            (currentPlan === "pro" && plan.id !== "pro") ||
-                            (currentPlan === "growth" && plan.id === "free");
+                        const planRank: Record<string, number> = { free: 0, growth: 1, pro: 2, support: 3 };
+                        const isDowngrade = planRank[plan.id] < (planRank[currentPlan] || 0);
 
                         return (
                             <Card

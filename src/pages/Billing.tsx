@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Crown, CreditCard, Download, CalendarClock, RefreshCw, Receipt, CheckCircle2, XCircle, Clock, Mail, Phone } from "lucide-react";
+import { Crown, CreditCard, Download, CalendarClock, RefreshCw, Receipt, CheckCircle2, XCircle, Clock, Mail, Phone, Heart } from "lucide-react";
 import { SubscriptionDialog, getPlanLimit, getPlanName } from "@/components/SubscriptionDialog";
 
 // Generate and download a PDF-like invoice as an HTML blob
@@ -216,12 +216,12 @@ const Billing = () => {
                 {companyLoading ? (
                     <Skeleton className="h-40 w-full" />
                 ) : company && (
-                    <Card className={`border-0 shadow-md overflow-hidden ${currentPlan === 'pro' ? 'bg-gradient-to-r from-purple-500/5 to-pink-500/5 ring-1 ring-purple-500/20' : currentPlan === 'growth' ? 'bg-gradient-to-r from-blue-500/5 to-cyan-500/5 ring-1 ring-blue-500/20' : 'bg-gradient-to-r from-emerald-500/5 to-teal-500/5 ring-1 ring-emerald-500/20'}`}>
+                    <Card className={`border-0 shadow-md overflow-hidden ${currentPlan === 'support' ? 'bg-gradient-to-r from-rose-500/5 to-pink-500/5 ring-1 ring-rose-500/20' : currentPlan === 'pro' ? 'bg-gradient-to-r from-purple-500/5 to-pink-500/5 ring-1 ring-purple-500/20' : currentPlan === 'growth' ? 'bg-gradient-to-r from-blue-500/5 to-cyan-500/5 ring-1 ring-blue-500/20' : 'bg-gradient-to-r from-emerald-500/5 to-teal-500/5 ring-1 ring-emerald-500/20'}`}>
                         <CardContent className="p-6">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div className="flex items-center gap-4">
-                                    <div className={`p-3 rounded-xl ${currentPlan === 'pro' ? 'bg-purple-500/10' : currentPlan === 'growth' ? 'bg-blue-500/10' : 'bg-emerald-500/10'}`}>
-                                        <Crown className={`h-7 w-7 ${currentPlan === 'pro' ? 'text-purple-500' : currentPlan === 'growth' ? 'text-blue-500' : 'text-emerald-500'}`} />
+                                    <div className={`p-3 rounded-xl ${currentPlan === 'support' ? 'bg-rose-500/10' : currentPlan === 'pro' ? 'bg-purple-500/10' : currentPlan === 'growth' ? 'bg-blue-500/10' : 'bg-emerald-500/10'}`}>
+                                        {currentPlan === 'support' ? <Heart className="h-7 w-7 text-rose-500" /> : <Crown className={`h-7 w-7 ${currentPlan === 'pro' ? 'text-purple-500' : currentPlan === 'growth' ? 'text-blue-500' : 'text-emerald-500'}`} />}
                                     </div>
                                     <div>
                                         <h2 className="text-xl font-bold">{getPlanName(currentPlan)}</h2>
@@ -255,7 +255,7 @@ const Billing = () => {
                                             </Button>
                                         </SubscriptionDialog>
                                     )}
-                                    {currentPlan !== 'pro' && !isExpired && (
+                                    {currentPlan !== 'support' && !isExpired && (
                                         <SubscriptionDialog
                                             companyId={company.id}
                                             companyName={company.name}
