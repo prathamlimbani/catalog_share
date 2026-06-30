@@ -179,8 +179,17 @@ const Landing = () => {
             <img src="/logo.png" alt="CatalogShare Logo" className="h-14 sm:h-16 w-auto object-contain flex-shrink-0" />
           </Link>
           {/* Desktop nav */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-1.5 lg:gap-3">
             <ThemeToggle />
+            <Button variant="ghost" className="text-foreground" asChild>
+              <Link to="/pricing">Pricing</Link>
+            </Button>
+            <Button variant="ghost" className="text-foreground" asChild>
+              <Link to="/customer-care">Customer Care</Link>
+            </Button>
+            <Button variant="ghost" className="text-foreground" asChild>
+              <Link to="/terms">Terms</Link>
+            </Button>
             <Button variant="ghost" className="text-foreground" asChild>
               <Link to="/about">About</Link>
             </Button>
@@ -199,6 +208,9 @@ const Landing = () => {
         {/* Mobile dropdown */}
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-border/50 bg-background/95 backdrop-blur-xl p-4 space-y-2 animate-fade-in">
+            <Link to="/pricing" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-foreground">Pricing</Link>
+            <Link to="/customer-care" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-foreground">Customer Care</Link>
+            <Link to="/terms" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-foreground">Terms</Link>
             <Link to="/about" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-foreground">About</Link>
             <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-foreground">Login</Link>
           </div>
@@ -455,8 +467,11 @@ const Landing = () => {
             <div className="flex items-center gap-2">
               <img src="/logo.png" alt="CatalogShare Logo" className="h-10 sm:h-12 w-auto object-contain" />
             </div>
-            <div className="text-sm text-muted-foreground flex gap-4">
+            <div className="text-sm text-muted-foreground flex flex-wrap gap-4 justify-center sm:justify-end">
+              <Link to="/pricing" className="hover:text-foreground transition-colors">Pricing</Link>
+              <Link to="/terms" className="hover:text-foreground transition-colors">Terms & Conditions</Link>
               <Link to="/about" className="hover:text-foreground transition-colors">About</Link>
+              <Link to="/customer-care" className="hover:text-foreground transition-colors">Contact Us</Link>
             </div>
           </div>
           <div className="mt-4 pt-4 border-t text-center">

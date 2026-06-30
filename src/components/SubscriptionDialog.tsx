@@ -5,8 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check, Crown, Zap, Sparkles, Heart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { useRazorpaySubscription } from "@/hooks/useRazorpaySubscription";
 
 declare global {
     interface Window {
@@ -100,145 +100,14 @@ interface SubscriptionDialogProps {
 
 export function SubscriptionDialog({ companyId, companyName, companyEmail, currentPlan, children }: SubscriptionDialogProps) {
     const [open, setOpen] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const queryClient = useQueryClient();
+    const { subscribe, loading } = useRazorpaySubscription(companyId, companyName, companyEmail);
 
-    const loadRazorpayScript = (): Promise<boolean> => {
-        return new Promise((resolve) => {
-            if (window.Razorpay) {
-                resolve(true);
-                return;
-            }
-            const script = document.createElement("script");
-            script.src = "https://checkout.razorpay.com/v1/checkout.js";
-            script.onload = () => resolve(true);
-            script.onerror = () => resolve(false);
-            document.body.appendChild(script);
-        });
-    };
-
-    const handleSubscribe = async (plan: Plan) => {
+    const handleSubscribe = (plan: Plan) => {
         if (plan.id === "free" || plan.id === currentPlan) return;
-
-        setLoading(true);
-
-        const scriptLoaded = await loadRazorpayScript();
-        if (!scriptLoaded) {
-            toast.error("Failed to load payment gateway. Please try again.");
-            setLoading(false);
-            return;
-        }
-
-        const razorpayKeyId = import.meta.env.VITE_RAZORPAY_KEY_ID;
-        if (!razorpayKeyId) {
-            toast.error("Payment configuration error.");
-            setLoading(false);
-            return;
-        }
-
-        const amountInPaise = plan.price * 100;
-
-        const options = {
-            key: razorpayKeyId,
-            amount: amountInPaise,
-            currency: "INR",
-            name: "CatalogShare",
-            description: `${plan.name} - Monthly Subscription`,
-            prefill: {
-                name: companyName,
-                email: companyEmail,
-            },
-            theme: {
-                color: "#6366f1",
-            },
-            handler: async (response: any) => {
-                try {
-                    // Calculate expiry (30 days from now)
-                    const now = new Date();
-                    const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-
-                    // Save subscription record
-                    const { error: subError } = await (supabase as any).from("subscriptions").insert({
-                        company_id: companyId,
-                        plan: plan.id,
-                        razorpay_payment_id: response.razorpay_payment_id,
-                        razorpay_order_id: response.razorpay_order_id || null,
-                        amount: amountInPaise,
-                        status: "active",
-                        starts_at: now.toISOString(),
-                        expires_at: expiresAt.toISOString(),
-                    });
-
-                    if (subError) throw subError;
-
-                    // Update company plan
-                    const { error: compError } = await supabase
-                        .from("companies")
-                        .update({
-                            subscription_plan: plan.id,
-                            subscription_expires_at: expiresAt.toISOString(),
-                        })
-                        .eq("id", companyId);
-
-                    if (compError) throw compError;
-
-                    // Send invoice email to the company (fire-and-forget)
-                    supabase.functions.invoke("send-emails", {
-                        body: {
-                            type: "invoice",
-                            to: companyEmail,
-                            companyName,
-                            planName: plan.name,
-                            amount: amountInPaise,
-                            paymentId: response.razorpay_payment_id || null,
-                            startsAt: now.toISOString(),
-                            expiresAt: expiresAt.toISOString(),
-                        },
-                    }).catch((e: any) => console.warn("Invoice email failed (non-blocking):", e));
-
-                    // Send admin notification to catalogshare123@gmail.com
-                    supabase.functions.invoke("send-emails", {
-                        body: {
-                            type: "admin_new_subscription",
-                            to: companyEmail,
-                            companyName,
-                            companyEmail,
-                            planName: plan.name,
-                            amount: amountInPaise,
-                            expiresAt: expiresAt.toISOString(),
-                        },
-                    }).catch((e: any) => console.warn("Admin subscription email failed (non-blocking):", e));
-
-                    // Refresh data
-                    queryClient.invalidateQueries({ queryKey: ["current-company"] });
-
-                    toast.success(`🎉 Successfully upgraded to ${plan.name}! Invoice sent to your email.`);
-                } catch (err: any) {
-                    console.error("Failed to record subscription:", err);
-                    toast.error("Payment received but failed to activate plan. Please contact support.");
-                }
-            },
-            modal: {
-                ondismiss: () => {
-                    setLoading(false);
-                },
-            },
-        };
-
-        const razorpay = new window.Razorpay(options);
-        razorpay.on("payment.failed", (response: any) => {
-            toast.error(`Payment failed: ${response.error.description}`);
-            setLoading(false);
-        });
-
-        // IMPORTANT: Close the Dialog BEFORE opening Razorpay.
-        // The Radix UI Dialog overlay captures pointer events (pointer-events: all),
-        // which blocks clicks inside the Razorpay iframe popup.
-        // Closing the Dialog removes the overlay from the DOM so Razorpay works normally.
-        setOpen(false);
-        razorpay.open();
-        setLoading(false);
+        subscribe(plan.id, plan.name, plan.price, () => setOpen(false));
     };
+
+
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>

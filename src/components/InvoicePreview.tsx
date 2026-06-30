@@ -1,5 +1,14 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ArrowLeft, Printer, Download, FileText } from "lucide-react";
 
 interface InvoicePreviewProps {
@@ -23,16 +32,25 @@ const formatDate = (dateStr: string) => {
 
 const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
   const [isInvoiceMode, setIsInvoiceMode] = useState(false);
+  const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
+  const [customInvoiceNumber, setCustomInvoiceNumber] = useState(invoice.invoice_number);
+  const [vehicleNumber, setVehicleNumber] = useState("");
   
   const handlePrint = () => {
     window.print();
   };
 
-  const handlePrintInvoice = () => {
+  const handleOpenInvoiceDialog = () => {
+    setCustomInvoiceNumber(invoice.invoice_number); // Reset to default on open
+    setIsInvoiceDialogOpen(true);
+  };
+
+  const handleConfirmInvoice = () => {
+    setIsInvoiceDialogOpen(false);
     setIsInvoiceMode(true);
     setTimeout(() => {
       window.print();
-    }, 100);
+    }, 500);
   };
 
   const handleDownloadPDF = async () => {
@@ -87,7 +105,7 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
             <Button
               variant="outline"
               size="sm"
-              onClick={handlePrintInvoice}
+              onClick={handleOpenInvoiceDialog}
               className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
             >
               <FileText className="h-4 w-4" />
@@ -138,7 +156,7 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
                   {isInvoiceMode ? "BILL OF SUPPLY" : "ESTIMATE"}
                 </h2>
                 <p className="text-slate-300 text-sm font-medium mt-1">
-                  {invoice.invoice_number}
+                  {isInvoiceMode ? customInvoiceNumber : invoice.invoice_number}
                 </p>
                 <p className="text-slate-400 text-sm">
                   {formatDate(invoice.invoice_date)}
@@ -159,6 +177,11 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
               {invoice.customer_phone && (
                 <p className="text-sm text-gray-600 mt-1">
                   Phone: {invoice.customer_phone}
+                </p>
+              )}
+              {isInvoiceMode && vehicleNumber && (
+                <p className="text-sm text-gray-600 mt-1">
+                  Vehicle No: {vehicleNumber}
                 </p>
               )}
               {invoice.customer_address && (
@@ -317,6 +340,18 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
             </div>
           )}
 
+          {/* Authorized Signature & Seal */}
+          {isInvoiceMode && (
+            <div className="px-4 sm:px-8 mt-8 mb-4 flex justify-end">
+              <div className="text-center">
+                <div className="w-48 h-24 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-2">
+                  <span className="text-gray-400 text-sm">Seal & Signature</span>
+                </div>
+                <p className="text-sm font-semibold text-gray-800">Authorized Signatory</p>
+              </div>
+            </div>
+          )}
+
           {/* Footer */}
           <div className="mt-8 pt-6 border-t border-gray-200 text-center px-4 sm:px-8">
             <p className="text-xs text-gray-400 mt-1">
@@ -331,6 +366,46 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
           </div>
         </div>
       </div>
+
+      {/* Invoice Details Dialog */}
+      <Dialog open={isInvoiceDialogOpen} onOpenChange={setIsInvoiceDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Invoice Details</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="invoice-number" className="text-right">
+                Invoice No.
+              </Label>
+              <Input
+                id="invoice-number"
+                value={customInvoiceNumber}
+                onChange={(e) => setCustomInvoiceNumber(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="vehicle-number" className="text-right">
+                Vehicle No.
+              </Label>
+              <Input
+                id="vehicle-number"
+                value={vehicleNumber}
+                onChange={(e) => setVehicleNumber(e.target.value)}
+                placeholder="Optional"
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsInvoiceDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmInvoice}>OK</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

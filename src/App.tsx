@@ -13,6 +13,9 @@ import NotFound from "./pages/NotFound";
 
 // Lazy load non-critical pages
 const About = lazy(() => import("./pages/About"));
+const Pricing = lazy(() => import("./pages/Pricing"));
+const Terms = lazy(() => import("./pages/Terms"));
+const CustomerCare = lazy(() => import("./pages/CustomerCare"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
@@ -54,6 +57,9 @@ const App = () => (
               {/* Platform pages */}
               <Route path="/" element={<Landing />} />
               <Route path="/about" element={<About />} />
+              <Route path="/pricing" element={<Pricing />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/customer-care" element={<CustomerCare />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />

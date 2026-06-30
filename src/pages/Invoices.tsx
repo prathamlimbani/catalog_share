@@ -9,6 +9,7 @@ import { Tables } from "@/integrations/supabase/types";
 import InvoiceForm from "@/components/InvoiceForm";
 import InvoicePreview from "@/components/InvoicePreview";
 import InvoiceHistory from "@/components/InvoiceHistory";
+import { SupportPromoDialog } from "@/components/SupportPromoDialog";
 
 type Product = Tables<"products">;
 
@@ -225,6 +226,8 @@ const Invoices = () => {
           onBack={handleBack}
         />
       )}
+      
+      <SupportPromoDialog company={company} />
     </AdminLayout>
   );
 };
