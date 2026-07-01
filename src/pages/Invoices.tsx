@@ -200,6 +200,7 @@ const Invoices = () => {
       {viewMode === "list" && (
         <InvoiceHistory
           invoices={invoices}
+          company={company}
           onCreateNew={handleCreateNew}
           onView={handleView}
           onEdit={handleEdit}

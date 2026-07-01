@@ -4,10 +4,36 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Eye, Pencil, FileText, Search, IndianRupee, Trash2 } from "lucide-react";
+import { Plus, Eye, Pencil, FileText, Search, IndianRupee, Trash2, Loader2 } from "lucide-react";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import InvoicePreview from "@/components/InvoicePreview";
+
+const WhatsappIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    width="24"
+    height="24"
+    fill="currentColor"
+    className={className}
+  >
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.82 9.82 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/>
+  </svg>
+);
 
 interface InvoiceHistoryProps {
   invoices: any[];
+  company: any;
   onCreateNew: () => void;
   onView: (invoice: any) => void;
   onEdit: (invoice: any) => void;
@@ -30,6 +56,7 @@ const formatDate = (dateStr: string) => {
 
 const InvoiceHistory = ({
   invoices,
+  company,
   onCreateNew,
   onView,
   onEdit,
@@ -37,6 +64,81 @@ const InvoiceHistory = ({
   isLoading,
 }: InvoiceHistoryProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [whatsappDialogOpen, setWhatsappDialogOpen] = useState(false);
+  const [whatsappNumber, setWhatsappNumber] = useState("+91");
+  const [selectedInvoiceForWhatsapp, setSelectedInvoiceForWhatsapp] = useState<any | null>(null);
+  const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+
+  const handleOpenWhatsapp = (invoice: any) => {
+    setSelectedInvoiceForWhatsapp(invoice);
+    let defaultNumber = "+91";
+    if (invoice.customer_phone) {
+      const phone = invoice.customer_phone.trim();
+      if (phone.startsWith("+91")) {
+        defaultNumber = phone;
+      } else if (phone.length === 10) {
+        defaultNumber = `+91${phone}`;
+      } else {
+        defaultNumber = `+91${phone}`;
+      }
+    }
+    setWhatsappNumber(defaultNumber);
+    setWhatsappDialogOpen(true);
+  };
+
+  const handleSendWhatsapp = async () => {
+    if (!selectedInvoiceForWhatsapp || !whatsappNumber.trim()) return;
+    
+    const cleanNumber = whatsappNumber.replace(/\s+/g, "").replace("+", "");
+    const amount = selectedInvoiceForWhatsapp.final_amount.toLocaleString("en-IN", { minimumFractionDigits: 2 });
+    
+    setIsGeneratingLink(true);
+    toast.loading("Generating secure PDF link...", { id: "pdf-gen" });
+
+    try {
+      const element = document.getElementById("invoice-print-area");
+      if (!element) throw new Error("Could not find invoice element to generate PDF");
+      
+      const html2pdf = (await import("html2pdf.js")).default;
+      
+      const pdfBlob = await html2pdf()
+        .set({
+          margin: 0.5,
+          filename: `${selectedInvoiceForWhatsapp.invoice_number}.pdf`,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
+        })
+        .from(element)
+        .output('blob');
+        
+      const fileName = `estimates/${selectedInvoiceForWhatsapp.id}-${Date.now()}.pdf`;
+      const { data, error } = await supabase.storage.from("product-images").upload(fileName, pdfBlob, {
+        contentType: "application/pdf",
+        upsert: true,
+      });
+      
+      if (error) throw error;
+      
+      const { data: urlData } = supabase.storage.from("product-images").getPublicUrl(fileName);
+      const publicUrl = urlData.publicUrl;
+
+      toast.dismiss("pdf-gen");
+      toast.success("Link generated!");
+
+      const text = `Hello ${selectedInvoiceForWhatsapp.customer_name},\n\nPlease find your estimate (${selectedInvoiceForWhatsapp.invoice_number}) for ₹${amount} here: ${publicUrl}\n\nThank you!`;
+      
+      const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(text)}`;
+      window.open(url, "_blank");
+      setWhatsappDialogOpen(false);
+    } catch (err: any) {
+      console.error(err);
+      toast.dismiss("pdf-gen");
+      toast.error("Failed to generate PDF link");
+    } finally {
+      setIsGeneratingLink(false);
+    }
+  };
 
   const sortedInvoices = useMemo(() => {
     return [...invoices].sort(
@@ -225,6 +327,15 @@ const InvoiceHistory = ({
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-8 w-8 text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30"
+                            onClick={() => handleOpenWhatsapp(invoice)}
+                            title="Send via WhatsApp"
+                          >
+                            <WhatsappIcon className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="h-8 w-8 text-gray-500 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30"
                             onClick={() => onEdit(invoice)}
                           >
@@ -302,6 +413,15 @@ const InvoiceHistory = ({
                   <Button
                     variant="outline"
                     size="sm"
+                    className="flex-1 gap-1.5 text-xs h-8 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-50 dark:hover:bg-green-900/30"
+                    onClick={() => handleOpenWhatsapp(invoice)}
+                  >
+                    <WhatsappIcon className="h-3.5 w-3.5" />
+                    Send
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="flex-1 gap-1.5 text-xs h-8 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-900/30"
                     onClick={() => onEdit(invoice)}
                   >
@@ -321,6 +441,72 @@ const InvoiceHistory = ({
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* WhatsApp Dialog */}
+      <Dialog open={whatsappDialogOpen} onOpenChange={setWhatsappDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <WhatsappIcon className="h-5 w-5 text-green-600" />
+              Send via WhatsApp
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="whatsapp-number" className="text-sm font-medium">
+                WhatsApp Number
+              </Label>
+              <Input
+                id="whatsapp-number"
+                value={whatsappNumber}
+                onChange={(e) => {
+                  let val = e.target.value;
+                  // Ensure +91 remains at the start if user tries to delete it
+                  if (!val.startsWith("+91")) {
+                    val = "+91" + val.replace("+91", "").trim();
+                  }
+                  setWhatsappNumber(val);
+                }}
+                className="w-full"
+                placeholder="+91 XXXXXXXXXX"
+              />
+              <p className="text-xs text-slate-500 mt-2">
+                Note: This will generate a secure online link to your PDF and include it in the WhatsApp message automatically.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWhatsappDialogOpen(false)} disabled={isGeneratingLink}>
+              Cancel
+            </Button>
+            <Button 
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={handleSendWhatsapp}
+              disabled={isGeneratingLink}
+            >
+              {isGeneratingLink ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                "Send via WhatsApp"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hidden Invoice Preview for PDF Generation */}
+      {selectedInvoiceForWhatsapp && (
+        <div style={{ position: "absolute", left: "-9999px", top: "-9999px" }} aria-hidden="true">
+          <InvoicePreview 
+            invoice={selectedInvoiceForWhatsapp} 
+            company={company} 
+            onBack={() => {}} 
+          />
         </div>
       )}
     </div>
