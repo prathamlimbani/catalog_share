@@ -18,6 +18,8 @@ interface InvoiceItem {
   quantity: number;
   unit: string;
   price: number;
+  discount: number;
+  discount_percent?: number | "";
   amount: number;
   size?: string;
 }
@@ -37,6 +39,8 @@ const emptyItem = (): InvoiceItem => ({
   quantity: 1,
   unit: "pcs",
   price: 0,
+  discount: 0,
+  discount_percent: "",
   amount: 0,
   size: "",
 });
@@ -97,6 +101,8 @@ const InvoiceForm = ({
               quantity: item.quantity || 1,
               unit: item.unit || "pcs",
               price: item.price || 0,
+              discount: item.discount || 0,
+              discount_percent: item.discount_percent || "",
               amount: item.amount || 0,
               size: item.size || "",
             }))
@@ -113,6 +119,24 @@ const InvoiceForm = ({
   }, [editingInvoice]);
 
   // Calculations
+  const totalGross = useMemo(
+    () => items.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+    [items]
+  );
+
+  const totalItemDiscount = useMemo(
+    () => items.reduce((sum, item) => sum + (item.discount || 0), 0),
+    [items]
+  );
+
+  const totalRate = useMemo(
+    () => items.reduce((sum, item) => {
+      const val = item.unit === 'sqft' ? (item.price * item.quantity) : (item.price || 0);
+      return sum + val;
+    }, 0),
+    [items]
+  );
+
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + item.amount, 0),
     [items]
@@ -148,9 +172,37 @@ const InvoiceForm = ({
   const updateItem = (index: number, updates: Partial<InvoiceItem>) => {
     setItems((prev) => {
       const updated = [...prev];
-      updated[index] = { ...updated[index], ...updates };
+      const current = updated[index];
+      
+      let newDiscount = current.discount || 0;
+      let newDiscountPercent = current.discount_percent;
+
+      if ('discount_percent' in updates) {
+        newDiscountPercent = updates.discount_percent;
+        if (newDiscountPercent !== "") {
+          newDiscount = (current.price * current.quantity * Number(newDiscountPercent)) / 100;
+        } else {
+          newDiscount = 0;
+        }
+        updates.discount = newDiscount;
+      } else if ('discount' in updates) {
+        newDiscount = updates.discount || 0;
+        newDiscountPercent = "";
+        updates.discount_percent = newDiscountPercent;
+      } else if ('price' in updates || 'quantity' in updates) {
+        const tempPrice = 'price' in updates ? updates.price! : current.price;
+        const tempQty = 'quantity' in updates ? updates.quantity! : current.quantity;
+        if (newDiscountPercent !== "" && newDiscountPercent !== undefined) {
+          newDiscount = (tempPrice * tempQty * Number(newDiscountPercent)) / 100;
+          updates.discount = newDiscount;
+        }
+      }
+
+      updated[index] = { ...current, ...updates };
+      
       // Recalculate amount
-      updated[index].amount = updated[index].price * updated[index].quantity;
+      const itemDiscount = updated[index].discount || 0;
+      updated[index].amount = Math.max(0, (updated[index].price * updated[index].quantity) - itemDiscount);
       return updated;
     });
   };
@@ -439,7 +491,7 @@ const InvoiceForm = ({
           </div>
 
           {/* Desktop table header */}
-          <div className="hidden md:grid md:grid-cols-[2fr_0.8fr_0.8fr_0.7fr_1fr_1fr_auto] gap-3 mb-2 px-1">
+          <div className="hidden md:grid md:grid-cols-[2fr_0.8fr_0.8fr_0.7fr_1fr_0.8fr_1fr_1fr_auto] gap-3 mb-2 px-1">
             <Label className="text-xs font-semibold text-slate-400 uppercase">
               Product
             </Label>
@@ -454,6 +506,12 @@ const InvoiceForm = ({
             </Label>
             <Label className="text-xs font-semibold text-slate-400 uppercase">
               Rate (₹)
+            </Label>
+            <Label className="text-xs font-semibold text-slate-400 uppercase">
+              Disc (%)
+            </Label>
+            <Label className="text-xs font-semibold text-slate-400 uppercase">
+              Disc (₹)
             </Label>
             <Label className="text-xs font-semibold text-slate-400 uppercase text-right">
               Amount
@@ -479,7 +537,7 @@ const InvoiceForm = ({
                 className="group rounded-xl border border-slate-200 bg-slate-50/50 p-3 transition-all hover:border-slate-300 hover:shadow-sm"
               >
                 {/* Desktop layout */}
-                <div className="hidden md:grid md:grid-cols-[2fr_0.8fr_0.8fr_0.7fr_1fr_1fr_auto] gap-3 items-center">
+                <div className="hidden md:grid md:grid-cols-[2fr_0.8fr_0.8fr_0.7fr_1fr_0.8fr_1fr_1fr_auto] gap-3 items-center">
                   <select
                     value={item.product_id}
                     onChange={(e) => handleProductSelect(index, e.target.value)}
@@ -568,6 +626,31 @@ const InvoiceForm = ({
                       })
                     }
                     className="border-slate-200 focus:border-blue-400"
+                  />
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.1"
+                    value={item.discount_percent === undefined ? "" : item.discount_percent}
+                    onChange={(e) => {
+                      const val = e.target.value === "" ? "" : Number(e.target.value);
+                      updateItem(index, { discount_percent: val });
+                    }}
+                    className="border-slate-200 focus:border-blue-400"
+                    placeholder="%"
+                  />
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={item.discount === 0 || !item.discount ? "" : item.discount}
+                    onChange={(e) =>
+                      updateItem(index, {
+                        discount: Math.max(0, Number(e.target.value) || 0),
+                      })
+                    }
+                    className="border-slate-200 focus:border-blue-400"
+                    placeholder="₹"
                   />
                   <div className="text-right font-semibold text-slate-800 dark:text-white text-sm pr-1">
                     {formatCurrency(item.amount)}
@@ -711,6 +794,42 @@ const InvoiceForm = ({
                       />
                     </div>
                   </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs text-slate-400">Disc (%)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.1"
+                        value={item.discount_percent === undefined ? "" : item.discount_percent}
+                        onChange={(e) => {
+                          const val = e.target.value === "" ? "" : Number(e.target.value);
+                          updateItem(index, { discount_percent: val });
+                        }}
+                        className="mt-1 border-slate-200 text-sm"
+                        placeholder="%"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-slate-400">Disc (₹)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={item.discount === 0 || !item.discount ? "" : item.discount}
+                        onChange={(e) =>
+                          updateItem(index, {
+                            discount: Math.max(
+                              0,
+                              Number(e.target.value) || 0
+                            ),
+                          })
+                        }
+                        className="mt-1 border-slate-200 text-sm"
+                        placeholder="₹"
+                      />
+                    </div>
+                  </div>
                   <div className="text-right font-semibold text-slate-700 dark:text-white text-sm">
                     Amount: {formatCurrency(item.amount)}
                   </div>
@@ -720,15 +839,37 @@ const InvoiceForm = ({
             })}
           </div>
 
-          {/* Subtotal row */}
-          <div className="mt-4 pt-4 border-t border-dashed border-slate-300 flex justify-end">
-            <div className="flex items-center gap-4">
-              <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
-                Subtotal
-              </span>
-              <span className="text-lg font-bold text-slate-800 dark:text-white min-w-[120px] text-right">
+          {/* Table Footer / Totals row */}
+          <div className="mt-4 pt-4 border-t border-slate-300">
+            {/* Desktop Totals */}
+            <div className="hidden md:grid md:grid-cols-[2fr_0.8fr_0.8fr_0.7fr_1fr_0.8fr_1fr_1fr_auto] gap-3 px-1 items-center">
+              <div className="col-span-4 text-right text-sm font-bold text-slate-600 uppercase pr-4">
+                Totals
+              </div>
+              <div className="text-sm font-bold text-slate-800 dark:text-white">
+                {formatCurrency(totalRate)}
+              </div>
+              <div className="col-span-2"></div>
+              <div className="text-right text-sm font-bold text-slate-800 dark:text-white pr-1">
                 {formatCurrency(subtotal)}
-              </span>
+              </div>
+              <div className="w-9" />
+            </div>
+
+            {/* Mobile Totals */}
+            <div className="md:hidden flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">Rate Total</span>
+                <span className="text-sm font-bold text-slate-800 dark:text-white">
+                  {formatCurrency(totalRate)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">Amount Total</span>
+                <span className="text-sm font-bold text-slate-800 dark:text-white">
+                  {formatCurrency(subtotal)}
+                </span>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -829,6 +970,20 @@ const InvoiceForm = ({
             </div>
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-500">Gross Total</span>
+                <span className="font-medium text-slate-700">
+                  {formatCurrency(totalGross)}
+                </span>
+              </div>
+              {totalItemDiscount > 0 && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-500">Item Discounts</span>
+                  <span className="font-medium text-slate-700">
+                    - {formatCurrency(totalItemDiscount)}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between text-sm border-t border-slate-200 pt-3">
                 <span className="text-slate-500">Subtotal</span>
                 <span className="font-medium text-slate-700">
                   {formatCurrency(subtotal)}

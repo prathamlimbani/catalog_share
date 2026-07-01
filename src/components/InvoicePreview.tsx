@@ -76,7 +76,13 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
     unit: string;
     price: number;
     amount: number;
+    size?: string;
   }[] = invoice.items || [];
+
+  const totalRate = items.reduce((sum, item) => {
+    const val = item.unit === 'sqft' ? (item.price * item.quantity) : (item.price || 0);
+    return sum + val;
+  }, 0);
 
   return (
     <div className="min-h-screen bg-gray-100 pb-10 print:bg-white print:pb-0 print:min-h-0">
@@ -245,10 +251,20 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
                     <td className="py-3 px-2 text-center text-gray-500">
                       {item.unit}
                     </td>
-                    <td className="py-3 px-2 text-right text-gray-700">
+                    <td className="py-3 px-2 text-right text-gray-700 whitespace-nowrap">
                       {item.price.toLocaleString("en-IN", {
                         minimumFractionDigits: 2,
                       })}
+                      {item.unit === 'sqft' && (
+                        <>
+                          /sqft
+                          <span className="text-gray-500 ml-1 text-xs">
+                            ({(item.price * item.quantity).toLocaleString("en-IN", {
+                              minimumFractionDigits: 2,
+                            })})
+                          </span>
+                        </>
+                      )}
                     </td>
                     <td className="py-3 px-2 text-right text-gray-900 font-medium">
                       {item.amount.toLocaleString("en-IN", {
@@ -257,6 +273,21 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
                     </td>
                   </tr>
                 ))}
+                <tr className="border-t-2 border-gray-800 bg-gray-50/80">
+                  <td colSpan={items.some(i => !!i.size) ? 5 : 4} className="py-3 px-2 text-right font-bold text-gray-800 uppercase text-xs tracking-wider">
+                    Totals
+                  </td>
+                  <td className="py-3 px-2 text-right text-gray-900 font-bold">
+                    {totalRate.toLocaleString("en-IN", {
+                      minimumFractionDigits: 2,
+                    })}
+                  </td>
+                  <td className="py-3 px-2 text-right text-gray-900 font-bold">
+                    {(invoice.subtotal || 0).toLocaleString("en-IN", {
+                      minimumFractionDigits: 2,
+                    })}
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
