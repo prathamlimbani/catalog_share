@@ -491,7 +491,7 @@ const InvoiceForm = ({
           </div>
 
           {/* Desktop table header */}
-          <div className="hidden md:grid md:grid-cols-[2fr_0.8fr_0.8fr_0.7fr_1fr_0.8fr_1fr_1fr_auto] gap-3 mb-2 px-1">
+          <div className="hidden md:grid md:grid-cols-[2fr_0.8fr_0.8fr_0.7fr_0.9fr_1fr_0.7fr_0.9fr_1fr_auto] gap-3 mb-2 px-1">
             <Label className="text-xs font-semibold text-slate-400 uppercase">
               Product
             </Label>
@@ -507,6 +507,9 @@ const InvoiceForm = ({
             <Label className="text-xs font-semibold text-slate-400 uppercase">
               Rate (₹)
             </Label>
+            <Label className="text-xs font-semibold text-slate-400 uppercase text-right">
+              Amount
+            </Label>
             <Label className="text-xs font-semibold text-slate-400 uppercase">
               Disc (%)
             </Label>
@@ -514,7 +517,7 @@ const InvoiceForm = ({
               Disc (₹)
             </Label>
             <Label className="text-xs font-semibold text-slate-400 uppercase text-right">
-              Amount
+              Total
             </Label>
             <div className="w-9" />
           </div>
@@ -537,7 +540,7 @@ const InvoiceForm = ({
                 className="group rounded-xl border border-slate-200 bg-slate-50/50 p-3 transition-all hover:border-slate-300 hover:shadow-sm"
               >
                 {/* Desktop layout */}
-                <div className="hidden md:grid md:grid-cols-[2fr_0.8fr_0.8fr_0.7fr_1fr_0.8fr_1fr_1fr_auto] gap-3 items-center">
+                <div className="hidden md:grid md:grid-cols-[2fr_0.8fr_0.8fr_0.7fr_0.9fr_1fr_0.7fr_0.9fr_1fr_auto] gap-3 items-center">
                   <select
                     value={item.product_id}
                     onChange={(e) => handleProductSelect(index, e.target.value)}
@@ -627,6 +630,9 @@ const InvoiceForm = ({
                     }
                     className="border-slate-200 focus:border-blue-400"
                   />
+                  <div className="text-right text-slate-600 dark:text-slate-300 text-sm font-medium pr-1">
+                    {formatCurrency(item.price * item.quantity)}
+                  </div>
                   <Input
                     type="number"
                     min={0}
@@ -830,8 +836,13 @@ const InvoiceForm = ({
                       />
                     </div>
                   </div>
-                  <div className="text-right font-semibold text-slate-700 dark:text-white text-sm">
-                    Amount: {formatCurrency(item.amount)}
+                  <div className="flex justify-between items-center text-sm mb-1 mt-2">
+                    <span className="text-slate-500">Amount:</span>
+                    <span className="font-medium text-slate-700">{formatCurrency(item.price * item.quantity)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm font-semibold text-slate-700 dark:text-white">
+                    <span>Total:</span>
+                    <span>{formatCurrency(item.amount)}</span>
                   </div>
                 </div>
               </div>
@@ -842,12 +853,13 @@ const InvoiceForm = ({
           {/* Table Footer / Totals row */}
           <div className="mt-4 pt-4 border-t border-slate-300">
             {/* Desktop Totals */}
-            <div className="hidden md:grid md:grid-cols-[2fr_0.8fr_0.8fr_0.7fr_1fr_0.8fr_1fr_1fr_auto] gap-3 px-1 items-center">
+            <div className="hidden md:grid md:grid-cols-[2fr_0.8fr_0.8fr_0.7fr_0.9fr_1fr_0.7fr_0.9fr_1fr_auto] gap-3 px-1 items-center">
               <div className="col-span-4 text-right text-sm font-bold text-slate-600 uppercase pr-4">
                 Totals
               </div>
-              <div className="text-sm font-bold text-slate-800 dark:text-white">
-                {formatCurrency(totalRate)}
+              <div></div>
+              <div className="text-right text-sm font-bold text-slate-800 dark:text-white pr-1">
+                {formatCurrency(totalGross)}
               </div>
               <div className="col-span-2"></div>
               <div className="text-right text-sm font-bold text-slate-800 dark:text-white pr-1">
@@ -859,13 +871,13 @@ const InvoiceForm = ({
             {/* Mobile Totals */}
             <div className="md:hidden flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">Rate Total</span>
+                <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">Amount Total</span>
                 <span className="text-sm font-bold text-slate-800 dark:text-white">
-                  {formatCurrency(totalRate)}
+                  {formatCurrency(totalGross)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">Amount Total</span>
+                <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">Subtotal</span>
                 <span className="text-sm font-bold text-slate-800 dark:text-white">
                   {formatCurrency(subtotal)}
                 </span>

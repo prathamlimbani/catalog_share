@@ -223,8 +223,11 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
                   <th className="text-right py-3 px-2 font-bold text-gray-800 w-28">
                     Rate (₹)
                   </th>
-                  <th className="text-right py-3 px-2 font-bold text-gray-800 w-32">
+                  <th className="text-right py-3 px-2 font-bold text-gray-800 w-28">
                     Amount (₹)
+                  </th>
+                  <th className="text-right py-3 px-2 font-bold text-gray-800 w-32">
+                    Total (₹)
                   </th>
                 </tr>
               </thead>
@@ -258,15 +261,15 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
                       {item.unit === 'sqft' && (
                         <>
                           /sqft
-                          <span className="text-gray-500 ml-1 text-xs">
-                            ({(item.price * item.quantity).toLocaleString("en-IN", {
-                              minimumFractionDigits: 2,
-                            })})
-                          </span>
                         </>
                       )}
                     </td>
-                    <td className="py-3 px-2 text-right text-gray-900 font-medium">
+                    <td className="py-3 px-2 text-right text-gray-800 font-medium whitespace-nowrap">
+                      {(item.price * item.quantity).toLocaleString("en-IN", {
+                        minimumFractionDigits: 2,
+                      })}
+                    </td>
+                    <td className="py-3 px-2 text-right text-gray-900 font-bold">
                       {item.amount.toLocaleString("en-IN", {
                         minimumFractionDigits: 2,
                       })}
@@ -278,7 +281,9 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
                     Totals
                   </td>
                   <td className="py-3 px-2 text-right text-gray-900 font-bold">
-                    {totalRate.toLocaleString("en-IN", {
+                  </td>
+                  <td className="py-3 px-2 text-right text-gray-900 font-bold">
+                    {items.reduce((sum, item) => sum + (item.price * item.quantity), 0).toLocaleString("en-IN", {
                       minimumFractionDigits: 2,
                     })}
                   </td>
