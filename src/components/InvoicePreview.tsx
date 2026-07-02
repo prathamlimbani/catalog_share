@@ -302,6 +302,21 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
             <div className="flex justify-end">
               <div className="w-full sm:w-72">
                 <div className="space-y-2 text-sm">
+                  {(() => {
+                    const totalItemDiscount = items.reduce((sum, item) => sum + (item.discount || 0), 0);
+                    const totalSaved = totalItemDiscount + (invoice.discount || 0);
+                    if (totalSaved > 0) {
+                      return (
+                        <div className="flex justify-between py-1">
+                          <span className="text-green-600 font-medium">You saved</span>
+                          <span className="text-green-600 font-medium">
+                            {formatCurrency(totalSaved)}
+                          </span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                   <div className="flex justify-between py-1">
                     <span className="text-gray-600">Subtotal</span>
                     <span className="text-gray-900 font-medium">
