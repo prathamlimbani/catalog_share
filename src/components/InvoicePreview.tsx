@@ -372,6 +372,23 @@ const InvoicePreview = ({ invoice, company, onBack }: InvoicePreviewProps) => {
                     }
                     return null;
                   })()}
+                  
+                  {invoice.advance_payment > 0 && (
+                    <div className="mt-4 pt-3 border-t border-gray-300">
+                      <div className="flex justify-between py-1 text-gray-700">
+                        <span>Advance Amount Received</span>
+                        <span className="font-medium text-gray-900">
+                          {formatCurrency(invoice.advance_payment)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between py-2 mt-1">
+                        <span className="font-bold text-gray-800">Balance to be Paid</span>
+                        <span className="font-bold text-gray-900 text-lg">
+                          {formatCurrency(Math.max(0, invoice.final_amount - invoice.advance_payment))}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

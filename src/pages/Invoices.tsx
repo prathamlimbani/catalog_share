@@ -60,7 +60,15 @@ const Invoices = () => {
         .eq("company_id", company.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data || [];
+      const mappedData = data?.map((inv: any) => {
+         const advItem = inv.items?.find((i: any) => i.product_id === 'ADVANCE_PAYMENT_METADATA');
+         if (advItem) {
+            inv.advance_payment = advItem.price;
+            inv.items = inv.items.filter((i: any) => i.product_id !== 'ADVANCE_PAYMENT_METADATA');
+         }
+         return inv;
+      });
+      return mappedData || [];
     },
     enabled: !!company?.id,
   });
@@ -85,7 +93,10 @@ const Invoices = () => {
     mutationFn: async (invoiceData: any) => {
       if (invoiceData.id) {
         // Update existing invoice
-        const { id, ...updateData } = invoiceData;
+        const { id, advance_payment, ...updateData } = invoiceData;
+        if (advance_payment !== undefined) {
+           updateData.items = [...updateData.items.filter((i: any) => i.product_id !== 'ADVANCE_PAYMENT_METADATA'), { product_id: 'ADVANCE_PAYMENT_METADATA', price: advance_payment, name: 'ADVANCE', quantity: 1, unit: 'pcs', amount: 0 }];
+        }
         const { data, error } = await (supabase as any)
           .from("invoices")
           .update(updateData)
@@ -93,15 +104,33 @@ const Invoices = () => {
           .select()
           .single();
         if (error) throw error;
+        if (data) {
+           const advItem = data.items?.find((i: any) => i.product_id === 'ADVANCE_PAYMENT_METADATA');
+           if (advItem) {
+              data.advance_payment = advItem.price;
+              data.items = data.items.filter((i: any) => i.product_id !== 'ADVANCE_PAYMENT_METADATA');
+           }
+        }
         return data;
       } else {
         // Insert new invoice
+        const { advance_payment, ...insertData } = invoiceData;
+        if (advance_payment !== undefined) {
+           insertData.items = [...insertData.items.filter((i: any) => i.product_id !== 'ADVANCE_PAYMENT_METADATA'), { product_id: 'ADVANCE_PAYMENT_METADATA', price: advance_payment, name: 'ADVANCE', quantity: 1, unit: 'pcs', amount: 0 }];
+        }
         const { data, error } = await (supabase as any)
           .from("invoices")
-          .insert(invoiceData)
+          .insert(insertData)
           .select()
           .single();
         if (error) throw error;
+        if (data) {
+           const advItem = data.items?.find((i: any) => i.product_id === 'ADVANCE_PAYMENT_METADATA');
+           if (advItem) {
+              data.advance_payment = advItem.price;
+              data.items = data.items.filter((i: any) => i.product_id !== 'ADVANCE_PAYMENT_METADATA');
+           }
+        }
         return data;
       }
     },

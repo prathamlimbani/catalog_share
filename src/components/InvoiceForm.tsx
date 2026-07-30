@@ -79,6 +79,7 @@ const InvoiceForm = ({
   const [cgstPercent, setCgstPercent] = useState(0);
   const [discount, setDiscount] = useState(0);
   const [discountPercent, setDiscountPercent] = useState<number | "">("");
+  const [advancePayment, setAdvancePayment] = useState<number>(0);
   const [notes, setNotes] = useState("");
 
   // Pre-fill when editing
@@ -114,6 +115,7 @@ const InvoiceForm = ({
       setSgstPercent(editingInvoice.sgst_percent || 0);
       setCgstPercent(editingInvoice.cgst_percent || 0);
       setDiscount(editingInvoice.discount || 0);
+      setAdvancePayment(editingInvoice.advance_payment || 0);
       setNotes(editingInvoice.notes || "");
     }
   }, [editingInvoice]);
@@ -255,6 +257,7 @@ const InvoiceForm = ({
       cgst_percent: applyGst ? cgstPercent : 0,
       cgst_amount: cgstAmount,
       discount,
+      advance_payment: advancePayment,
       grand_total: grandTotal,
       final_amount: finalAmount,
       notes: notes || null,
@@ -282,6 +285,7 @@ const InvoiceForm = ({
     cgst_percent: applyGst ? cgstPercent : 0,
     cgst_amount: cgstAmount,
     discount,
+    advance_payment: advancePayment,
     grand_total: grandTotal,
     final_amount: finalAmount,
     notes: notes || null,
@@ -1097,6 +1101,35 @@ const InvoiceForm = ({
                   </div>
                 </div>
               </div>
+
+              <div className="border-t border-slate-200 pt-3 mt-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Advance Payment Received
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">₹</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={advancePayment === 0 ? "" : advancePayment}
+                      onChange={(e) => setAdvancePayment(Math.max(0, Number(e.target.value) || 0))}
+                      className="w-32 pl-7 border-slate-300 focus:border-blue-400 text-right"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {advancePayment > 0 && (
+                <div className="flex items-center justify-between text-sm mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                  <span className="font-bold text-slate-800 dark:text-slate-200">Balance to be Paid</span>
+                  <span className="font-bold text-red-600 dark:text-red-400">
+                    {formatCurrency(Math.max(0, finalAmount - advancePayment))}
+                  </span>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
