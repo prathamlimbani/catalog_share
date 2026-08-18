@@ -81,6 +81,7 @@ const Invoices = () => {
       setIsLocked(false);
       return;
     }
+
     // Update every second
     const interval = setInterval(() => {
       const expired = isTrialExpired(company.id);

@@ -79,17 +79,11 @@ export function SupportPromoDialog({ company }: { company: any }) {
             return;
         }
 
-        // Otherwise, show once per day
-        const lastPopupDate = localStorage.getItem("lastSupportPopupDate");
-        const today = new Date().toISOString().split("T")[0];
-
-        if (lastPopupDate !== today) {
-            const timer = setTimeout(() => {
-                setOpen(true);
-                localStorage.setItem("lastSupportPopupDate", today);
-            }, 1000);
-            return () => clearTimeout(timer);
-        }
+        // Show every time the page loads
+        const timer = setTimeout(() => {
+            setOpen(true);
+        }, 1000);
+        return () => clearTimeout(timer);
     }, [company, countdown.expired]);
 
     // 5-second close button timer — only when trial is still active
