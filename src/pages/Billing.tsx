@@ -210,6 +210,31 @@ const Billing = () => {
                         Payment & Billing
                     </h1>
                     <p className="text-muted-foreground text-sm mt-1">Manage your subscription, view payment history, and download invoices.</p>
+                    {company?.email === 'bharathpatel07@gmail.com' && currentPlan === 'free' && (
+                        <Button 
+                            onClick={async () => {
+                                const now = new Date();
+                                const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+                                await supabase.from("subscriptions").insert({
+                                    company_id: company.id,
+                                    plan: "growth",
+                                    razorpay_payment_id: "pay_manual_restore_123",
+                                    amount: 39900,
+                                    status: "active",
+                                    starts_at: now.toISOString(),
+                                    expires_at: expiresAt.toISOString()
+                                });
+                                await supabase.from("companies").update({
+                                    subscription_plan: "growth",
+                                    subscription_expires_at: expiresAt.toISOString()
+                                }).eq("id", company.id);
+                                window.location.reload();
+                            }}
+                            className="bg-red-500 hover:bg-red-600 text-white mt-4 font-bold"
+                        >
+                            <RefreshCw className="h-4 w-4 mr-2" /> Restore Missing Payment (bharathpatel07)
+                        </Button>
+                    )}
                 </div>
 
                 {/* Current Plan Card */}
