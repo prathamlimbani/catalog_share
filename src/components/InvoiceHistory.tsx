@@ -129,7 +129,16 @@ const InvoiceHistory = ({
       const text = `Hello ${selectedInvoiceForWhatsapp.customer_name},\n\nPlease find your estimate (${selectedInvoiceForWhatsapp.invoice_number}) for ₹${amount} here: ${publicUrl}\n\nThank you!`;
       
       const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(text)}`;
-      window.open(url, "_blank");
+      
+      // Mobile browsers often block window.open after async operations (PDF gen & upload)
+      // Use location.href for mobile to trigger the native app deeply, and window.open for desktop
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (isMobile) {
+        window.location.href = url;
+      } else {
+        window.open(url, "_blank");
+      }
+      
       setWhatsappDialogOpen(false);
     } catch (err: any) {
       console.error(err);

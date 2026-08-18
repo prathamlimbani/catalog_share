@@ -38,7 +38,15 @@ const Cart = () => {
     // Strip any non-numeric characters
     const formattedPhone = WHATSAPP_NUMBER.replace(/\D/g, '');
     const encoded = encodeURIComponent(message);
-    window.open(`https://wa.me/${formattedPhone}?text=${encoded}`, "_blank");
+    const url = `https://wa.me/${formattedPhone}?text=${encoded}`;
+    
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      window.location.href = url;
+    } else {
+      window.open(url, "_blank");
+    }
+    
     toast.success("Opening WhatsApp...");
   };
 
