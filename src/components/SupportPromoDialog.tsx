@@ -33,7 +33,7 @@ function getTimeRemaining(trialStart: number): { days: number; hours: number; mi
 
 function hasActiveEstimatePlan(company: any): boolean {
     const plan = company?.subscription_plan;
-    if (plan !== "support" && plan !== "pro" && plan !== "estimate_generate") return false;
+    if (plan !== "support" && plan !== "pro" && plan !== "estimate_generate" && plan !== "growth") return false;
     const expiresAt = company?.subscription_expires_at;
     if (!expiresAt) return false;
     return new Date(expiresAt).getTime() > Date.now();

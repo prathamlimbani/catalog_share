@@ -65,11 +65,17 @@ export function useRazorpaySubscription(companyId: string, companyName: string, 
                     const now = new Date();
                     const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
+                    // Database has a strict CHECK constraint for subscription_plan: 'free', 'growth', 'pro'
+                    // We map our new plans to the existing DB ENUM values so payment successfully saves.
+                    let dbPlanId = planId;
+                    if (planId === "estimate_generate") dbPlanId = "growth";
+                    if (planId === "support") dbPlanId = "pro";
+
                     // Save subscription record (non-blocking - don't let this fail the whole flow)
                     try {
                         const { error: subError } = await (supabase as any).from("subscriptions").insert({
                             company_id: companyId,
-                            plan: planId,
+                            plan: dbPlanId,
                             razorpay_payment_id: response.razorpay_payment_id,
                             razorpay_order_id: response.razorpay_order_id || null,
                             amount: amountInPaise,
@@ -88,7 +94,7 @@ export function useRazorpaySubscription(companyId: string, companyName: string, 
                     const { error: compError } = await supabase
                         .from("companies")
                         .update({
-                            subscription_plan: planId,
+                            subscription_plan: dbPlanId,
                             subscription_expires_at: expiresAt.toISOString(),
                         })
                         .eq("id", companyId);
