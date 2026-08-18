@@ -65,21 +65,26 @@ export function useRazorpaySubscription(companyId: string, companyName: string, 
                     const now = new Date();
                     const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-                    // Save subscription record
-                    const { error: subError } = await (supabase as any).from("subscriptions").insert({
-                        company_id: companyId,
-                        plan: planId,
-                        razorpay_payment_id: response.razorpay_payment_id,
-                        razorpay_order_id: response.razorpay_order_id || null,
-                        amount: amountInPaise,
-                        status: "active",
-                        starts_at: now.toISOString(),
-                        expires_at: expiresAt.toISOString(),
-                    });
+                    // Save subscription record (non-blocking - don't let this fail the whole flow)
+                    try {
+                        const { error: subError } = await (supabase as any).from("subscriptions").insert({
+                            company_id: companyId,
+                            plan: planId,
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_order_id: response.razorpay_order_id || null,
+                            amount: amountInPaise,
+                            status: "active",
+                            starts_at: now.toISOString(),
+                            expires_at: expiresAt.toISOString(),
+                        });
+                        if (subError) {
+                            console.warn("Subscription record insert failed (non-blocking):", subError);
+                        }
+                    } catch (subErr: any) {
+                        console.warn("Subscription record insert exception (non-blocking):", subErr);
+                    }
 
-                    if (subError) throw subError;
-
-                    // Update company plan
+                    // Update company plan — this is the critical step
                     const { error: compError } = await supabase
                         .from("companies")
                         .update({
@@ -88,7 +93,10 @@ export function useRazorpaySubscription(companyId: string, companyName: string, 
                         })
                         .eq("id", companyId);
 
-                    if (compError) throw compError;
+                    if (compError) {
+                        console.error("Company plan update failed:", compError);
+                        throw compError;
+                    }
 
                     // Send invoice email to the company (fire-and-forget)
                     supabase.functions.invoke("send-emails", {
@@ -122,7 +130,7 @@ export function useRazorpaySubscription(companyId: string, companyName: string, 
 
                     toast.success(`🎉 Successfully upgraded to ${planName}! Invoice sent to your email.`);
                 } catch (err: any) {
-                    console.error("Failed to record subscription:", err);
+                    console.error("Failed to activate plan:", err);
                     toast.error("Payment received but failed to activate plan. Please contact support.");
                 }
             },

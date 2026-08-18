@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Settings, Upload, QrCode } from "lucide-react";
+import { Settings, Upload, QrCode, Trash2 } from "lucide-react";
 import { Tables } from "@/integrations/supabase/types";
 import ColorThemePicker from "@/components/ColorThemePicker";
 
@@ -115,6 +115,8 @@ const CompanyEditDialog = ({ company, children, externalOpen, onExternalOpenChan
         if (qrUploadError) throw qrUploadError;
         const { data: qrUrlData } = supabase.storage.from("product-images").getPublicUrl(path);
         qrUrl = qrUrlData.publicUrl;
+      } else if (!qrPreview) {
+        qrUrl = null;
       }
 
       const { error } = await supabase
@@ -238,9 +240,24 @@ const CompanyEditDialog = ({ company, children, externalOpen, onExternalOpenChan
                 )}
                 <label className="flex items-center gap-2 px-4 py-2 border border-input rounded-md cursor-pointer hover:bg-accent text-sm">
                   <QrCode className="h-4 w-4" />
-                  {qrFile ? "Change QR" : "Upload QR"}
+                  {qrFile || qrPreview ? "Change QR" : "Upload QR"}
                   <input type="file" accept="image/*" onChange={handleQrSelect} className="hidden" />
                 </label>
+                {(qrPreview || qrFile) && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="h-9 w-9 shrink-0"
+                    onClick={() => {
+                      setQrPreview(null);
+                      setQrFile(null);
+                    }}
+                    title="Remove QR Code"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </div>
           </div>
