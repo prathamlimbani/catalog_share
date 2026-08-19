@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Base application theme. Only ever seen behind system dialogs. -->
+    <style name="AppTheme" parent="Theme.AppCompat.NoActionBar">
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+        <item name="android:windowBackground">@color/splashBackground</item>
+    </style>
+
+    <!--
+        The theme Capacitor's BridgeActivity switches to in onCreate, i.e. the one
+        that is live from the moment the splash is dismissed until the WebView
+        paints its first frame. windowBackground MUST be the same dark colour as
+        the splash: leave it at the AppCompat default and that gap renders as a
+        full-screen white flash on every cold start.
+    -->
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowBackground">@color/splashBackground</item>
+        <item name="android:colorBackground">@color/splashBackground</item>
+        <item name="android:statusBarColor">@color/statusBarBackground</item>
+        <item name="android:navigationBarColor">@color/navigationBarBackground</item>
+        <!-- #0B1020 is dark, so the system icons must stay light. -->
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <!--
+        Launch (cold start) theme. Applied by the manifest before any of our code
+        runs, so this is the very first thing the user sees.
+    -->
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <!--
+            windowBackground is a FLAT COLOUR, never @drawable/splash.
+
+            The window background is painted behind the WebView for the whole life
+            of the Activity, not just during launch. With the splash artwork set
+            here, any region the WebView had not yet painted showed the dark panel
+            with the centred logo straight through the running app - which is
+            exactly the bug that was reported: app chrome at the top and right,
+            a logo-stamped rectangle filling the rest.
+
+            The Android 12+ splash API draws the branded icon for us on top of
+            windowSplashScreenBackground, so nothing is lost by dropping it here.
+        -->
+        <item name="android:windowBackground">@color/splashBackground</item>
+        <!-- Android 12+ splash API, provided back-compatibly by core-splashscreen. -->
+        <item name="windowSplashScreenBackground">@color/splashBackground</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
+        <item name="android:statusBarColor">@color/statusBarBackground</item>
+        <item name="android:navigationBarColor">@color/navigationBarBackground</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+</resources>

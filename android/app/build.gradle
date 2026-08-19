@@ -1,0 +1,129 @@
+apply plugin: 'com.android.application'
+
+/**
+ * Release signing is driven by android/keystore.properties, which is gitignored.
+ * See android/keystore.properties.example and RELEASE.md.
+ *
+ * The file is deliberately OPTIONAL: a fresh clone with no keystore must still be
+ * able to run `gradlew.bat assembleDebug`, so everything below is guarded on the
+ * file existing rather than assumed present.
+ */
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+def hasReleaseKeystore = false
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+    // Guard on the resolved file too - a stale path in keystore.properties would
+    // otherwise fail deep inside the signing task with a useless error.
+    def storeFilePath = keystoreProperties['storeFile']
+    hasReleaseKeystore = storeFilePath != null && rootProject.file(storeFilePath).exists()
+    if (!hasReleaseKeystore) {
+        logger.warn("keystore.properties found but storeFile '${storeFilePath}' does not exist - release build will be UNSIGNED.")
+    }
+}
+
+android {
+    namespace = "in.catalogshare.app"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "in.catalogshare.app"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        // IMPORTANT: versionCode must be incremented on EVERY upload to Play.
+        // Play rejects a bundle whose versionCode is <= one already uploaded to
+        // the same track, and a rejected upload cannot be reused - you have to
+        // bump and rebuild. versionName is the human-facing string and may repeat.
+        versionCode 3
+        versionName "1.0.2"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+
+    signingConfigs {
+        release {
+            if (hasReleaseKeystore) {
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+
+            // Play wants a native debug symbol file for the .so files that ship
+            // inside the Ads and Razorpay dependencies, otherwise native crashes
+            // arrive in the console unsymbolicated. SYMBOL_TABLE keeps the AAB
+            // small; FULL would also embed DWARF debug info.
+            ndk {
+                debugSymbolLevel 'SYMBOL_TABLE'
+            }
+
+            // Unsigned when no keystore is present, so CI and fresh clones still
+            // build. Assignment form, not the command form - a bare ternary after
+            // `signingConfig` is ambiguous to the Groovy parser.
+            signingConfig = hasReleaseKeystore ? signingConfigs.release : null
+        }
+    }
+
+    lint {
+        // lintVitalRelease runs as part of `bundleRelease` and fails the build on
+        // any fatal issue - which is what we want, except for the App Links
+        // check: it fetches https://catalogshare.online/.well-known/assetlinks.json
+        // over the network at build time, so it fails on an offline machine and
+        // fails before that file is published (RELEASE.md section 5). App Links
+        // are verified on-device with `adb shell pm get-app-links` instead.
+        disable 'AppLinksAutoVerifyError', 'AppLinksAutoVerifyWarning'
+        checkReleaseBuilds true
+        abortOnError true
+    }
+
+    bundle {
+        language {
+            // Capacitor's web assets are a single bundle in assets/public and are
+            // NOT split by locale. Leaving language splits on makes Play serve a
+            // device only its own language resources, which strips nothing useful
+            // and has historically broken WebView asset resolution on install-time
+            // split delivery. Keep every locale in the base module.
+            enableSplit = false
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

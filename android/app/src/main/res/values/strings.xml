@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <!-- Launcher label and the Play Store listing name must match exactly. -->
+    <string name="app_name">CatalogShare</string>
+    <string name="title_activity_main">CatalogShare</string>
+
+    <!-- Identity strings. These are the applicationId, not display text, so they
+         must never be localised or Capacitor's plugin lookup and the custom URL
+         scheme stop resolving. -->
+    <string name="package_name" translatable="false">in.catalogshare.app</string>
+    <string name="custom_url_scheme" translatable="false">in.catalogshare.app</string>
+</resources>

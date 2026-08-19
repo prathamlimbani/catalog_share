@@ -5,6 +5,17 @@ export default {
   content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
   prefix: "",
   theme: {
+    // `xs:` was already used in AdminLayout but never defined, which left the
+    // header search hidden at every width and the "mobile only" search visible
+    // at every width. Defining the full scale fixes both.
+    screens: {
+      xs: "400px",
+      sm: "640px",
+      md: "768px",
+      lg: "1024px",
+      xl: "1280px",
+      "2xl": "1536px",
+    },
     container: {
       center: true,
       padding: "2rem",
@@ -63,6 +74,20 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      spacing: {
+        // Safe-area helpers so fixed chrome clears the notch and gesture bar.
+        "safe-t": "env(safe-area-inset-top)",
+        "safe-b": "env(safe-area-inset-bottom)",
+        // Height of the bottom tab bar, used to pad scroll containers.
+        "tabbar": "4rem",
+      },
+      minHeight: {
+        // 100dvh tracks the collapsing URL bar; 100vh stays as the fallback.
+        screen: ["100vh", "100dvh"] as unknown as string,
+      },
+      height: {
+        screen: ["100vh", "100dvh"] as unknown as string,
+      },
       keyframes: {
         "accordion-down": {
           from: {
@@ -87,5 +112,7 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  // @tailwindcss/typography was installed but never registered, so every
+  // `prose` class in the legal pages emitted no CSS at all.
+  plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography")],
 } satisfies Config;

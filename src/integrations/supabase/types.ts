@@ -277,6 +277,114 @@ export type Database = {
           }
         ]
       }
+      invoices: {
+        Row: {
+          advance_payment: number | null
+          cgst_amount: number | null
+          cgst_percent: number | null
+          company_id: string
+          created_at: string
+          customer_address: string | null
+          customer_name: string
+          customer_phone: string | null
+          discount: number | null
+          final_amount: number
+          grand_total: number
+          id: string
+          invoice_date: string
+          invoice_number: string
+          items: Json
+          notes: string | null
+          sgst_amount: number | null
+          sgst_percent: number | null
+          subtotal: number
+          updated_at: string | null
+        }
+        Insert: {
+          advance_payment?: number | null
+          cgst_amount?: number | null
+          cgst_percent?: number | null
+          company_id: string
+          created_at?: string
+          customer_address?: string | null
+          customer_name: string
+          customer_phone?: string | null
+          discount?: number | null
+          final_amount?: number
+          grand_total?: number
+          id?: string
+          invoice_date?: string
+          invoice_number: string
+          items?: Json
+          notes?: string | null
+          sgst_amount?: number | null
+          sgst_percent?: number | null
+          subtotal?: number
+          updated_at?: string | null
+        }
+        Update: {
+          advance_payment?: number | null
+          cgst_amount?: number | null
+          cgst_percent?: number | null
+          company_id?: string
+          created_at?: string
+          customer_address?: string | null
+          customer_name?: string
+          customer_phone?: string | null
+          discount?: number | null
+          final_amount?: number
+          grand_total?: number
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          items?: Json
+          notes?: string | null
+          sgst_amount?: number | null
+          sgst_percent?: number | null
+          subtotal?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          plan: string
+          razorpay_order_id: string | null
+          razorpay_payment_id: string | null
+          starts_at: string
+          status: string
+        }
+        Insert: {
+          amount: number
+          company_id: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          plan: string
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
+          starts_at?: string
+          status?: string
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          plan?: string
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
+          starts_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

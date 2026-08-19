@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Native chrome colours.
+
+    These override the placeholder indigo/pink that ships inside the
+    capacitor-android library. They only ever paint the few pixels the WebView is
+    not responsible for - the cold-start window, the splash, the status bar and
+    the navigation bar - so they mirror the web design tokens rather than
+    duplicating them: everything inside the app still comes from src/index.css.
+-->
+<resources>
+
+    <!-- The app's dark canvas. Matches `backgroundColor` in capacitor.config.ts
+         and the StatusBar plugin config; all three must stay identical or the
+         seam between splash and first paint shows as a flicker. -->
+    <color name="splashBackground">#0B1020</color>
+    <color name="statusBarBackground">#0B1020</color>
+    <color name="navigationBarBackground">#0B1020</color>
+
+    <!-- Brand orange, hsl(25 95% 53%) from the web design system. -->
+    <color name="colorPrimary">#F97415</color>
+    <color name="colorPrimaryDark">#0B1020</color>
+    <color name="colorAccent">#F97415</color>
+
+</resources>

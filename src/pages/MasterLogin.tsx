@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { beginSystemSignOut } from "@/native/bootstrap";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -41,6 +42,8 @@ const MasterLogin = () => {
         .eq("role", "admin");
 
       if (!roles || roles.length === 0) {
+        // Access denied, not a user logout — must not wipe the offline store.
+        beginSystemSignOut();
         await supabase.auth.signOut();
         toast.error("Access denied. Master admin privileges required.");
         return;

@@ -3,9 +3,15 @@ import { isSkinTheme, getSkinId, getSkinById, PREMIUM_SKINS } from "@/lib/premiu
 
 /**
  * Applies a company's selected color theme or premium skin to CSS custom properties.
- * 
+ *
  * For regular themes: Overrides --primary and --accent with the company's saved theme.
  * For premium skins: Applies complete CSS variable overrides and adds wrapper classes.
+ *
+ * Cleanup REMOVES the properties this hook wrote rather than restoring a
+ * snapshot. The snapshot used to be taken with getComputedStyle, so restoring
+ * it baked ~16 resolved values onto :root as inline styles — and an inline
+ * custom property outranks the `.dark` class, which left dark mode broken for
+ * the rest of the session once the user navigated back to /dashboard.
  */
 const useStoreTheme = (themePrimary: string | null, themeAccent: string | null) => {
     useEffect(() => {
@@ -20,18 +26,19 @@ const useStoreTheme = (themePrimary: string | null, themeAccent: string | null) 
             const skin = getSkinById(skinId);
             if (!skin) return;
 
-            // Save all original values we're going to override
-            const originalVars: Record<string, string> = {};
-            const varsToApply = isDark ? skin.darkCssVars : skin.cssVars;
-            
-            Object.keys(varsToApply).forEach((key) => {
-                originalVars[key] = getComputedStyle(root).getPropertyValue(key).trim();
-            });
+            // Union of every property written while this effect is alive. The
+            // light and dark variable sets are re-applied on theme flips, so
+            // the set has to grow rather than be recomputed.
+            const appliedKeys = new Set<string>();
 
-            // Apply all skin CSS variables
-            Object.entries(varsToApply).forEach(([key, value]) => {
-                root.style.setProperty(key, value);
-            });
+            const applyVars = (vars: Record<string, string>) => {
+                Object.entries(vars).forEach(([key, value]) => {
+                    root.style.setProperty(key, value);
+                    appliedKeys.add(key);
+                });
+            };
+
+            applyVars(isDark ? skin.darkCssVars : skin.cssVars);
 
             // Add skin wrapper class to body
             document.body.classList.add(skin.wrapperClass);
@@ -45,29 +52,18 @@ const useStoreTheme = (themePrimary: string | null, themeAccent: string | null) 
             // Listen for theme (dark/light) changes and re-apply
             const observer = new MutationObserver(() => {
                 const nowDark = root.classList.contains("dark");
-                const newVars = nowDark ? skin.darkCssVars : skin.cssVars;
-                Object.entries(newVars).forEach(([key, value]) => {
-                    root.style.setProperty(key, value);
-                });
+                applyVars(nowDark ? skin.darkCssVars : skin.cssVars);
             });
             observer.observe(root, { attributes: true, attributeFilter: ["class"] });
 
             return () => {
-                // Restore original values
-                Object.entries(originalVars).forEach(([key, value]) => {
-                    root.style.setProperty(key, value);
-                });
-                // Remove skin class
+                appliedKeys.forEach((key) => root.style.removeProperty(key));
                 document.body.classList.remove(skin.wrapperClass);
                 observer.disconnect();
             };
         }
 
         // Regular color theme
-        const originalPrimary = getComputedStyle(root).getPropertyValue("--primary").trim();
-        const originalAccent = getComputedStyle(root).getPropertyValue("--accent").trim();
-        const originalRing = getComputedStyle(root).getPropertyValue("--ring").trim();
-
         root.style.setProperty("--primary", themePrimary);
         root.style.setProperty("--ring", themePrimary);
         if (themeAccent) {
@@ -80,10 +76,11 @@ const useStoreTheme = (themePrimary: string | null, themeAccent: string | null) 
         });
 
         return () => {
-            // Restore original values when unmounting
-            root.style.setProperty("--primary", originalPrimary);
-            root.style.setProperty("--accent", originalAccent);
-            root.style.setProperty("--ring", originalRing);
+            // Dropping the inline declaration hands :root back to the
+            // stylesheet, so the .dark block wins again as it should.
+            root.style.removeProperty("--primary");
+            root.style.removeProperty("--ring");
+            root.style.removeProperty("--accent");
         };
     }, [themePrimary, themeAccent]);
 };

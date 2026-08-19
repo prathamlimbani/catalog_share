@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="How to delete your CatalogShare account and data — what is deleted, what is retained, and how long it takes.">
+<title>Delete Your Account — CatalogShare</title>
+<style>
+  :root{
+    color-scheme: light dark;
+    --bg:#fafafa;--fg:#14181f;--card:#ffffff;--muted:#6a7181;--border:#e5e7eb;
+    --primary:#f97415;--accent:#fef0e6;--accent-fg:#954004;--danger:#dc2626;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{--bg:#0e1015;--fg:#e7ebef;--card:#171a21;--muted:#98a4b3;--border:#303540;
+      --primary:#f97a1f;--accent:#492912;--accent-fg:#fac49e;--danger:#f87171;}
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+    font-size:16px;line-height:1.6;
+    padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+  header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--border);
+    padding-top:env(safe-area-inset-top)}
+  .bar{max-width:46rem;margin:0 auto;padding:.8rem 1rem;display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap}
+  .brand{font-weight:700;color:var(--primary);text-decoration:none;font-size:1rem;
+    font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif}
+  h1,h2,h3{font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif}
+  h1{font-size:1.05rem;margin:0;font-weight:600}
+  main{max-width:46rem;margin:0 auto;padding:1.5rem 1rem calc(3rem + env(safe-area-inset-bottom))}
+  h2{font-size:1.1rem;margin:1.75rem 0 .5rem;font-weight:600}
+  h3{font-size:.95rem;margin:1.15rem 0 .35rem;font-weight:600}
+  p,li{color:var(--muted);font-size:.95rem}
+  p{margin:0 0 .75rem}
+  ul,ol{margin:0 0 .85rem;padding-left:1.35rem}
+  li{margin-bottom:.4rem}
+  li::marker{color:var(--primary)}
+  strong{color:var(--fg);font-weight:600}
+  a{color:var(--primary)}
+  .meta{display:flex;flex-wrap:wrap;gap:.5rem;margin:0 0 1.25rem}
+  .pill{background:var(--card);border:1px solid var(--border);border-radius:999px;
+    padding:.25rem .7rem;font-size:.75rem;color:var(--muted);font-weight:500}
+  .note{background:var(--accent);border:1px solid var(--border);border-left:3px solid var(--primary);
+    border-radius:.65rem;padding:.9rem 1rem;margin:0 0 1rem}
+  .note p,.note strong{color:var(--accent-fg);margin:0}
+  .action{background:var(--card);border:1px solid var(--border);border-radius:.75rem;padding:1rem;margin:0 0 1rem}
+  .action p{margin:0 0 .75rem}
+  .btn{display:inline-block;background:var(--danger);color:#fff;text-decoration:none;font-weight:600;
+    font-size:.9rem;padding:.65rem 1.1rem;border-radius:.6rem;min-height:44px;line-height:1.6}
+  nav.docs{display:flex;flex-wrap:wrap;gap:.35rem 1.15rem;margin-top:1.25rem;font-size:.9rem}
+  hr{border:0;border-top:1px solid var(--border);margin:2rem 0}
+  footer{color:var(--muted);font-size:.78rem;margin-top:1.25rem}
+  @media (max-width:380px){body{font-size:15px}.btn{display:block;text-align:center}}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="brand" href="https://catalogshare.online">CatalogShare</a>
+    <h1>Delete Your Account</h1>
+  </div>
+</header>
+
+<main>
+  <div class="meta">
+    <span class="pill">Effective date: 19 August 2026</span>
+    <span class="pill">Last updated: 19 August 2026</span>
+  </div>
+
+  <p>This page explains how to permanently delete your CatalogShare account (Google Play package <strong>in.catalogshare.app</strong>, website <strong>https://catalogshare.online</strong>) and everything stored with it. You can do it yourself from inside the app, or ask us to do it by email.</p>
+
+  <div class="note"><p>Deletion is <strong>permanent and cannot be undone</strong>. Export anything you need &mdash; your catalogue and estimates can be exported as CSV and PDF from the dashboard &mdash; before you continue.</p></div>
+
+  <h2>1. What gets deleted</h2>
+  <p>Requesting deletion removes all of the following, permanently:</p>
+  <ol>
+    <li><strong>Your login account</strong> &mdash; the authentication user holding your email address, hashed password and session tokens.</li>
+    <li><strong>Your company profile</strong> &mdash; company name, business email, phone number, business address, GST number, UPI id, theme settings and store slug.</li>
+    <li><strong>Your entire product catalogue</strong> &mdash; every product with its name, price, category and description.</li>
+    <li><strong>All product images</strong> you uploaded, deleted from our file storage.</li>
+    <li><strong>All estimates and invoices</strong> &mdash; including the customer names, phone numbers, addresses, line items and amounts they contain, and any estimate PDFs generated from them.</li>
+    <li><strong>Your public store page</strong> &mdash; your storefront link stops working immediately and the slug is released.</li>
+    <li><strong>Your analytics events</strong> &mdash; every page-view and product-view row recorded for your store.</li>
+    <li><strong>Your uploaded logo and UPI QR code images.</strong></li>
+    <li><strong>Locally stored data</strong> on the device where you are signed in &mdash; offline estimates held in IndexedDB, cached company details and saved preferences.</li>
+  </ol>
+
+  <h2>2. What is retained, and why</h2>
+  <ul>
+    <li><strong>Payment and tax records.</strong> Indian tax and company law requires a seller to keep records of the payments it has received. We therefore retain the Razorpay payment id, the amount, the plan and the transaction date for the statutory period (currently up to eight years from the end of the relevant financial year). These records are kept in an <strong>anonymised form</strong>: your name, email, phone number and company details are stripped out, so what remains cannot identify you. They are used only for accounting, audit and tax filing, never for marketing or profiling.</li>
+    <li><strong>Records we are legally ordered to preserve</strong> in connection with an active investigation, dispute or court order, kept only for as long as that obligation lasts.</li>
+    <li><strong>Aggregate, non-identifying statistics</strong> &mdash; for example total number of stores created in a month. These contain no personal data and cannot be traced back to you.</li>
+  </ul>
+  <p>Anything sent from your account to somebody else before deletion &mdash; an estimate PDF you shared over WhatsApp, a link a customer saved &mdash; is outside our systems and cannot be recalled by us.</p>
+
+  <h2>3. How long it takes</h2>
+  <ol>
+    <li><strong>Immediately</strong> &mdash; when you confirm in the app, your account, company, products, images, estimates, storefront and analytics rows are deleted from our live systems. You are signed out and your store link stops resolving straight away.</li>
+    <li><strong>Within 30 days</strong> &mdash; residual copies in our encrypted backups expire and are overwritten. Backups are never restored to bring a deleted account back.</li>
+    <li><strong>Within 30 days</strong> &mdash; deletion requests sent by email are actioned after we verify that the request came from the registered account holder.</li>
+  </ol>
+
+  <h2>4. Deletion is permanent</h2>
+  <p>There is no undo, no grace period and no recycle bin. We cannot restore a deleted account, its catalogue, its images or its estimates &mdash; not even the next day. Your store slug is released and may be taken by another business. If you sign up again later, you start from an empty account.</p>
+
+  <h2>5. Delete from inside the app</h2>
+  <p>This is the fastest route and it completes immediately:</p>
+  <ol>
+    <li>Open the CatalogShare app, or sign in at <a href="https://catalogshare.online/login">catalogshare.online/login</a>.</li>
+    <li>Go to <strong>Settings &rarr; Delete account</strong>, or open <a href="https://catalogshare.online/account-deletion">catalogshare.online/account-deletion</a> while signed in.</li>
+    <li>Tap <strong>Delete my account</strong>, type <strong>DELETE</strong> in the confirmation box, and confirm.</li>
+  </ol>
+
+  <h2>6. Requesting deletion by email</h2>
+  <p>If you cannot access the app, email <strong>catalogshare123@gmail.com</strong> from the business email address registered on the account, with the subject <strong>Account deletion request</strong>, and include your company name and registered phone number. We verify that the request comes from the account holder, delete the account, and confirm by reply. Requests are actioned within <strong>30 days</strong>. You can also call <a href="tel:+917625025686">+91 76250 25686</a> (Monday to Saturday, 10:00 to 19:00 IST), though we will still ask for the request in writing so the audit trail is clear.</p>
+
+  <div class="action">
+    <p>Ready to request deletion by email? This opens your mail app with the details pre-filled.</p>
+    <a class="btn" href="mailto:catalogshare123@gmail.com?subject=Account%20deletion%20request%20-%20CatalogShare&amp;body=Please%20delete%20my%20CatalogShare%20account%20and%20all%20associated%20data.%0A%0ARegistered%20business%20email%3A%20%0ACompany%20name%3A%20%0ARegistered%20phone%20number%3A%20%0A%0AI%20understand%20this%20is%20permanent%20and%20cannot%20be%20undone.">Request deletion by email</a>
+  </div>
+
+  <h2>7. Deleting the app is not deleting your account</h2>
+  <p>Uninstalling CatalogShare removes the app and its local data from that device, but your account, catalogue and storefront stay live on our servers. Use the in-app flow, or the email route above, to delete the account itself.</p>
+
+  <h2>8. Related documents</h2>
+  <p>Our <a href="/legal/privacy.html">Privacy Policy</a> explains what we collect and how long we keep it. Our <a href="/legal/refund.html">Refund Policy</a> explains what happens to a paid plan &mdash; note that deleting your account does not automatically refund an unused period; refunds are governed separately by that policy.</p>
+
+  <hr>
+  <nav class="docs">
+    <a href="/legal/privacy.html">Privacy Policy</a>
+    <a href="/legal/terms.html">Terms &amp; Conditions</a>
+    <a href="/legal/refund.html">Refund Policy</a>
+    <a href="/legal/account-deletion.html">Account Deletion</a>
+  </nav>
+  <footer>CatalogShare, India &middot; catalogshare123@gmail.com &middot; +91 76250 25686</footer>
+</main>
+</body>
+</html>

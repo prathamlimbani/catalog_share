@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FileProvider paths.
+
+    Every one of these must be present: sharing a URI that falls outside the
+    declared set throws IllegalArgumentException at Share time and crashes the
+    app. saveBlob() in src/native/files.ts walks a fallback chain across three
+    Capacitor Directory values (Documents -> External -> Cache) because scoped
+    storage blocks the public Documents folder from targetSdk 29 upwards, so all
+    three destinations are declared here.
+-->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Directory.Documents / Directory.ExternalStorage -->
+    <external-path name="my_images" path="." />
+    <!-- Directory.Cache — where shared PDFs are staged -->
+    <cache-path name="my_cache_images" path="." />
+    <!-- Directory.External — app-specific external storage, the reliable fallback -->
+    <external-files-path name="external_files" path="." />
+    <external-cache-path name="external_cache" path="." />
+    <!-- Directory.Data — app-internal storage -->
+    <files-path name="internal_files" path="." />
+</paths>

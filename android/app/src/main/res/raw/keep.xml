@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Resource-shrinker allowlist.
+
+    `shrinkResources true` removes any resource it cannot see referenced from
+    code or XML. Capacitor resolves several of these by NAME at runtime through
+    Resources.getIdentifier() - the splash drawable comes from the
+    `androidSplashResourceName` string in capacitor.config.ts, and the Cordova
+    compatibility layer looks up res/xml/config.xml the same way - so the
+    shrinker has no static reference to follow and would strip them, producing a
+    black splash and a broken plugin bootstrap in release only.
+
+    shrinkMode stays "safe": everything else is still shrunk normally.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:shrinkMode="safe"
+    tools:keep="@drawable/splash,@drawable-*/splash,@xml/config,@xml/file_paths,@xml/network_security_config,@xml/data_extraction_rules,@style/AppTheme*,@color/splashBackground,@color/statusBarBackground,@color/navigationBarBackground,@mipmap/ic_launcher*" />

@@ -32,7 +32,7 @@ const Products = () => {
 
   const filtered = products?.filter((p) => {
     const matchesSearch =
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      (p.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
       (p.category && p.category.toLowerCase().includes(search.toLowerCase())) ||
       (p.description && p.description.toLowerCase().includes(search.toLowerCase()));
     const matchesCategory = !selectedCategory || p.category === selectedCategory;

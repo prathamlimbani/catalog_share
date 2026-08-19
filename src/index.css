@@ -1,4 +1,14 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap');
+/* Fonts are bundled, not fetched from Google.
+   A remote @import fails with no network, which meant an offline estimate PDF
+   rendered in a fallback face and looked different from the online one. */
+@import '@fontsource/dm-sans/400.css';
+@import '@fontsource/dm-sans/500.css';
+@import '@fontsource/dm-sans/700.css';
+@import '@fontsource/space-grotesk/300.css';
+@import '@fontsource/space-grotesk/400.css';
+@import '@fontsource/space-grotesk/500.css';
+@import '@fontsource/space-grotesk/600.css';
+@import '@fontsource/space-grotesk/700.css';
 
 @tailwind base;
 @tailwind components;
@@ -110,6 +120,7 @@
 html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
+  overflow-x: hidden;
   overflow-x: clip;
 }
 
@@ -117,6 +128,7 @@ html {
 body {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
+  overflow-x: hidden;
   overflow-x: clip;
   width: 100%;
 }
@@ -367,8 +379,8 @@ html.dark body.skin-luxe-gold {
 }
 
 /* Gold-rimmed glassmorphic cards */
-body.skin-luxe-gold [class*="CardContent"],
-body.skin-luxe-gold [class*="Card"] {
+body.skin-luxe-gold .bg-card,
+body.skin-luxe-gold [class*="bg-card"] {
   border: 1px solid hsl(43 60% 55% / 0.25) !important;
   box-shadow: 0 0 0 1px hsl(43 60% 55% / 0.08), 0 8px 32px hsl(43 60% 30% / 0.08) !important;
   background: hsl(var(--card) / 0.85) !important;
@@ -479,8 +491,8 @@ body.skin-wooden-artisan #root {
 }
 
 /* Wooden cards with grain border & craft shadow */
-body.skin-wooden-artisan [class*="CardContent"],
-body.skin-wooden-artisan [class*="Card"] {
+body.skin-wooden-artisan .bg-card,
+body.skin-wooden-artisan [class*="bg-card"] {
   border: 2px solid hsl(25 30% 55% / 0.25) !important;
   border-radius: 12px !important;
   box-shadow:
@@ -626,7 +638,7 @@ html.dark body.skin-midnight-aurora {
 }
 
 /* Light mode aurora - more visible overlays */
-body.skin-midnight-aurora:not(.dark) {
+html:not(.dark) body.skin-midnight-aurora {
   background-color: hsl(240 20% 96%);
   background-image:
     radial-gradient(ellipse 70% 50% at 20% 20%, hsl(270 70% 65% / 0.12) 0%, transparent 70%),
@@ -634,9 +646,73 @@ body.skin-midnight-aurora:not(.dark) {
     radial-gradient(ellipse 50% 60% at 50% 50%, hsl(230 60% 65% / 0.06) 0%, transparent 60%);
 }
 
+/* The drifting blobs the auroraBlob* keyframes were written for. They are
+   additive glow layers behind the app rather than extra background-image
+   layers on <body>, because a background layer cannot be transformed. #root
+   hosts the third one: <body> only has two pseudo-elements to give. */
+body.skin-midnight-aurora::before,
+body.skin-midnight-aurora::after,
+body.skin-midnight-aurora #root::before {
+  content: '';
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+}
+
+body.skin-midnight-aurora::before {
+  top: -18%;
+  left: -14%;
+  width: 78vw;
+  height: 62vh;
+  background: radial-gradient(closest-side, hsl(270 80% 55% / 0.22), transparent 72%);
+}
+
+body.skin-midnight-aurora::after {
+  right: -16%;
+  bottom: -20%;
+  width: 72vw;
+  height: 58vh;
+  background: radial-gradient(closest-side, hsl(185 90% 50% / 0.18), transparent 72%);
+}
+
+body.skin-midnight-aurora #root::before {
+  top: 22%;
+  left: 18%;
+  width: 66vw;
+  height: 54vh;
+  background: radial-gradient(closest-side, hsl(320 70% 55% / 0.14), transparent 72%);
+}
+
+/* On the light variant the same glows sit on a near-white page, so they have
+   to be pulled back or they read as smudges rather than aurora. */
+html:not(.dark) body.skin-midnight-aurora::before,
+html:not(.dark) body.skin-midnight-aurora::after,
+html:not(.dark) body.skin-midnight-aurora #root::before {
+  opacity: 0.55;
+}
+
+/* Motion is opt-in: with "reduce" set the blobs stay put and the skin still
+   reads as an aurora, and the compositor layers are never even created. */
+@media (prefers-reduced-motion: no-preference) {
+  body.skin-midnight-aurora::before {
+    animation: auroraBlob1 26s ease-in-out infinite;
+    will-change: transform;
+  }
+
+  body.skin-midnight-aurora::after {
+    animation: auroraBlob2 34s ease-in-out infinite;
+    will-change: transform;
+  }
+
+  body.skin-midnight-aurora #root::before {
+    animation: auroraBlob3 42s ease-in-out infinite;
+    will-change: transform;
+  }
+}
+
 /* Neon glass cards */
-body.skin-midnight-aurora [class*="CardContent"],
-body.skin-midnight-aurora [class*="Card"] {
+body.skin-midnight-aurora .bg-card,
+body.skin-midnight-aurora [class*="bg-card"] {
   border: 1px solid hsl(270 60% 60% / 0.2) !important;
   box-shadow:
     0 0 0 1px hsl(270 60% 60% / 0.05),
@@ -647,7 +723,7 @@ body.skin-midnight-aurora [class*="Card"] {
 }
 
 @media (hover: hover) {
-  body.skin-midnight-aurora [class*="Card"]:hover {
+  body.skin-midnight-aurora [class*="bg-card"]:hover {
     border-color: hsl(270 70% 65% / 0.4) !important;
     box-shadow:
       0 0 24px hsl(270 60% 60% / 0.15),
@@ -664,7 +740,7 @@ body.skin-midnight-aurora nav {
   box-shadow: 0 4px 20px hsl(250 60% 10% / 0.3) !important;
 }
 
-body.skin-midnight-aurora:not(.dark) nav {
+html:not(.dark) body.skin-midnight-aurora nav {
   background: hsl(240 20% 98% / 0.85) !important;
 }
 
@@ -678,7 +754,7 @@ body.skin-midnight-aurora .bg-gradient-to-br {
       hsl(320 60% 50% / 0.08)) !important;
 }
 
-body.skin-midnight-aurora:not(.dark) .bg-gradient-to-br {
+html:not(.dark) body.skin-midnight-aurora .bg-gradient-to-br {
   background: linear-gradient(160deg,
       hsl(270 70% 65% / 0.12),
       hsl(240 20% 96%),
@@ -831,4 +907,254 @@ body.skin-midnight-aurora input[type="search"]::placeholder {
   .page-break {
     page-break-before: always;
   }
+}
+/* ==========================================================================
+   NATIVE APP LAYER
+   Styles that only matter inside the Android shell. `body.is-native` is set
+   once at boot by src/main.tsx, so the website is completely unaffected.
+   ========================================================================== */
+
+/* Dynamic viewport height. In an Android WebView `100vh` is the height BEFORE
+   the URL bar collapses, so full-height screens overflow by the toolbar height
+   and, when the soft keyboard opens, inputs end up behind it. */
+.min-h-dvh {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.h-dvh {
+  height: 100vh;
+  height: 100dvh;
+}
+
+:root {
+  --keyboard-height: 0px;
+  --banner-height: 0px;
+  --tabbar-height: 4rem;
+}
+
+/* Safe-area utilities */
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.pb-safe-tabbar {
+  padding-bottom: calc(env(safe-area-inset-bottom) + var(--tabbar-height) + var(--banner-height));
+}
+
+.mb-safe {
+  margin-bottom: env(safe-area-inset-bottom);
+}
+
+/* Native shell defaults: no text selection on chrome, no tap highlight, no
+   overscroll bounce revealing the WebView background. */
+body.is-native {
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+/* …but form fields and generated documents must stay selectable/copyable. */
+body.is-native input,
+body.is-native textarea,
+body.is-native [contenteditable="true"],
+body.is-native .selectable,
+body.is-native #invoice-print-area {
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
+}
+
+/* iOS/Android zoom on focus is triggered by any font-size under 16px. */
+body.is-native input,
+body.is-native select,
+body.is-native textarea {
+  font-size: max(16px, 1rem);
+}
+
+/* Momentum scrolling inside panes */
+.native-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Lift a sticky action bar above the soft keyboard. */
+body.keyboard-open .keyboard-aware {
+  padding-bottom: var(--keyboard-height);
+  transition: padding-bottom 150ms ease-out;
+}
+
+/* Minimum 44px touch targets on the app's own chrome. */
+body.is-native button,
+body.is-native a[role="button"],
+body.is-native [role="tab"] {
+  touch-action: manipulation;
+}
+
+/* Backdrop blur is the most expensive effect in an Android WebView, and on a
+   sticky header it forces a full-viewport readback every scroll frame. On
+   touch devices use a flat fill instead. Also add the -webkit- prefix, which
+   older WebView builds require. */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .glass,
+  .backdrop-blur-md,
+  .backdrop-blur-xl {
+    -webkit-backdrop-filter: blur(12px);
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  body.is-native .backdrop-blur-md,
+  body.is-native .backdrop-blur-xl {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background-color: hsl(var(--card) / 0.97);
+  }
+}
+
+/* Respect the OS "reduce motion" setting — required for accessibility and it
+   noticeably improves scrolling on low-end devices. */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* The offscreen node used to rasterise estimate/receipt PDFs. Rendered at a
+   fixed A4 width so the capture is identical on every screen size, and kept
+   on-screen-but-invisible because html2canvas cannot rasterise a node that has
+   been pushed outside the viewport with left:-9999px. */
+.pdf-capture-host {
+  position: fixed;
+  top: 0;
+  left: 0;
+  /* Deliberately NOT z-index:-1. A fixed element behind the root stacking
+     context composites as a hole through to the native window background on
+     some Android WebViews. z-0 + opacity:0 hides it just as well and stays
+     inside the page. */
+  z-index: 0;
+  width: 794px;
+  opacity: 0;
+  pointer-events: none;
+  background: #ffffff;
+  overflow: visible;
+}
+
+/* ==========================================================================
+   ADAPTIVE SIZING
+   "Auto adjust with the mobile and their size" — the layout should suit a
+   360px budget phone, a 412px flagship and a 800px folded-open tablet without
+   any of them getting a layout designed for one of the others.
+   ========================================================================== */
+
+/* Nothing may push the page sideways. A single overflowing child used to make
+   the whole app scrollable horizontally, which reads as "broken" more than any
+   other single defect. */
+html,
+body,
+#root {
+  max-width: 100%;
+}
+
+/* Fluid gutters: tight on a small phone, roomier as the screen grows, capped so
+   a tablet does not end up with a thin column of content in a sea of padding. */
+:root {
+  --app-gutter: clamp(0.75rem, 3.5vw, 1.5rem);
+}
+
+/* Fluid type. clamp() keeps headings proportionate to the viewport instead of
+   a 30px title eating a third of a 360px screen, while the rem-based middle
+   term means the OS font-size accessibility setting still scales everything. */
+.text-fluid-2xl {
+  font-size: clamp(1.25rem, 1.05rem + 1.4vw, 1.75rem);
+  line-height: 1.2;
+}
+
+.text-fluid-xl {
+  font-size: clamp(1.075rem, 0.95rem + 0.9vw, 1.375rem);
+  line-height: 1.25;
+}
+
+.text-fluid-base {
+  font-size: clamp(0.875rem, 0.83rem + 0.25vw, 1rem);
+  line-height: 1.5;
+}
+
+/* Very small / older devices (360px and below), where the default spacing scale
+   is simply too generous to fit a form row. */
+@media (max-width: 360px) {
+  body.is-native {
+    --app-gutter: 0.625rem;
+  }
+
+  /* Buttons sitting side by side in a row need to stop demanding their
+     comfortable padding before they start clipping their own labels. */
+  body.is-native .btn-row-tight > * {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    font-size: 0.8125rem;
+  }
+}
+
+/* Landscape phones are short, not small: vertical padding is the scarce
+   resource there, so give the height back to content. */
+@media (max-height: 480px) and (orientation: landscape) {
+  body.is-native .pb-safe-tabbar {
+    padding-bottom: calc(env(safe-area-inset-bottom) + var(--tabbar-height));
+  }
+}
+
+/* Tablets and unfolded foldables: cap the reading measure so forms and lists do
+   not stretch into unusable full-width rows. */
+@media (min-width: 768px) {
+  .measure-app {
+    max-width: 56rem;
+    margin-inline: auto;
+  }
+}
+
+/* A dialog on a short screen must scroll, not overflow off the top and bottom
+   with its close button unreachable. Applied globally so every shadcn dialog
+   inherits it without each call site remembering. */
+[role="dialog"] {
+  max-height: min(85dvh, 100% - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Tables never widen the page; they scroll inside their own box. */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+/* The app's scrolling content area must never scroll sideways.
+   `clip` rather than `hidden`: `overflow-x: hidden` forces overflow-y to
+   `auto`, which turns this into its own scroll container and breaks the
+   viewport-relative sticky action bars and the safe-area padding. `clip` has no
+   such side effect. The `hidden` line ahead of it is the fallback for older
+   Android WebViews (clip landed in Chromium 90). */
+.no-x-scroll {
+  overflow-x: hidden;
+  overflow-x: clip;
+  max-width: 100%;
+}
+
+/* Long unbroken strings — an email, a store URL, a payment id — are the usual
+   cause of a page that suddenly scrolls sideways. */
+.break-anywhere {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }

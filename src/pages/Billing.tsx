@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminLayout } from "@/components/AdminLayout";
@@ -7,114 +8,65 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
-import { Crown, CreditCard, Download, CalendarClock, RefreshCw, Receipt, CheckCircle2, XCircle, Clock, Mail, Phone, Heart } from "lucide-react";
-import { SubscriptionDialog, getPlanLimit, getPlanName } from "@/components/SubscriptionDialog";
+import { Crown, CreditCard, Download, CalendarClock, RefreshCw, Receipt, CheckCircle2, XCircle, Clock, FileText, Loader2, Mail, Phone, Heart, WifiOff } from "lucide-react";
+import { SubscriptionDialog } from "@/components/SubscriptionDialog";
+import { getPlanLimit, getPlanName } from "@/lib/plans";
+import { downloadInvoice, resolvePaidPlanId } from "@/lib/receipt";
+import { useNetwork } from "@/hooks/useNetwork";
+import { useEntitlement } from "@/hooks/useEntitlement";
+import { SUPPORT_EMAIL, SUPPORT_PHONE } from "@/lib/appInfo";
+import { hideBanner } from "@/native/ads";
+import { beginUserSignOut } from "@/native/bootstrap";
 
-// Generate and download a PDF-like invoice as an HTML blob
-function downloadInvoice(payment: any, company: any) {
-    const invoiceDate = new Date(payment.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-    const expiryDate = payment.expires_at ? new Date(payment.expires_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "N/A";
-    const amount = (payment.amount / 100).toFixed(2);
-
-    const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Invoice - ${payment.razorpay_payment_id || payment.id}</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f8f9fa; padding: 40px; }
-    .invoice { max-width: 600px; margin: auto; background: white; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); overflow: hidden; }
-    .header { background: linear-gradient(135deg, #6366f1, #a855f7); color: white; padding: 32px; display: flex; align-items: center; gap: 16px; }
-    .header img { height: 56px; width: auto; border-radius: 10px; background: white; padding: 6px; }
-    .header-text h1 { font-size: 28px; font-weight: 800; margin-bottom: 4px; }
-    .header-text p { opacity: 0.85; font-size: 14px; }
-    .body { padding: 32px; }
-    .row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
-    .row:last-child { border-bottom: none; }
-    .label { color: #6b7280; font-size: 14px; }
-    .value { font-weight: 600; font-size: 14px; text-align: right; }
-    .total { background: #f8f9fa; margin: 20px -32px -32px; padding: 24px 32px; display: flex; justify-content: space-between; align-items: center; }
-    .total .label { font-size: 16px; font-weight: 600; color: #111; }
-    .total .value { font-size: 24px; font-weight: 800; color: #6366f1; }
-    .badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
-    .badge-active { background: #dcfce7; color: #16a34a; }
-    .badge-expired { background: #fee2e2; color: #dc2626; }
-    .footer { text-align: center; padding: 16px; color: #9ca3af; font-size: 12px; }
-  </style>
-</head>
-<body>
-  <div class="invoice">
-    <div class="header">
-      <img src="https://www.catalogshare.online/logo.png" alt="CatalogShare" />
-      <div class="header-text">
-        <h1>CatalogShare</h1>
-        <p>Subscription Invoice</p>
-      </div>
-    </div>
-    <div class="body">
-      <div class="row">
-        <span class="label">Invoice ID</span>
-        <span class="value">${(payment.razorpay_payment_id || payment.id).substring(0, 20)}</span>
-      </div>
-      <div class="row">
-        <span class="label">Company</span>
-        <span class="value">${company?.name || "—"}</span>
-      </div>
-      <div class="row">
-        <span class="label">Plan</span>
-        <span class="value">${getPlanName(payment.plan)}</span>
-      </div>
-      <div class="row">
-        <span class="label">Payment Date</span>
-        <span class="value">${invoiceDate}</span>
-      </div>
-      <div class="row">
-        <span class="label">Valid Until</span>
-        <span class="value">${expiryDate}</span>
-      </div>
-      <div class="row">
-        <span class="label">Status</span>
-        <span class="value"><span class="badge ${payment.status === 'active' ? 'badge-active' : 'badge-expired'}">${payment.status}</span></span>
-      </div>
-      <div class="row">
-        <span class="label">Payment ID</span>
-        <span class="value" style="font-size:12px; word-break:break-all;">${payment.razorpay_payment_id || "—"}</span>
-      </div>
-      <div class="total">
-        <span class="label">Total Amount</span>
-        <span class="value">₹${amount}</span>
-      </div>
-    </div>
-    <div class="footer">
-      <p>Thank you for choosing CatalogShare · www.catalogshare.online</p>
-    </div>
-  </div>
-  <script>window.onload = () => window.print();</script>
-</body>
-</html>`;
-
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const win = window.open(url, "_blank");
-    if (!win) {
-        // Fallback: download as .html
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `invoice_${payment.razorpay_payment_id || payment.id}.html`;
-        a.click();
-    }
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
-}
-
-// Export for Master Admin use
+// Re-exported so MasterAdmin.tsx's historical `import { downloadInvoice } from "@/pages/Billing"`
+// keeps compiling. New call sites must import it from "@/lib/receipt" directly — importing it
+// from here drags this whole page (AdminLayout, SubscriptionDialog, Razorpay) into their chunk.
 export { downloadInvoice };
+
+/**
+ * Every value on this screen comes out of an untyped `subscriptions` row, where
+ * `status`, `plan`, `amount` and the dates are all nullable. These four helpers
+ * are the only places that touch them, so a null can never reach a `.toUpperCase()`
+ * or a `new Date()` during render.
+ */
+const parseTs = (value: unknown): number => {
+    if (typeof value !== "string" && typeof value !== "number") return NaN;
+    return new Date(value).getTime();
+};
+
+const formatDate = (value: unknown): string => {
+    const ts = parseTs(value);
+    return Number.isNaN(ts)
+        ? "—"
+        : new Date(ts).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+};
+
+/** Paise -> "1,299". Anything unparseable is zero, never "NaN". */
+const formatPaise = (paise: unknown): string => {
+    const value = Number(paise);
+    return (Number.isFinite(value) ? value / 100 : 0).toLocaleString("en-IN");
+};
+
+const normalizeStatus = (status: unknown): string =>
+    typeof status === "string" ? status.trim().toLowerCase() : "";
+
+/** Trimmed string, or "" for null / undefined / anything that is not one. */
+const str = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
+
+/** Stable identity for a payment row, for React keys and the busy button. */
+const paymentKey = (payment: Record<string, unknown>): string =>
+    str(payment.id) || str(payment.razorpay_payment_id);
+
+const statusLabel = (status: unknown): string => normalizeStatus(status).toUpperCase() || "UNKNOWN";
 
 const Billing = () => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
+    const { offline } = useNetwork();
+    const { entitlement } = useEntitlement();
+    // Which receipt is being rendered right now. A PDF build takes a few seconds
+    // on a mid-range phone, and without this the button looked inert.
+    const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
     // Get current user
     const { data: session } = useQuery({
@@ -125,9 +77,10 @@ const Billing = () => {
         },
     });
 
-    // Get company
+    // Get company. The key carries the user id so a second account on the same
+    // device cannot read the previous owner's plan out of the cache.
     const { data: company, isLoading: companyLoading } = useQuery({
-        queryKey: ["current-company"],
+        queryKey: ["billing-company", session?.user?.id ?? "anon"],
         queryFn: async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return null;
@@ -165,34 +118,79 @@ const Billing = () => {
         enabled: !!company?.id,
     });
 
+    // No ads on the payment screen: a banner next to a "Pay ₹399" button reads
+    // as part of the checkout, and Play treats that as a dark pattern.
     useEffect(() => {
-        supabase.auth.getSession().then(({ data }) => {
-            if (!data.session) navigate("/login");
+        void hideBanner();
+    }, []);
+
+    // Bounce to /login only when we KNOW there is no session. Offline, or when
+    // the session lookup itself fails, /login is a dead end — the user cannot
+    // sign in without a connection — so the offline placeholder below is shown
+    // instead. Mirrors the guard on the Estimates screen.
+    useEffect(() => {
+        let cancelled = false;
+        supabase.auth.getSession().then(({ data, error }) => {
+            if (cancelled || error || offline) return;
+            if (!data.session) navigate("/login", { replace: true });
         });
-    }, [navigate]);
+        return () => {
+            cancelled = true;
+        };
+    }, [navigate, offline]);
 
     const handleLogout = async () => {
+        // Tells the auth listener this SIGNED_OUT is deliberate, so wiping the
+        // offline store is correct here (an expired token must not wipe it).
+        beginUserSignOut();
         await supabase.auth.signOut();
-        navigate("/login");
+        navigate("/login", { replace: true });
     };
 
-    const currentPlan = (company as any)?.subscription_plan || "free";
+    // "payment made -> receipt shown": the moment the plan is active, the user
+    // lands on their receipt rather than back on a stale billing page.
+    const goToReceipt = (paymentId: string) => {
+        queryClient.invalidateQueries({ queryKey: ["billing-payments"] });
+        navigate(`/billing/receipt/${paymentId}`);
+    };
+
+    // The generated Supabase types predate the subscription columns, so the row
+    // is read as an untyped bag — but through `str`, never with a bare cast, so
+    // a null column cannot reach a string method during render.
+    const companyRow = (company ?? null) as Record<string, unknown> | null;
+    const currentPlan = str(companyRow?.subscription_plan) || "free";
     const planLimit = getPlanLimit(currentPlan);
-    const expiresAt = (company as any)?.subscription_expires_at;
-    const isExpired = expiresAt && new Date(expiresAt) < new Date();
+    const expiresAt = companyRow?.subscription_expires_at;
+    const expiryTs = parseTs(expiresAt);
+    const isExpired = !Number.isNaN(expiryTs) && expiryTs < Date.now();
+    const companyId = str(companyRow?.id);
+    const companyName = str(companyRow?.name);
+    const companyEmail = str(companyRow?.email);
 
+    const handleDownload = async (payment: Record<string, unknown>) => {
+        if (downloadingId) return;
+        setDownloadingId(paymentKey(payment));
+        try {
+            await downloadInvoice(payment, companyRow);
+        } catch {
+            toast.error("Could not build that receipt. Check your storage space and try again.");
+        } finally {
+            setDownloadingId(null);
+        }
+    };
 
-
-    const getStatusIcon = (status: string) => {
-        if (status === "active") return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
-        if (status === "expired") return <XCircle className="h-4 w-4 text-red-500" />;
+    const getStatusIcon = (status: unknown) => {
+        const value = normalizeStatus(status);
+        if (value === "active") return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
+        if (value === "expired") return <XCircle className="h-4 w-4 text-destructive" />;
         return <Clock className="h-4 w-4 text-amber-500" />;
     };
 
-    const getStatusColor = (status: string) => {
-        if (status === "active") return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400";
-        if (status === "expired") return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
-        return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
+    const getStatusColor = (status: unknown) => {
+        const value = normalizeStatus(status);
+        if (value === "active") return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400";
+        if (value === "expired") return "bg-destructive/15 text-destructive";
+        return "bg-amber-500/15 text-amber-700 dark:text-amber-400";
     };
 
     return (
@@ -205,101 +203,103 @@ const Billing = () => {
             <div className="max-w-4xl mx-auto space-y-8">
                 {/* Page Header */}
                 <div>
-                    <h1 className="text-2xl font-bold flex items-center gap-2">
-                        <CreditCard className="h-6 w-6 text-primary" />
-                        Payment & Billing
+                    <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+                        <CreditCard className="h-6 w-6 shrink-0 text-primary" />
+                        Payment &amp; Billing
                     </h1>
-                    <p className="text-muted-foreground text-sm mt-1">Manage your subscription, view payment history, and download invoices.</p>
-                    {company?.email === 'bharathpatel07@gmail.com' && currentPlan === 'free' && (
-                        <Button 
-                            onClick={async () => {
-                                const now = new Date();
-                                const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-                                await supabase.from("subscriptions").insert({
-                                    company_id: company.id,
-                                    plan: "growth",
-                                    razorpay_payment_id: "pay_manual_restore_123",
-                                    amount: 39900,
-                                    status: "active",
-                                    starts_at: now.toISOString(),
-                                    expires_at: expiresAt.toISOString()
-                                });
-                                await supabase.from("companies").update({
-                                    subscription_plan: "growth",
-                                    subscription_expires_at: expiresAt.toISOString()
-                                }).eq("id", company.id);
-                                window.location.reload();
-                            }}
-                            className="bg-red-500 hover:bg-red-600 text-white mt-4 font-bold"
-                        >
-                            <RefreshCw className="h-4 w-4 mr-2" /> Restore Missing Payment (bharathpatel07)
-                        </Button>
-                    )}
+                    <p className="text-muted-foreground text-sm mt-1">Manage your subscription, view payment history, and download receipts.</p>
                 </div>
 
+                {/* Plan and history both come from the server; with no connection
+                    there is nothing truthful to show, and an empty history would
+                    read as "you never paid us". */}
+                {offline && !company ? (
+                    <Card className="border-dashed bg-muted/30">
+                        <CardContent className="p-6 sm:p-8 text-center">
+                            <WifiOff className="h-10 w-10 mx-auto mb-3 text-muted-foreground opacity-60" />
+                            <h2 className="font-semibold">You are offline</h2>
+                            <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
+                                Your plan, payment history and receipts load as soon as you are
+                                back online. Creating and sharing estimates keeps working meanwhile.
+                            </p>
+                            <Button asChild className="mt-5 h-11 w-full sm:w-auto">
+                                <Link to="/invoices">
+                                    <FileText className="h-4 w-4 mr-2" /> Open Estimates
+                                </Link>
+                            </Button>
+                        </CardContent>
+                    </Card>
+                ) : (
+                  <>
                 {/* Current Plan Card */}
                 {companyLoading ? (
                     <Skeleton className="h-40 w-full" />
                 ) : company && (
                     <Card className={`border-0 shadow-md overflow-hidden ${currentPlan === 'support' ? 'bg-gradient-to-r from-rose-500/5 to-pink-500/5 ring-1 ring-rose-500/20' : currentPlan === 'pro' ? 'bg-gradient-to-r from-purple-500/5 to-pink-500/5 ring-1 ring-purple-500/20' : currentPlan === 'growth' ? 'bg-gradient-to-r from-blue-500/5 to-cyan-500/5 ring-1 ring-blue-500/20' : 'bg-gradient-to-r from-emerald-500/5 to-teal-500/5 ring-1 ring-emerald-500/20'}`}>
-                        <CardContent className="p-6">
+                        <CardContent className="p-4 sm:p-6">
+                            {/* Column first, row from sm: at 360px the plan name and
+                                the action button cannot share a line without one of
+                                them being clipped. */}
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                <div className="flex items-center gap-4">
-                                    <div className={`p-3 rounded-xl ${currentPlan === 'support' ? 'bg-rose-500/10' : currentPlan === 'pro' ? 'bg-purple-500/10' : currentPlan === 'growth' ? 'bg-blue-500/10' : 'bg-emerald-500/10'}`}>
+                                <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+                                    <div className={`shrink-0 p-3 rounded-xl ${currentPlan === 'support' ? 'bg-rose-500/10' : currentPlan === 'pro' ? 'bg-purple-500/10' : currentPlan === 'growth' ? 'bg-blue-500/10' : 'bg-emerald-500/10'}`}>
                                         {currentPlan === 'support' ? <Heart className="h-7 w-7 text-rose-500" /> : <Crown className={`h-7 w-7 ${currentPlan === 'pro' ? 'text-purple-500' : currentPlan === 'growth' ? 'text-blue-500' : 'text-emerald-500'}`} />}
                                     </div>
-                                    <div>
-                                        <h2 className="text-xl font-bold">{getPlanName(currentPlan)}</h2>
-                                        <div className="flex items-center gap-3 mt-1">
+                                    <div className="min-w-0">
+                                        <h2 className="text-lg sm:text-xl font-bold break-anywhere">{getPlanName(currentPlan)}</h2>
+                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
                                             <Badge className={getStatusColor(isExpired ? "expired" : "active")}>
                                                 {isExpired ? "EXPIRED" : "ACTIVE"}
                                             </Badge>
                                             <span className="text-sm text-muted-foreground">
-                                                {productCount}/{planLimit === 9999 ? '∞' : planLimit} products used
+                                                {productCount ?? "—"}/{planLimit === 9999 ? '∞' : planLimit} products used
                                             </span>
                                         </div>
                                         {expiresAt && currentPlan !== 'free' && (
-                                            <p className={`text-xs mt-1 ${isExpired ? 'text-red-500 font-bold' : 'text-muted-foreground'}`}>
+                                            <p className={`text-xs mt-1 ${isExpired ? 'text-destructive font-bold' : 'text-muted-foreground'}`}>
                                                 <CalendarClock className="h-3 w-3 inline mr-1" />
-                                                {isExpired ? 'Expired on' : 'Renews on'} {new Date(expiresAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                                                {isExpired ? 'Expired on' : 'Renews on'} {formatDate(expiresAt)}
                                             </p>
                                         )}
                                     </div>
                                 </div>
-                                <div className="flex gap-2">
+                                <div className="flex flex-col gap-2 sm:flex-row sm:shrink-0">
                                     {/* Renewal / Upgrade */}
                                     {currentPlan !== 'free' && isExpired && (
                                         <SubscriptionDialog
-                                            companyId={company.id}
-                                            companyName={company.name}
-                                            companyEmail={company.email}
+                                            companyId={companyId}
+                                            companyName={companyName}
+                                            companyEmail={companyEmail}
+                                            onPaymentSuccess={goToReceipt}
                                             currentPlan="free"
                                         >
-                                            <Button className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold shadow-sm">
+                                            <Button className="h-11 w-full sm:w-auto bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold shadow-sm">
                                                 <RefreshCw className="h-4 w-4 mr-2" /> Renew Plan
                                             </Button>
                                         </SubscriptionDialog>
                                     )}
                                     {currentPlan !== 'support' && !isExpired && (
                                         <SubscriptionDialog
-                                            companyId={company.id}
-                                            companyName={company.name}
-                                            companyEmail={company.email}
+                                            companyId={companyId}
+                                            companyName={companyName}
+                                            companyEmail={companyEmail}
+                                            onPaymentSuccess={goToReceipt}
                                             currentPlan={currentPlan}
                                         >
-                                            <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold shadow-sm">
+                                            <Button className="h-11 w-full sm:w-auto bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold shadow-sm">
                                                 <Crown className="h-4 w-4 mr-2" /> Upgrade Plan
                                             </Button>
                                         </SubscriptionDialog>
                                     )}
                                     {currentPlan !== 'free' && !isExpired && (
                                         <SubscriptionDialog
-                                            companyId={company.id}
-                                            companyName={company.name}
-                                            companyEmail={company.email}
+                                            companyId={companyId}
+                                            companyName={companyName}
+                                            companyEmail={companyEmail}
+                                            onPaymentSuccess={goToReceipt}
                                             currentPlan="free"
                                         >
-                                            <Button variant="outline" className="font-bold">
+                                            <Button variant="outline" className="h-11 w-full sm:w-auto font-bold">
                                                 <RefreshCw className="h-4 w-4 mr-2" /> Renew
                                             </Button>
                                         </SubscriptionDialog>
@@ -322,77 +322,141 @@ const Billing = () => {
                         </div>
                     ) : payments && payments.length > 0 ? (
                         <div className="space-y-3">
-                            {payments.map((payment: any) => (
-                                <Card key={payment.id} className="hover:shadow-md transition-shadow">
-                                    <CardContent className="p-4">
-                                        <div className="flex items-center justify-between gap-4 flex-wrap">
-                                            <div className="flex items-center gap-3 min-w-0">
-                                                {getStatusIcon(payment.status)}
-                                                <div className="min-w-0">
+                            {payments.map((payment: Record<string, unknown>) => {
+                                const key = paymentKey(payment);
+                                const razorpayId = str(payment.razorpay_payment_id);
+                                const planLabel = getPlanName(
+                                    resolvePaidPlanId(str(payment.plan), Number(payment.amount) || 0),
+                                );
+                                const expiresOn = payment.expires_at ? formatDate(payment.expires_at) : "";
+
+                                return (
+                                    <Card key={key} className="hover:shadow-md transition-shadow">
+                                        <CardContent className="p-3 sm:p-4">
+                                            {/* One column at 360px: the amount rides the title
+                                                line, the actions get a row of their own. The old
+                                                single row put a date range, a payment id and two
+                                                buttons on one line and pushed the page sideways. */}
+                                            <div className="flex items-start gap-3">
+                                                <span className="mt-0.5 shrink-0">{getStatusIcon(payment.status)}</span>
+                                                <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-2 flex-wrap">
-                                                        <span className="font-bold text-sm">{getPlanName(payment.plan)}</span>
-                                                        <Badge className={`text-[10px] ${getStatusColor(payment.status)}`}>{payment.status.toUpperCase()}</Badge>
+                                                        <span className="font-bold text-sm break-anywhere">{planLabel}</span>
+                                                        <Badge className={`text-[10px] ${getStatusColor(payment.status)}`}>{statusLabel(payment.status)}</Badge>
+                                                        <span className="ml-auto font-bold text-base sm:text-lg">₹{formatPaise(payment.amount)}</span>
                                                     </div>
                                                     <p className="text-xs text-muted-foreground mt-0.5">
-                                                        {new Date(payment.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
-                                                        {payment.expires_at && ` → ${new Date(payment.expires_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}`}
+                                                        {formatDate(payment.created_at)}
+                                                        {expiresOn && ` → ${expiresOn}`}
                                                     </p>
-                                                    {payment.razorpay_payment_id && (
-                                                        <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
-                                                            ID: {payment.razorpay_payment_id}
+                                                    {razorpayId && (
+                                                        <p className="break-anywhere text-[10px] text-muted-foreground font-mono mt-0.5">
+                                                            ID: {razorpayId}
                                                         </p>
                                                     )}
+                                                    <div className="flex flex-wrap gap-2 mt-3">
+                                                        {razorpayId && (
+                                                            <Button variant="ghost" className="h-11 flex-1 text-xs sm:flex-none sm:px-4" asChild>
+                                                                <Link to={`/billing/receipt/${razorpayId}`}>
+                                                                    <Receipt className="h-3.5 w-3.5 mr-1" /> View
+                                                                </Link>
+                                                            </Button>
+                                                        )}
+                                                        <Button
+                                                            variant="outline"
+                                                            className="h-11 flex-1 text-xs sm:flex-none sm:px-4"
+                                                            disabled={downloadingId !== null}
+                                                            onClick={() => void handleDownload(payment)}
+                                                        >
+                                                            {downloadingId === key ? (
+                                                                <>
+                                                                    <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Preparing…
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Download className="h-3.5 w-3.5 mr-1" /> Receipt
+                                                                </>
+                                                            )}
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-3 shrink-0">
-                                                <span className="font-bold text-lg">₹{(payment.amount / 100).toFixed(0)}</span>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="h-8 text-xs"
-                                                    onClick={() => downloadInvoice(payment, company)}
-                                                >
-                                                    <Download className="h-3.5 w-3.5 mr-1" /> Invoice
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            ))}
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })}
                         </div>
                     ) : (
                         <Card className="bg-muted/30">
-                            <CardContent className="p-8 text-center text-muted-foreground">
-                                <Receipt className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                                <p className="font-medium">No payments yet</p>
-                                <p className="text-sm mt-1">Your payment history will appear here once you subscribe to a plan.</p>
+                            <CardContent className="p-6 sm:p-8 text-center">
+                                <Receipt className="h-10 w-10 mx-auto mb-3 text-muted-foreground opacity-40" />
+                                <h3 className="font-semibold">No payments yet</h3>
+                                <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
+                                    You are on the {getPlanName(currentPlan)}. Pick a paid plan to remove ads,
+                                    raise your product limit and unlock estimates — every receipt then shows up here.
+                                </p>
+                                {companyId && (
+                                    <SubscriptionDialog
+                                        companyId={companyId}
+                                        companyName={companyName}
+                                        companyEmail={companyEmail}
+                                        onPaymentSuccess={goToReceipt}
+                                        currentPlan={currentPlan}
+                                    >
+                                        <Button className="mt-5 h-11 w-full sm:w-auto font-semibold">
+                                            <Crown className="h-4 w-4 mr-2" /> See plans
+                                        </Button>
+                                    </SubscriptionDialog>
+                                )}
                             </CardContent>
                         </Card>
                     )}
                 </div>
+                  </>
+                )}
 
                 {/* Customer Care Section */}
-                <div className="bg-primary/5 rounded-2xl p-8 sm:p-12 border border-primary/10 text-center mt-8">
-                    <h2 className="text-2xl sm:text-3xl font-bold mb-4">Customer Care Support</h2>
-                    <p className="text-muted-foreground mb-6 max-w-xl mx-auto">
+                {/* The contact pills used to be `inline-flex` with the support
+                    address as one unbreakable child, so at 360px the widest of
+                    them stuck ~30px past the card and took the whole page
+                    sideways with it. They are block-level and breakable now, and
+                    the card's padding starts small instead of at 32px. */}
+                <div className="bg-primary/5 rounded-2xl p-5 sm:p-8 md:p-12 border border-primary/10 text-center mt-8">
+                    <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-3">Customer Care Support</h2>
+                    <p className="text-muted-foreground text-sm sm:text-base mb-6 max-w-xl mx-auto">
                         Need assistance or have any queries? Our dedicated support team is here to help you out. Click below to reach out directly to us!
                     </p>
-                    <Button asChild size="lg" className="rounded-full gap-2 px-8">
-                        <a href="mailto:catalogshare123@gmail.com?subject=custome%20care%20support">
+                    <Button asChild size="lg" className="h-12 w-full sm:w-auto rounded-full gap-2 sm:px-8">
+                        <a href={`mailto:${SUPPORT_EMAIL}?subject=Customer%20care%20support`}>
                             <Mail className="h-5 w-5" />
                             Contact Customer Care
                         </a>
                     </Button>
-                    <div className="mt-6 flex flex-col items-center gap-3">
-                        <div className="inline-flex items-center justify-center gap-2 text-sm text-muted-foreground bg-background rounded-full px-4 py-2 shadow-sm border">
-                            <span>Direct Email:</span>
-                            <span className="font-semibold text-foreground">catalogshare123@gmail.com</span>
+                    <div className="mt-6 flex flex-col items-stretch gap-3 sm:items-center">
+                        <div className="flex min-w-0 flex-col items-center gap-0.5 rounded-2xl border bg-background px-4 py-2.5 text-sm text-muted-foreground shadow-sm sm:flex-row sm:gap-2 sm:rounded-full">
+                            <span className="shrink-0">Direct email</span>
+                            <a
+                                href={`mailto:${SUPPORT_EMAIL}`}
+                                className="break-anywhere min-w-0 font-semibold text-foreground"
+                            >
+                                {SUPPORT_EMAIL}
+                            </a>
                         </div>
-                        {currentPlan === 'pro' && (
-                            <div className="inline-flex items-center justify-center gap-2 text-sm text-muted-foreground bg-background rounded-full px-4 py-2 shadow-sm border border-primary/20 bg-primary/5">
-                                <Phone className="h-4 w-4" />
-                                <span>Call Support:</span>
-                                <span className="font-semibold text-foreground">+917625025686</span>
+                        {/* Gated on the entitlement, not on `plan === 'pro'`: the ₹499
+                            Support plan pays for the phone line too and was being told
+                            it does not exist. */}
+                        {entitlement.supportPhoneUnlocked && (
+                            <div className="flex min-w-0 flex-col items-center gap-0.5 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm text-muted-foreground shadow-sm sm:flex-row sm:gap-2 sm:rounded-full">
+                                <span className="flex shrink-0 items-center gap-1.5">
+                                    <Phone className="h-4 w-4" />
+                                    Call support
+                                </span>
+                                <a
+                                    href={`tel:${SUPPORT_PHONE.replace(/\s+/g, "")}`}
+                                    className="break-anywhere min-w-0 font-semibold text-foreground"
+                                >
+                                    {SUPPORT_PHONE}
+                                </a>
                             </div>
                         )}
                     </div>

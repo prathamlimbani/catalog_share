@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { memo, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -36,8 +36,25 @@ const SURVEY_QUESTIONS: SurveyQuestion[] = [
   },
 ];
 
+/**
+ * The star field is randomised ONCE, at module load.
+ *
+ * It used to call Math.random() during render, so every re-render of the page
+ * (a keystroke in the survey name field, a tap on the star rating) rebuilt all
+ * 160 stars — both sky instances — and the whole night sky visibly jumped.
+ */
+const STAR_FIELD = Array.from({ length: 80 }, () => ({
+  size: Math.random() * 2.5 + 0.5,
+  left: Math.random() * 100,
+  top: Math.random() * 100,
+  opacity: Math.random() * 0.7 + 0.2,
+  twinkleDur: Math.random() * 3 + 2,
+  driftDur: Math.random() * 40 + 30,
+  delay: Math.random() * 5,
+}));
+
 /* ─── Animated Sky Background ─── */
-const SkyBackground = () => {
+const SkyBackground = memo(function SkyBackground() {
   const [isDark, setIsDark] = useState(true);
 
   useEffect(() => {
@@ -56,18 +73,18 @@ const SkyBackground = () => {
           <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-indigo-950 to-purple-950" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.15),transparent_70%)]" />
           {/* Twinkling stars */}
-          {Array.from({ length: 80 }).map((_, i) => (
+          {STAR_FIELD.map((star, i) => (
             <div
               key={`star-${i}`}
               className="absolute rounded-full bg-white"
               style={{
-                width: `${Math.random() * 2.5 + 0.5}px`,
-                height: `${Math.random() * 2.5 + 0.5}px`,
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                opacity: Math.random() * 0.7 + 0.2,
-                animation: `twinkle ${Math.random() * 3 + 2}s ease-in-out infinite, drift ${Math.random() * 40 + 30}s linear infinite`,
-                animationDelay: `${Math.random() * 5}s`,
+                width: `${star.size}px`,
+                height: `${star.size}px`,
+                left: `${star.left}%`,
+                top: `${star.top}%`,
+                opacity: star.opacity,
+                animation: `twinkle ${star.twinkleDur}s ease-in-out infinite, drift ${star.driftDur}s linear infinite`,
+                animationDelay: `${star.delay}s`,
               }}
             />
           ))}
@@ -88,7 +105,7 @@ const SkyBackground = () => {
       )}
     </div>
   );
-};
+});
 
 const Cloud = ({ className, dur, delay }: { className: string; dur: string; delay: string }) => (
   <div
@@ -328,7 +345,9 @@ const Landing = () => {
                   {SURVEY_QUESTIONS.map((_, i) => (
                     <div
                       key={i}
-                      className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${i <= surveyStep ? "bg-indigo-400" : "bg-white/20"
+                      // The unfilled segment needs a dark tint in day mode: white/20
+                      // over the light sky gradient was completely invisible.
+                      className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${i <= surveyStep ? "bg-indigo-400" : "bg-slate-900/20 dark:bg-white/20"
                         }`}
                     />
                   ))}
@@ -358,15 +377,25 @@ const Landing = () => {
                           <button
                             key={star}
                             type="button"
-                            onMouseEnter={() => setHoverRating(star)}
-                            onMouseLeave={() => setHoverRating(0)}
-                            onClick={() => setRating(star)}
-                            className="transition-transform hover:scale-125"
+                            aria-label={`Rate ${star} out of 5`}
+                            aria-pressed={star <= rating}
+                            // Touch never fires mouseenter/mouseleave, so a phone
+                            // user got no preview at all — and the WebView's
+                            // emulated hover could leave a star stuck highlighted.
+                            // Pointer events cover both, and the preview is cleared
+                            // as soon as the finger lifts.
+                            onPointerEnter={(e) => { if (e.pointerType === "mouse") setHoverRating(star); }}
+                            onPointerLeave={(e) => { if (e.pointerType === "mouse") setHoverRating(0); }}
+                            onPointerDown={() => setHoverRating(star)}
+                            onPointerUp={() => setHoverRating(0)}
+                            onPointerCancel={() => setHoverRating(0)}
+                            onClick={() => { setRating(star); setHoverRating(0); }}
+                            className="rounded-full transition-transform hover:scale-125 active:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                           >
                             <Star
                               className={`h-10 w-10 transition-colors ${star <= (hoverRating || rating)
                                 ? "text-yellow-400 fill-yellow-400"
-                                : "text-white/30"
+                                : "text-slate-900/25 dark:text-white/30"
                                 }`}
                             />
                           </button>
@@ -476,7 +505,7 @@ const Landing = () => {
           </div>
           <div className="mt-4 pt-4 border-t text-center">
             <p className="text-xs text-muted-foreground">
-              © 2026 CatalogShare. All rights reserved.
+              © {new Date().getFullYear()} CatalogShare. All rights reserved.
             </p>
           </div>
         </div>

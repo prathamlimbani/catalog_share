@@ -2,17 +2,24 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Mail, Phone, Lock } from "lucide-react";
+import { useEntitlement } from "@/hooks/useEntitlement";
 
 interface CustomerSupportDialogProps {
     children?: React.ReactNode;
-    plan: string;
+    /**
+     * @deprecated Ignored — `plan === "pro"` hid the phone line from the ₹499
+     * Monthly Support subscribers that CustomerCare.tsx promises priority phone
+     * support to. Kept so existing call sites keep compiling.
+     */
+    plan?: string;
     externalOpen?: boolean;
     onExternalOpenChange?: (open: boolean) => void;
 }
 
-export function CustomerSupportDialog({ children, plan, externalOpen, onExternalOpenChange }: CustomerSupportDialogProps) {
+export function CustomerSupportDialog({ children, externalOpen, onExternalOpenChange }: CustomerSupportDialogProps) {
     const [internalOpen, setInternalOpen] = useState(false);
-    const isPro = plan === "pro";
+    const { entitlement } = useEntitlement();
+    const canCall = entitlement.supportPhoneUnlocked;
 
     // Determine if we're in externally controlled mode
     const isExternallyControlled = externalOpen !== undefined;
@@ -45,13 +52,13 @@ export function CustomerSupportDialog({ children, plan, externalOpen, onExternal
                         </a>
                     </Button>
 
-                    <Button 
-                        asChild={isPro} 
-                        variant="outline" 
-                        disabled={!isPro}
-                        className={`h-auto py-5 flex flex-col gap-3 relative overflow-hidden group shadow-sm ${!isPro ? 'opacity-80 bg-muted/30 border-dashed cursor-not-allowed' : 'hover:border-primary/50'}`}
+                    <Button
+                        asChild={canCall}
+                        variant="outline"
+                        disabled={!canCall}
+                        className={`h-auto py-5 flex flex-col gap-3 relative overflow-hidden group shadow-sm ${!canCall ? 'opacity-80 bg-muted/30 border-dashed cursor-not-allowed' : 'hover:border-primary/50'}`}
                     >
-                        {isPro ? (
+                        {canCall ? (
                             <a href="tel:+917625025686">
                                 <div className="bg-primary/10 p-3 rounded-full group-hover:bg-primary/20 transition-colors">
                                     <Phone className="h-6 w-6 text-primary group-hover:scale-110 transition-transform" />
@@ -69,7 +76,7 @@ export function CustomerSupportDialog({ children, plan, externalOpen, onExternal
                                 <div className="text-center">
                                     <span className="font-semibold block text-muted-foreground text-base">Call Support</span>
                                     <span className="text-xs font-semibold text-amber-600 bg-amber-500/10 px-3 py-1 rounded-full flex items-center justify-center gap-1.5 mt-2 mx-auto w-max">
-                                        <Lock className="h-3 w-3" /> PRO PLAN EXCLUSIVE
+                                        <Lock className="h-3 w-3" /> PRO &amp; SUPPORT PLANS
                                     </span>
                                 </div>
                             </div>

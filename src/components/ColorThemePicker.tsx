@@ -1,6 +1,7 @@
 import { Label } from "@/components/ui/label";
 import { Lock, Sparkles, Crown } from "lucide-react";
 import { PREMIUM_SKINS, getSkinKey, isSkinTheme, getSkinId } from "@/lib/premiumSkins";
+import { useEntitlement } from "@/hooks/useEntitlement";
 
 export interface ThemePreset {
     name: string;
@@ -27,12 +28,20 @@ const THEME_PRESETS: ThemePreset[] = [
 interface ColorThemePickerProps {
     selectedPrimary: string;
     onSelect: (primary: string, accent: string) => void;
+    /**
+     * @deprecated Ignored — the plan string alone cannot answer "may this
+     * account use premium themes", because it says nothing about whether the
+     * subscription is still in date. useEntitlement() is the authority now.
+     * Kept so existing call sites keep compiling.
+     */
     plan?: string;
 }
 
-const ColorThemePicker = ({ selectedPrimary, onSelect, plan = "free" }: ColorThemePickerProps) => {
-    const isPro = plan === "pro";
-    const isGrowthOrPro = plan === "growth" || plan === "pro";
+const ColorThemePicker = ({ selectedPrimary, onSelect }: ColorThemePickerProps) => {
+    const { entitlement } = useEntitlement();
+    // Premium swatches ship with every paid plan; the full skins are Pro/₹499.
+    const canUsePremiumThemes = entitlement.premiumThemes;
+    const canUseSkins = entitlement.premiumSkins;
     const selectedSkinId = isSkinTheme(selectedPrimary) ? getSkinId(selectedPrimary) : null;
 
     return (
@@ -42,7 +51,7 @@ const ColorThemePicker = ({ selectedPrimary, onSelect, plan = "free" }: ColorThe
                 <div className="grid grid-cols-4 gap-2">
                     {THEME_PRESETS.map((preset) => {
                         const isSelected = !selectedSkinId && selectedPrimary === preset.primary;
-                        const isPremiumLocked = preset.isPremium && !isGrowthOrPro;
+                        const isPremiumLocked = preset.isPremium && !canUsePremiumThemes;
                         return (
                             <button
                                 key={preset.name}
@@ -76,16 +85,16 @@ const ColorThemePicker = ({ selectedPrimary, onSelect, plan = "free" }: ColorThe
                 </div>
             </div>
 
-            {/* Premium Skin Themes - Pro only */}
+            {/* Premium Skin Themes — Pro and Monthly Support subscribers */}
             <div className="space-y-2">
                 <div className="flex items-center gap-2">
                     <Label className="flex items-center gap-1.5">
                         <Crown className="h-4 w-4 text-purple-500" />
                         Premium Skins
                     </Label>
-                    {!isPro && (
+                    {!canUseSkins && (
                         <span className="text-[10px] font-bold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                            Pro Only
+                            Pro &amp; Support
                         </span>
                     )}
                 </div>
@@ -95,7 +104,7 @@ const ColorThemePicker = ({ selectedPrimary, onSelect, plan = "free" }: ColorThe
                 <div className="grid gap-2">
                     {PREMIUM_SKINS.map((skin) => {
                         const isSelected = selectedSkinId === skin.id;
-                        const isLocked = !isPro;
+                        const isLocked = !canUseSkins;
                         const skinKey = getSkinKey(skin.id);
                         
                         return (

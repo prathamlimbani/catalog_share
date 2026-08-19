@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Network security policy for CatalogShare.
+
+    Everything this app talks to is HTTPS-only: Supabase (REST + realtime + auth),
+    Razorpay checkout, the Google Mobile Ads SDK and https://catalogshare.online.
+    There is no legitimate plaintext endpoint, so cleartext is refused outright
+    rather than left to the platform default - Play flags apps that permit it, and
+    an accidental http:// asset URL should fail loudly in QA instead of silently
+    downgrading a request that carries a Supabase bearer token.
+
+    The release trust store is SYSTEM CAs ONLY. User-installed CAs are trusted in
+    debug builds so a proxy (Charles / mitmproxy) can be used while developing;
+    granting that in release would let anyone who can talk a user into installing
+    a certificate profile read their auth session and payment traffic.
+-->
+<network-security-config>
+
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!--
+        Applied only when the APK is built debuggable; the block is stripped from
+        the effective policy of a release build by the platform.
+    -->
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+
+</network-security-config>

@@ -1,22 +1,26 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Eye, Pencil, FileText, Search, IndianRupee, Trash2, Loader2 } from "lucide-react";
+import { Plus, Eye, Pencil, FileText, Search, Trash2, Loader2 } from "lucide-react";
 
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import InvoicePreview from "@/components/InvoicePreview";
+import { elementToPdfBlob } from "@/lib/pdf";
+import { shareBlob, safeFileName, openWhatsApp } from "@/native/files";
+import { isNative } from "@/native/platform";
 
 const WhatsappIcon = ({ className }: { className?: string }) => (
   <svg
@@ -41,17 +45,57 @@ interface InvoiceHistoryProps {
   isLoading: boolean;
 }
 
-const formatCurrency = (amount: number) => {
-  return `₹${amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+/* Every estimate column this list reads is nullable, and `final_amount` comes
+   back from PostgREST as a numeric string. Coerce, never dereference. */
+
+const num = (value: unknown): number => {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : 0;
 };
 
-const formatDate = (dateStr: string) => {
-  const date = new Date(dateStr);
+const str = (value: unknown, fallback = ""): string => {
+  if (value === null || value === undefined) return fallback;
+  const s = String(value).trim();
+  return s || fallback;
+};
+
+const formatAmount = (value: unknown) =>
+  num(value).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const formatCurrency = (value: unknown) => `₹${formatAmount(value)}`;
+
+const formatDate = (value: unknown) => {
+  // `new Date(null)` is the epoch, not an error — reject the empty cases first.
+  if (value === null || value === undefined || value === "") return "—";
+  const date = new Date(value as string | number | Date);
+  if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "short",
     year: "numeric",
   });
+};
+
+/** Sort key. A missing or unparseable timestamp sorts last instead of poisoning
+ *  the comparator with NaN, which makes the whole list order arbitrary. */
+const timeOf = (value: unknown): number => {
+  if (value === null || value === undefined || value === "") return 0;
+  const t = new Date(value as string).getTime();
+  return Number.isNaN(t) ? 0 : t;
+};
+
+/**
+ * Best-effort default for the WhatsApp box.
+ *
+ * Stored numbers arrive as "98765 43210", "+91 98765 43210" and
+ * "919876543210" in roughly equal measure. The old code prefixed +91 to
+ * anything that did not already start with it, so a number that carried the
+ * country code without the plus became +9191…, i.e. someone else entirely.
+ */
+const defaultWhatsappNumber = (phone: unknown): string => {
+  const digits = String(phone ?? "").replace(/\D/g, "").replace(/^0+/, "");
+  if (!digits) return "+91";
+  return digits.length > 10 ? `+${digits}` : `+91${digits}`;
 };
 
 const InvoiceHistory = ({
@@ -69,91 +113,117 @@ const InvoiceHistory = ({
   const [selectedInvoiceForWhatsapp, setSelectedInvoiceForWhatsapp] = useState<any | null>(null);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
 
+  // The off-screen render used for the PDF. Scoping the lookup to this host
+  // stops `getElementById` picking up a different #invoice-print-area if one is
+  // ever mounted alongside the list.
+  const captureHostRef = useRef<HTMLDivElement>(null);
+
+  const whatsappDigits = whatsappNumber.replace(/\D/g, "");
+  const isWhatsappNumberValid = whatsappDigits.length >= 10 && whatsappDigits.length <= 15;
+
   const handleOpenWhatsapp = (invoice: any) => {
     setSelectedInvoiceForWhatsapp(invoice);
-    let defaultNumber = "+91";
-    if (invoice.customer_phone) {
-      const phone = invoice.customer_phone.trim();
-      if (phone.startsWith("+91")) {
-        defaultNumber = phone;
-      } else if (phone.length === 10) {
-        defaultNumber = `+91${phone}`;
-      } else {
-        defaultNumber = `+91${phone}`;
-      }
-    }
-    setWhatsappNumber(defaultNumber);
+    setWhatsappNumber(defaultWhatsappNumber(invoice?.customer_phone));
     setWhatsappDialogOpen(true);
   };
 
+  /** Closing also drops the hidden capture render, which would otherwise stay
+   *  mounted on every screen for the rest of the session. */
+  const closeWhatsappDialog = () => {
+    setWhatsappDialogOpen(false);
+    setSelectedInvoiceForWhatsapp(null);
+  };
+
+  /**
+   * Send the estimate to a customer on WhatsApp.
+   *
+   * On device the PDF is attached directly through the Android share sheet.
+   * The previous flow uploaded every estimate — customer name, phone, address
+   * and prices — to a PUBLIC storage bucket and shared the raw link, which left
+   * that data permanently readable by anyone who guessed the URL. Nothing is
+   * uploaded now.
+   *
+   * The browser keeps the upload-and-link path, because there is no other way
+   * to attach a file to a WhatsApp web message.
+   */
   const handleSendWhatsapp = async () => {
-    if (!selectedInvoiceForWhatsapp || !whatsappNumber.trim()) return;
-    
-    const cleanNumber = whatsappNumber.replace(/\s+/g, "").replace("+", "");
-    const amount = selectedInvoiceForWhatsapp.final_amount.toLocaleString("en-IN", { minimumFractionDigits: 2 });
-    
+    if (!selectedInvoiceForWhatsapp || !isWhatsappNumberValid) return;
+
+    // Digits only: the old `replace("+","")` left spaces, dashes and brackets
+    // in the wa.me path, which WhatsApp rejects as an invalid number.
+    const cleanNumber = whatsappDigits;
+    const amount = formatAmount(selectedInvoiceForWhatsapp.final_amount);
+    const customerName = str(selectedInvoiceForWhatsapp.customer_name, "there");
+
     setIsGeneratingLink(true);
-    toast.loading("Generating secure PDF link...", { id: "pdf-gen" });
 
     try {
-      const element = document.getElementById("invoice-print-area");
-      if (!element) throw new Error("Could not find invoice element to generate PDF");
-      
-      const html2pdf = (await import("html2pdf.js")).default;
-      
-      const pdfBlob = await html2pdf()
-        .set({
-          margin: 0.5,
-          filename: `${selectedInvoiceForWhatsapp.invoice_number}.pdf`,
-          image: { type: "jpeg", quality: 0.98 },
-          html2canvas: { scale: 2 },
-          jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
-        })
-        .from(element)
-        .output('blob');
-        
-      const fileName = `estimates/${selectedInvoiceForWhatsapp.id}-${Date.now()}.pdf`;
-      const { data, error } = await supabase.storage.from("product-images").upload(fileName, pdfBlob, {
+      const element =
+        captureHostRef.current?.querySelector<HTMLElement>("#invoice-print-area") ?? null;
+      if (!element) throw new Error("Could not prepare the estimate. Please reopen this screen.");
+
+      const number = str(selectedInvoiceForWhatsapp.invoice_number, "Estimate");
+      const message =
+        `Hello ${customerName},\n\n` +
+        `Please find your estimate ${number} for ₹${amount} attached.\n\n` +
+        `Thank you!\n${str(company?.name)}`;
+
+      const pdfBlob = await elementToPdfBlob(element, { name: number });
+
+      if (isNative) {
+        const result = await shareBlob(pdfBlob, safeFileName(number), {
+          title: `Estimate ${number}`,
+          text: message,
+          dialogTitle: "Send estimate",
+        });
+
+        if (!result.ok && result.error && result.error !== "cancelled") {
+          throw new Error(result.error);
+        }
+        closeWhatsappDialog();
+        return;
+      }
+
+      // ---- web fallback: upload, then hand WhatsApp a link ----
+      toast.loading("Preparing your estimate...", { id: "pdf-gen" });
+      const fileName = `estimates/${str(selectedInvoiceForWhatsapp.id, "estimate")}-${Date.now()}.pdf`;
+      const { error } = await supabase.storage.from("product-images").upload(fileName, pdfBlob, {
         contentType: "application/pdf",
         upsert: true,
       });
-      
       if (error) throw error;
-      
+
       const { data: urlData } = supabase.storage.from("product-images").getPublicUrl(fileName);
-      const publicUrl = urlData.publicUrl;
-
       toast.dismiss("pdf-gen");
-      toast.success("Link generated!");
 
-      const text = `Hello ${selectedInvoiceForWhatsapp.customer_name},\n\nPlease find your estimate (${selectedInvoiceForWhatsapp.invoice_number}) for ₹${amount} here: ${publicUrl}\n\nThank you!`;
-      
-      const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(text)}`;
-      
-      // Mobile browsers often block window.open after async operations (PDF gen & upload)
-      // Use location.href for mobile to trigger the native app deeply, and window.open for desktop
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-      if (isMobile) {
-        window.location.href = url;
-      } else {
-        window.open(url, "_blank");
-      }
-      
-      setWhatsappDialogOpen(false);
-    } catch (err: any) {
-      console.error(err);
+      const linkMessage =
+        `Hello ${customerName},\n\n` +
+        `Please find your estimate (${number}) for ₹${amount} here: ${urlData.publicUrl}\n\nThank you!`;
+
+      await openWhatsApp(cleanNumber, linkMessage);
+      closeWhatsappDialog();
+    } catch (err) {
+      console.error("WhatsApp share failed:", err);
       toast.dismiss("pdf-gen");
-      toast.error("Failed to generate PDF link");
+      toast.error("Could not send the estimate", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
     } finally {
       setIsGeneratingLink(false);
     }
   };
 
+  // The prop is `any[]`, and an offline read that fails resolves to undefined.
+  const rows: any[] = Array.isArray(invoices) ? invoices : [];
+
   const sortedInvoices = useMemo(() => {
-    return [...invoices].sort(
+    // Newest first, falling back to the estimate date when the row predates the
+    // created_at column.
+    return [...rows].sort(
       (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        timeOf(b?.created_at ?? b?.invoice_date) - timeOf(a?.created_at ?? a?.invoice_date)
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoices]);
 
   const filteredInvoices = useMemo(() => {
@@ -161,34 +231,33 @@ const InvoiceHistory = ({
     const query = searchQuery.toLowerCase().trim();
     return sortedInvoices.filter(
       (inv) =>
-        inv.customer_name?.toLowerCase().includes(query) ||
-        inv.invoice_number?.toLowerCase().includes(query)
+        str(inv?.customer_name).toLowerCase().includes(query) ||
+        str(inv?.invoice_number).toLowerCase().includes(query)
     );
   }, [sortedInvoices, searchQuery]);
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5 sm:space-y-6">
         {/* Header skeleton */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Skeleton className="h-8 w-32" />
-          <Skeleton className="h-10 w-44" />
+          <Skeleton className="h-11 w-full sm:w-52" />
         </div>
         {/* Search skeleton */}
-        <Skeleton className="h-10 w-full" />
-        {/* Table skeletons */}
+        <Skeleton className="h-11 w-full" />
+        {/* Row skeletons */}
         <div className="space-y-3">
           {Array.from({ length: 5 }).map((_, i) => (
             <Card key={i} className="overflow-hidden">
               <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-2 flex-1">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1 space-y-2">
                     <Skeleton className="h-4 w-28" />
                     <Skeleton className="h-3 w-40" />
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex shrink-0 items-center gap-3">
                     <Skeleton className="h-5 w-20" />
-                    <Skeleton className="h-8 w-8 rounded-md" />
                     <Skeleton className="h-8 w-8 rounded-md" />
                   </div>
                 </div>
@@ -201,55 +270,54 @@ const InvoiceHistory = ({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+    <div className="space-y-5 sm:space-y-6">
+      {/* Header — stacks on a phone so the title never fights the action button */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="min-w-0">
+          <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
             Estimates
           </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          <p className="mt-1 text-sm text-muted-foreground">
             Manage and view all your estimates
           </p>
         </div>
         <Button
           onClick={onCreateNew}
-          className="bg-blue-600 hover:bg-blue-700 shadow-md transition-all rounded-full px-5"
+          className="h-11 w-full shrink-0 rounded-full px-5 shadow-md transition-all sm:w-auto"
         >
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="mr-2 h-4 w-4" />
           Create New Estimate
         </Button>
       </div>
 
-      {/* Search */}
+      {/* Search — the only search left on this screen, so it takes the full width */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="text"
-          placeholder="Search by customer or estimate number..."
+          inputMode="search"
+          placeholder="Search customer or estimate no."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9 bg-white dark:bg-slate-800 dark:text-white dark:border-slate-700 border-slate-200 focus:border-blue-400 focus:ring-blue-400/20"
+          aria-label="Search estimates"
+          className="h-11 w-full pl-10 text-base"
         />
       </div>
 
       {/* Empty state */}
-      {invoices.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-20">
-          <div className="h-24 w-24 rounded-full bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center mb-6">
-            <FileText className="h-10 w-10 text-blue-500" />
+      {rows.length === 0 && (
+        <div className="flex flex-col items-center justify-center px-4 py-16 sm:py-20">
+          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 sm:h-24 sm:w-24">
+            <FileText className="h-9 w-9 text-primary sm:h-10 sm:w-10" />
           </div>
-          <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-2">
+          <h3 className="mb-2 text-lg font-semibold text-foreground sm:text-xl">
             No estimates yet
           </h3>
-          <p className="text-gray-500 text-sm text-center max-w-sm mb-6">
+          <p className="mb-6 max-w-sm text-center text-sm text-muted-foreground">
             Create your first estimate to start tracking your sales and managing
             your billing.
           </p>
-          <Button
-            onClick={onCreateNew}
-            className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-md shadow-blue-500/20"
-          >
+          <Button onClick={onCreateNew} className="h-11 gap-2 px-5 shadow-md">
             <Plus className="h-4 w-4" />
             Create First Estimate
           </Button>
@@ -257,104 +325,119 @@ const InvoiceHistory = ({
       )}
 
       {/* No search results */}
-      {invoices.length > 0 && filteredInvoices.length === 0 && (
-        <div className="text-center py-10">
-          <div className="mx-auto w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3">
-            <Search className="h-6 w-6 text-slate-400" />
+      {rows.length > 0 && filteredInvoices.length === 0 && (
+        <div className="px-4 py-10 text-center">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+            <Search className="h-6 w-6 text-muted-foreground" />
           </div>
-          <h3 className="text-lg font-medium text-slate-900">No results found</h3>
-          <p className="text-slate-500 mt-1">No estimates match your search criteria.</p>
+          <h3 className="text-lg font-medium text-foreground">No results found</h3>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+            No estimate matches “{searchQuery.trim()}”. Try a customer name or an estimate number.
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => setSearchQuery("")}
+            className="mt-4 h-11 px-5"
+          >
+            Clear search
+          </Button>
         </div>
       )}
 
-      {/* Desktop Table */}
+      {/* Desktop table (md and up) */}
       {filteredInvoices.length > 0 && (
         <div className="hidden md:block">
-          <Card className="overflow-hidden border-gray-200 dark:border-slate-800 shadow-sm">
+          <Card className="overflow-hidden border-border shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-gray-50/80 dark:bg-slate-800/80 border-b border-gray-200 dark:border-slate-700">
-                    <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300 text-xs uppercase tracking-wider">
+                  <tr className="border-b border-border bg-muted/60">
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Estimate #
                     </th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300 text-xs uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Date
                     </th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300 text-xs uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Customer
                     </th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300 text-xs uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Phone
                     </th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-600 dark:text-gray-300 text-xs uppercase tracking-wider">
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Final Amount
                     </th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-600 dark:text-gray-300 text-xs uppercase tracking-wider">
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
-                  {filteredInvoices.map((invoice) => (
+                <tbody className="divide-y divide-border">
+                  {filteredInvoices.map((invoice, index) => (
                     <tr
-                      key={invoice.id}
-                      className="hover:bg-blue-50/40 dark:hover:bg-slate-800/50 transition-colors duration-150"
+                      // A row that never synced has no id yet; a duplicated key
+                      // makes React reuse the wrong row on the next render.
+                      key={str(invoice?.id, `row-${index}`)}
+                      className="transition-colors duration-150 hover:bg-muted/50"
                     >
-                      <td className="py-3 px-4">
-                        <Badge
-                          variant="secondary"
-                          className="font-mono text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                        >
-                          {invoice.invoice_number}
+                      <td className="px-4 py-3">
+                        <Badge variant="secondary" className="font-mono text-xs">
+                          {str(invoice?.invoice_number, "—")}
                         </Badge>
                       </td>
-                      <td className="py-3 px-4 text-gray-600 dark:text-gray-400">
-                        {formatDate(invoice.invoice_date)}
+                      <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                        {formatDate(invoice?.invoice_date)}
                       </td>
-                      <td className="py-3 px-4 text-gray-900 dark:text-white font-medium">
-                        {invoice.customer_name}
+                      <td className="px-4 py-3 font-medium text-card-foreground">
+                        {str(invoice?.customer_name, "Unnamed customer")}
                       </td>
-                      <td className="py-3 px-4 text-gray-500 dark:text-gray-400">
-                        {invoice.customer_phone || "—"}
+                      <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                        {str(invoice?.customer_phone, "—")}
                       </td>
-                      <td className="py-3 px-4 text-right">
-                        <span className="font-semibold text-gray-900 dark:text-white">
-                          {formatCurrency(invoice.final_amount)}
+                      <td className="whitespace-nowrap px-4 py-3 text-right">
+                        <span className="font-semibold tabular-nums text-card-foreground">
+                          {formatCurrency(invoice?.final_amount)}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-right">
+                      <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                            className="h-10 w-10 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                             onClick={() => onView(invoice)}
+                            title="View estimate"
+                            aria-label={`View estimate ${str(invoice?.invoice_number, "")}`}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30"
+                            className="h-10 w-10 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-300"
                             onClick={() => handleOpenWhatsapp(invoice)}
                             title="Send via WhatsApp"
+                            aria-label={`Send estimate ${str(invoice?.invoice_number, "")} on WhatsApp`}
                           >
                             <WhatsappIcon className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-gray-500 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30"
+                            className="h-10 w-10 text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/40 dark:hover:text-amber-300"
                             onClick={() => onEdit(invoice)}
+                            title="Edit estimate"
+                            aria-label={`Edit estimate ${str(invoice?.invoice_number, "")}`}
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30"
+                            className="h-10 w-10 text-destructive hover:bg-destructive/10 hover:text-destructive"
                             onClick={() => onDelete(invoice)}
+                            title="Delete estimate"
+                            aria-label={`Delete estimate ${str(invoice?.invoice_number, "")}`}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -369,106 +452,120 @@ const InvoiceHistory = ({
         </div>
       )}
 
-      {/* Mobile Cards */}
+      {/* Mobile cards (below md). The summary block is itself the "view" tap
+          target, so the action row only has to carry the four real actions. */}
       {filteredInvoices.length > 0 && (
-        <div className="md:hidden space-y-3">
-          {filteredInvoices.map((invoice) => (
+        <div className="space-y-3 md:hidden">
+          {filteredInvoices.map((invoice, index) => (
             <Card
-              key={invoice.id}
-              className="overflow-hidden border-gray-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow duration-200"
+              key={str(invoice?.id, `row-${index}`)}
+              className="overflow-hidden border-border shadow-sm"
             >
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <Badge
-                      variant="secondary"
-                      className="font-mono text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 mb-1.5"
-                    >
-                      {invoice.invoice_number}
-                    </Badge>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                      {invoice.customer_name}
+              <button
+                type="button"
+                onClick={() => onView(invoice)}
+                aria-label={`View estimate ${str(invoice?.invoice_number, "")} for ${str(
+                  invoice?.customer_name,
+                  "unnamed customer",
+                )}`}
+                className="flex w-full items-start justify-between gap-3 p-4 text-left transition-colors hover:bg-muted/50 active:bg-muted"
+              >
+                {/* min-w-0 is what actually lets the long names truncate */}
+                <div className="min-w-0 flex-1">
+                  <Badge variant="secondary" className="mb-1.5 font-mono text-xs">
+                    {str(invoice?.invoice_number, "—")}
+                  </Badge>
+                  <p className="truncate text-sm font-semibold text-card-foreground">
+                    {str(invoice?.customer_name, "Unnamed customer")}
+                  </p>
+                  {invoice?.customer_phone && (
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {str(invoice.customer_phone)}
                     </p>
-                    {invoice.customer_phone && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                        {invoice.customer_phone}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-400 dark:text-gray-500">
-                      {formatDate(invoice.invoice_date)}
-                    </p>
-                    <div className="flex items-center justify-end gap-1 mt-1">
-                      <IndianRupee className="h-3.5 w-3.5 text-gray-700 dark:text-gray-300" />
-                      <span className="text-base font-bold text-gray-900 dark:text-white">
-                        {invoice.final_amount.toLocaleString("en-IN", {
-                          minimumFractionDigits: 2,
-                        })}
-                      </span>
-                    </div>
-                  </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-slate-800">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 gap-1.5 text-xs h-8 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/30"
-                    onClick={() => onView(invoice)}
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                    View
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 gap-1.5 text-xs h-8 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-50 dark:hover:bg-green-900/30"
-                    onClick={() => handleOpenWhatsapp(invoice)}
-                  >
-                    <WhatsappIcon className="h-3.5 w-3.5" />
-                    Send
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 gap-1.5 text-xs h-8 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-900/30"
-                    onClick={() => onEdit(invoice)}
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 gap-1.5 text-xs h-8 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/30"
-                    onClick={() => onDelete(invoice)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Delete
-                  </Button>
+                <div className="shrink-0 text-right">
+                  <p className="whitespace-nowrap text-xs text-muted-foreground">
+                    {formatDate(invoice?.invoice_date)}
+                  </p>
+                  <p className="mt-1 whitespace-nowrap text-base font-bold tabular-nums text-card-foreground">
+                    {formatCurrency(invoice?.final_amount)}
+                  </p>
                 </div>
-              </CardContent>
+              </button>
+
+              {/* Four equal columns: every target stays ~80x48px even at 320px */}
+              <div className="grid grid-cols-4 divide-x divide-border border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => onView(invoice)}
+                  aria-label="View"
+                  className="flex h-12 items-center justify-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground active:bg-muted"
+                >
+                  <Eye className="h-4 w-4 shrink-0" />
+                  View
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenWhatsapp(invoice)}
+                  aria-label="Send via WhatsApp"
+                  className="flex h-12 items-center justify-center gap-1.5 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-50 active:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40 dark:active:bg-emerald-950/40"
+                >
+                  <WhatsappIcon className="h-4 w-4 shrink-0" />
+                  Send
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onEdit(invoice)}
+                  aria-label="Edit"
+                  className="flex h-12 items-center justify-center gap-1.5 text-xs font-medium text-amber-600 transition-colors hover:bg-amber-50 active:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40 dark:active:bg-amber-950/40"
+                >
+                  <Pencil className="h-4 w-4 shrink-0" />
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete(invoice)}
+                  aria-label="Delete"
+                  className="flex h-12 items-center justify-center gap-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10 active:bg-destructive/10"
+                >
+                  <Trash2 className="h-4 w-4 shrink-0" />
+                  Delete
+                </button>
+              </div>
             </Card>
           ))}
         </div>
       )}
 
       {/* WhatsApp Dialog */}
-      <Dialog open={whatsappDialogOpen} onOpenChange={setWhatsappDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+      <Dialog
+        open={whatsappDialogOpen}
+        onOpenChange={(open) => {
+          // Never yank the capture host out from under an in-flight render.
+          if (isGeneratingLink) return;
+          if (!open) closeWhatsappDialog();
+        }}
+      >
+        <DialogContent className="max-h-[85dvh] w-[calc(100vw-2rem)] overflow-y-auto sm:w-[425px] sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <WhatsappIcon className="h-5 w-5 text-green-600" />
+            <DialogTitle className="flex items-center gap-2 text-left">
+              <WhatsappIcon className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
               Send via WhatsApp
             </DialogTitle>
+            <DialogDescription className="text-left">
+              Check the number before sending — the estimate goes to whoever owns it.
+            </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-4 py-2">
             <div className="space-y-2">
               <Label htmlFor="whatsapp-number" className="text-sm font-medium">
                 WhatsApp Number
               </Label>
               <Input
                 id="whatsapp-number"
+                type="tel"
+                inputMode="tel"
                 value={whatsappNumber}
                 onChange={(e) => {
                   let val = e.target.value;
@@ -478,27 +575,46 @@ const InvoiceHistory = ({
                   }
                   setWhatsappNumber(val);
                 }}
-                className="w-full"
+                aria-invalid={!isWhatsappNumberValid}
+                aria-describedby="whatsapp-number-hint"
+                className="h-11 w-full text-base"
                 placeholder="+91 XXXXXXXXXX"
               />
-              <p className="text-xs text-slate-500 mt-2">
-                Note: This will generate a secure online link to your PDF and include it in the WhatsApp message automatically.
+              <p
+                id="whatsapp-number-hint"
+                className={`mt-2 text-xs leading-relaxed ${
+                  isWhatsappNumberValid ? "text-muted-foreground" : "text-destructive"
+                }`}
+              >
+                {isWhatsappNumberValid
+                  ? // The two paths really do differ: on device the PDF is
+                    // attached and nothing leaves the phone, on the web it has
+                    // to be uploaded first because WhatsApp Web takes no file.
+                    isNative
+                    ? "The estimate is attached to the message as a PDF. Nothing is uploaded."
+                    : "A link to the PDF is generated and added to the message automatically."
+                  : "Enter the full number including the country code, e.g. +91 98765 43210."}
               </p>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setWhatsappDialogOpen(false)} disabled={isGeneratingLink}>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              className="h-11"
+              onClick={closeWhatsappDialog}
+              disabled={isGeneratingLink}
+            >
               Cancel
             </Button>
-            <Button 
-              className="bg-green-600 hover:bg-green-700 text-white"
+            <Button
+              className="h-11 bg-emerald-600 text-white hover:bg-emerald-700"
               onClick={handleSendWhatsapp}
-              disabled={isGeneratingLink}
+              disabled={isGeneratingLink || !isWhatsappNumberValid}
             >
               {isGeneratingLink ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating...
+                  Preparing PDF...
                 </>
               ) : (
                 "Send via WhatsApp"
@@ -510,11 +626,11 @@ const InvoiceHistory = ({
 
       {/* Hidden Invoice Preview for PDF Generation */}
       {selectedInvoiceForWhatsapp && (
-        <div style={{ position: "absolute", left: "-9999px", top: "-9999px" }} aria-hidden="true">
-          <InvoicePreview 
-            invoice={selectedInvoiceForWhatsapp} 
-            company={company} 
-            onBack={() => {}} 
+        <div className="pdf-capture-host" aria-hidden="true" ref={captureHostRef}>
+          <InvoicePreview
+            invoice={selectedInvoiceForWhatsapp}
+            company={company}
+            onBack={() => {}}
           />
         </div>
       )}

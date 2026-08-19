@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { beginUserSignOut } from "@/native/bootstrap";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +15,7 @@ import { LogOut, Store, Phone, Mail, MapPin, FileText, ExternalLink, Trash2, Mes
 import ThemeToggle from "@/components/ThemeToggle";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { exportMasterDataToExcel } from "@/lib/exportUtils";
-import { downloadInvoice } from "@/pages/Billing";
+import { downloadInvoice } from "@/lib/receipt";
 import { getPlanName } from "@/components/SubscriptionDialog";
 
 const MasterAdmin = () => {
@@ -100,16 +101,23 @@ const MasterAdmin = () => {
       // @ts-ignore - html2pdf is dynamically loaded or available globally
       const html2pdf = (await import('html2pdf.js')).default;
       const element = document.getElementById('analytics-report-content');
+      // The report container only exists once the analytics query has settled;
+      // exporting mid-refetch used to hand html2pdf a null and fail opaquely.
+      if (!element) {
+        toast.error("Report is still loading — try again in a moment");
+        return;
+      }
 
-      const opt = {
-        margin: 0.5,
-        filename: `${companyName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_analytics_report.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' }
-      };
-
-      await html2pdf().set(opt).from(element).save();
+      await html2pdf()
+        .set({
+          margin: 0.5,
+          filename: `${companyName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_analytics_report.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' },
+        })
+        .from(element)
+        .save();
       toast.success("PDF Downloaded successfully!");
     } catch (e) {
       console.error(e);
@@ -198,6 +206,7 @@ const MasterAdmin = () => {
   });
 
   const handleLogout = async () => {
+    beginUserSignOut();
     await supabase.auth.signOut();
     navigate("/");
   };

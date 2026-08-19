@@ -4,10 +4,22 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ShoppingCart, Check, Plus, Minus, ChevronLeft, ChevronRight, Eye } from "lucide-react";
-import { useState, useEffect, memo } from "react";
+import { ShoppingCart, Check, Plus, Minus, ChevronLeft, ChevronRight } from "lucide-react";
+import { useState, useEffect, useMemo, memo } from "react";
 import ProductViewDialog from "@/components/ProductViewDialog";
+import ProductImage from "@/components/ProductImage";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  asText,
+  formatPrice,
+  isSizeSoldOut,
+  parseFeatureSizes,
+  productFeatures,
+  productImages,
+  productName,
+  sizeLabel,
+  splitList,
+} from "@/lib/productData";
 
 type Product = Tables<"products">;
 
@@ -18,24 +30,20 @@ const ProductCard = ({ product }: { product: Product }) => {
   const [currentImageIdx, setCurrentImageIdx] = useState(0);
   const [viewOpen, setViewOpen] = useState(false);
 
-  const allImages: string[] = [];
-  if (product.image_url) allImages.push(product.image_url);
-  if (product.images) {
-    product.images.forEach((img) => { if (img && !allImages.includes(img)) allImages.push(img); });
-  }
+  const name = productName(product);
+  const allImages = useMemo(() => productImages(product), [product]);
 
-  const globalSizes = product.size ? product.size.split(",").map((s) => s.trim()).filter(Boolean) : [];
-  const features = product.features || [];
-  const featureSizes = (product as any).feature_sizes as Record<string, string[]> | null;
-  const hasFeatureSizes = featureSizes && Object.keys(featureSizes).length > 0;
+  const globalSizes = splitList(product.size);
+  const features = useMemo(() => productFeatures(product), [product]);
+  // feature_sizes is JSONB from older builds, so it is parsed rather than cast.
+  const { byFeature } = useMemo(() => parseFeatureSizes(product.feature_sizes), [product.feature_sizes]);
+  const hasFeatureSizes = Object.keys(byFeature).length > 0;
 
   const [selectedFeature, setSelectedFeature] = useState<string | null>(
     features.length === 1 ? features[0] : null
   );
 
-  const sizes = hasFeatureSizes && selectedFeature
-    ? (featureSizes[selectedFeature] || [])
-    : globalSizes;
+  const sizes = hasFeatureSizes && selectedFeature ? (byFeature[selectedFeature] ?? []) : globalSizes;
 
   const [selectedSize, setSelectedSize] = useState<string | null>(
     sizes.length === 1 ? sizes[0] : null
@@ -49,6 +57,9 @@ const ProductCard = ({ product }: { product: Product }) => {
       setSelectedSize(null);
     }
   }, [selectedFeature, JSON.stringify(sizes)]);
+
+  // A gallery that shrinks (a deleted photo) must not leave the index past the end.
+  const imageIdx = allImages.length > 0 ? Math.min(currentImageIdx, allImages.length - 1) : 0;
 
   const handleAdd = () => {
     if (sizes.length > 0 && !selectedSize) return;
@@ -74,58 +85,61 @@ const ProductCard = ({ product }: { product: Product }) => {
   const nextImage = () => setCurrentImageIdx((i) => (i + 1) % allImages.length);
   const prevImage = () => setCurrentImageIdx((i) => (i - 1 + allImages.length) % allImages.length);
 
+  const price = Number(product.price) || 0;
+
   return (
     <>
       <Card className="group overflow-hidden hover:shadow-lg transition-all duration-300 border-border/50 flex flex-col h-full bg-card">
-        <div className="aspect-square w-full overflow-hidden bg-muted relative cursor-pointer" onClick={() => allImages.length > 0 && handleView()}>
-          {allImages.length > 0 ? (
+        <div
+          className="aspect-square w-full overflow-hidden bg-muted relative cursor-pointer"
+          onClick={() => allImages.length > 0 && handleView()}
+        >
+          <ProductImage
+            src={allImages[imageIdx]}
+            alt={name}
+            className="h-full w-full transition-transform duration-500 group-hover:scale-105"
+            iconClassName="h-10 w-10"
+            label="No photo yet"
+          />
+          {allImages.length > 1 && (
             <>
-              <img
-                src={allImages[currentImageIdx]}
-                alt={product.name}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                loading="lazy"
-              />
-              {allImages.length > 1 && (
-                <>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); prevImage(); }}
-                    className="absolute left-1 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background rounded-full p-2 opacity-0 group-hover:opacity-100 transition-all shadow-sm"
-                  >
-                    <ChevronLeft className="h-4 w-4 text-foreground" />
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); nextImage(); }}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background rounded-full p-2 opacity-0 group-hover:opacity-100 transition-all shadow-sm"
-                  >
-                    <ChevronRight className="h-4 w-4 text-foreground" />
-                  </button>
-                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 bg-background/50 px-2 py-1.5 rounded-full backdrop-blur-sm">
-                    {allImages.map((_, i) => (
-                      <span key={i} className={`w-1.5 h-1.5 rounded-full transition-all ${i === currentImageIdx ? "bg-primary w-3" : "bg-primary/40"}`} />
-                    ))}
-                  </div>
-                </>
-              )}
+              {/* Hover-only arrows, hidden below sm: on a touch screen they were
+                  invisible but still tappable, so an edge tap swapped the photo
+                  instead of opening the viewer. */}
+              <button
+                aria-label="Previous photo"
+                onClick={(e) => { e.stopPropagation(); prevImage(); }}
+                className="absolute left-1 top-1/2 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-background/80 opacity-0 shadow-sm transition-all hover:bg-background group-hover:opacity-100 sm:flex"
+              >
+                <ChevronLeft className="h-4 w-4 text-foreground" />
+              </button>
+              <button
+                aria-label="Next photo"
+                onClick={(e) => { e.stopPropagation(); nextImage(); }}
+                className="absolute right-1 top-1/2 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-background/80 opacity-0 shadow-sm transition-all hover:bg-background group-hover:opacity-100 sm:flex"
+              >
+                <ChevronRight className="h-4 w-4 text-foreground" />
+              </button>
+              <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5 rounded-full bg-background/60 px-2 py-1.5 backdrop-blur-sm">
+                {allImages.map((_, i) => (
+                  <span key={i} className={`h-1.5 rounded-full transition-all ${i === imageIdx ? "w-3 bg-primary" : "w-1.5 bg-primary/40"}`} />
+                ))}
+              </div>
             </>
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-muted-foreground/30 bg-secondary/30">
-              <ShoppingCart className="h-12 w-12" />
-            </div>
           )}
           {product.is_trending && (
             <Badge className="absolute top-3 left-3 bg-primary hover:bg-primary text-primary-foreground font-bold tracking-wider text-[10px] uppercase shadow-sm">Trending</Badge>
           )}
         </div>
 
-        <CardContent className="p-4 sm:p-5 space-y-4 flex flex-col flex-1">
-          <div className="space-y-1.5">
-            <h3 className="font-bold text-base sm:text-lg line-clamp-2 leading-tight text-foreground">{product.name}</h3>
-            {product.price > 0 && (
-              <p className="text-sm font-bold text-primary">₹{product.price}</p>
+        <CardContent className="flex flex-1 flex-col space-y-4 p-3 sm:p-5">
+          <div className="min-w-0 space-y-1.5">
+            <h3 className="font-bold text-base sm:text-lg line-clamp-2 leading-tight text-foreground break-anywhere">{name}</h3>
+            {price > 0 && (
+              <p className="text-sm font-bold text-primary">₹{formatPrice(price)}</p>
             )}
-            {product.description && (
-              <p className="text-[13px] text-muted-foreground line-clamp-2">{product.description}</p>
+            {asText(product.description).trim() && (
+              <p className="text-[13px] text-muted-foreground line-clamp-2 break-anywhere">{asText(product.description)}</p>
             )}
           </div>
 
@@ -135,17 +149,17 @@ const ProductCard = ({ product }: { product: Product }) => {
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Option</label>
                 {features.length === 1 ? (
-                  <Badge variant="secondary" className="text-xs bg-secondary/50 text-foreground py-1 px-3 w-full justify-start rounded-lg border font-medium">
+                  <Badge variant="secondary" className="text-xs bg-secondary/50 text-foreground py-1 px-3 w-full justify-start rounded-lg border font-medium break-anywhere">
                     {features[0]}
                   </Badge>
                 ) : (
                   <Select value={selectedFeature || ""} onValueChange={(v) => { setSelectedFeature(v); setSelectedSize(null); }}>
-                    <SelectTrigger className="h-9 text-sm bg-background border-input text-foreground font-medium rounded-lg">
+                    <SelectTrigger className="h-11 text-sm bg-background border-input text-foreground font-medium rounded-lg">
                       <SelectValue placeholder="Select option" />
                     </SelectTrigger>
                     <SelectContent className="bg-popover border-border z-50">
                       {features.map((f) => (
-                        <SelectItem key={f} value={f} className="text-sm font-medium text-popover-foreground py-2 focus:bg-primary/10 focus:text-primary cursor-pointer transition-colors">
+                        <SelectItem key={f} value={f} className="text-sm font-medium text-popover-foreground py-2.5 focus:bg-primary/10 focus:text-primary cursor-pointer transition-colors">
                           {f}
                         </SelectItem>
                       ))}
@@ -160,26 +174,25 @@ const ProductCard = ({ product }: { product: Product }) => {
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Size</label>
                 {sizes.length === 1 ? (
-                  <Badge variant="secondary" className="text-xs bg-secondary/50 text-foreground py-1 px-3 font-medium rounded-lg border">
-                    {sizes[0]}
+                  <Badge variant="secondary" className="text-xs bg-secondary/50 text-foreground py-1 px-3 font-medium rounded-lg border break-anywhere">
+                    {sizeLabel(sizes[0])}
                   </Badge>
                 ) : sizes.length > 3 ? (
                   <Select value={selectedSize || ""} onValueChange={setSelectedSize}>
-                    <SelectTrigger className="h-9 text-sm bg-background border-input text-foreground font-medium rounded-lg">
+                    <SelectTrigger className="h-11 text-sm bg-background border-input text-foreground font-medium rounded-lg">
                       <SelectValue placeholder="Select size" />
                     </SelectTrigger>
                     <SelectContent className="bg-popover border-border z-50">
                       {sizes.map((s) => {
-                        const isOutOfStock = s.startsWith("~") || s.endsWith("~");
-                        const displaySize = s.replace(/~/g, "").trim();
+                        const soldOut = isSizeSoldOut(s);
                         return (
                           <SelectItem
                             key={s}
                             value={s}
-                            disabled={isOutOfStock}
-                            className={`text-sm font-medium py-2 focus:bg-primary/10 focus:text-primary cursor-pointer transition-colors ${isOutOfStock ? "opacity-50 line-through" : ""}`}
+                            disabled={soldOut}
+                            className={`text-sm font-medium py-2.5 focus:bg-primary/10 focus:text-primary cursor-pointer transition-colors ${soldOut ? "opacity-50 line-through" : ""}`}
                           >
-                            {displaySize}
+                            {sizeLabel(s)}
                           </SelectItem>
                         );
                       })}
@@ -188,21 +201,20 @@ const ProductCard = ({ product }: { product: Product }) => {
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     {sizes.map((s) => {
-                      const isOutOfStock = s.startsWith("~") || s.endsWith("~");
-                      const displaySize = s.replace(/~/g, "").trim();
+                      const soldOut = isSizeSoldOut(s);
                       return (
                         <button
                           key={s}
-                          disabled={isOutOfStock}
-                          onClick={() => !isOutOfStock && setSelectedSize(s)}
-                          className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${isOutOfStock
+                          disabled={soldOut}
+                          onClick={() => !soldOut && setSelectedSize(s)}
+                          className={`min-h-[44px] min-w-[44px] break-anywhere rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${soldOut
                             ? "opacity-50 cursor-not-allowed line-through bg-muted/50 text-muted-foreground"
                             : selectedSize === s
                               ? "bg-primary text-primary-foreground border-primary shadow-sm"
                               : "bg-background text-foreground border-border hover:border-primary hover:bg-primary/10 hover:text-primary"
                             }`}
                         >
-                          {displaySize}
+                          {sizeLabel(s)}
                         </button>
                       );
                     })}
@@ -214,26 +226,33 @@ const ProductCard = ({ product }: { product: Product }) => {
             <div className="space-y-1.5">
               <div className="flex items-center gap-2">
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Quantity</label>
-                {product.quantity_unit && <span className="text-xs font-medium text-muted-foreground mt-0.5">{product.quantity_unit}</span>}
+                {asText(product.quantity_unit).trim() && (
+                  <span className="mt-0.5 min-w-0 truncate text-xs font-medium text-muted-foreground">{asText(product.quantity_unit)}</span>
+                )}
               </div>
-              <div className="flex items-center">
-                <Button size="icon" variant="outline" className="h-8 w-8 rounded-l-lg rounded-r-none border-r-0 bg-background text-foreground shrink-0" onClick={() => setQuantity(Math.max(1, quantity - 1))}>
+              {/* The stepper is width-driven, not fixed: at 360px this card is
+                  ~124px wide inside a two-column grid, so the readout shrinks
+                  while the two 44px targets stay put. */}
+              <div className="flex w-full items-center">
+                <Button size="icon" variant="outline" aria-label="Decrease quantity" className="h-11 w-11 shrink-0 rounded-l-lg rounded-r-none border-r-0 bg-background text-foreground" onClick={() => setQuantity(Math.max(1, quantity - 1))}>
                   <Minus className="h-3 w-3" />
                 </Button>
                 {product.allow_custom_quantity ? (
                   <input
                     type="number"
                     min="1"
+                    inputMode="numeric"
+                    aria-label="Quantity"
                     value={quantity}
                     onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="h-8 w-14 flex items-center justify-center text-center font-semibold text-sm border border-y-input border-x-0 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 z-10"
+                    className="z-10 h-11 min-w-0 flex-1 border border-x-0 border-y-input bg-background px-1 text-center text-base font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
                   />
                 ) : (
-                  <div className="h-8 w-12 flex items-center justify-center font-semibold text-sm border-y border-input bg-background text-foreground">
+                  <div className="flex h-11 min-w-0 flex-1 items-center justify-center border-y border-input bg-background text-base font-semibold text-foreground">
                     {quantity}
                   </div>
                 )}
-                <Button size="icon" variant="outline" className="h-8 w-8 rounded-r-lg rounded-l-none border-l-0 bg-background text-foreground shrink-0" onClick={() => setQuantity(quantity + 1)}>
+                <Button size="icon" variant="outline" aria-label="Increase quantity" className="h-11 w-11 shrink-0 rounded-l-none rounded-r-lg border-l-0 bg-background text-foreground" onClick={() => setQuantity(quantity + 1)}>
                   <Plus className="h-3 w-3" />
                 </Button>
               </div>
@@ -242,7 +261,7 @@ const ProductCard = ({ product }: { product: Product }) => {
 
           <div className="pt-2 mt-auto">
             <Button
-              className={`w-full h-11 font-bold tracking-wide rounded-xl shadow-sm transition-all ${added ? "bg-green-600 hover:bg-green-700 text-white" : "bg-primary hover:bg-primary/90 text-primary-foreground"}`}
+              className={`w-full h-11 font-bold tracking-wide rounded-xl shadow-sm transition-all ${added ? "bg-emerald-600 hover:bg-emerald-600 text-primary-foreground" : "bg-primary hover:bg-primary/90 text-primary-foreground"}`}
               onClick={handleAdd}
               disabled={(sizes.length > 0 && !selectedSize) || (features.length > 0 && !selectedFeature)}
             >
@@ -264,7 +283,7 @@ const ProductCard = ({ product }: { product: Product }) => {
         open={viewOpen}
         onOpenChange={setViewOpen}
         images={allImages}
-        productName={product.name}
+        productName={name}
       />
     </>
   );

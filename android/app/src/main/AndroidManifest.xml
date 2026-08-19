@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+        <!--
+            Backups are OFF on purpose. Android auto-backup would copy this app's
+            shared preferences (which is where Capacitor Preferences stores the
+            Supabase auth session) and the WebView IndexedDB holding the offline
+            estimate database into the user's Google Drive, where it is outside
+            our control and outside the retention promises in the privacy policy.
+            data_extraction_rules.xml is the Android 12+ equivalent and is kept in
+            sync so device-to-device transfer cannot leak the session either.
+        -->
+
+        <activity
+            android:name=".MainActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:launchMode="singleTask"
+            android:exported="true"
+            android:resizeableActivity="true"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+                App Links. Shared storefront and invoice links open inside the app
+                instead of the browser. autoVerify requires
+                https://catalogshare.online/.well-known/assetlinks.json to list the
+                SHA-256 of the signing certificate (use the Play App Signing cert,
+                not the upload cert) - see RELEASE.md.
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="https" android:host="catalogshare.online" android:pathPrefix="/store" />
+                <data android:scheme="https" android:host="catalogshare.online" android:pathPrefix="/invoices" />
+                <data android:scheme="https" android:host="www.catalogshare.online" android:pathPrefix="/store" />
+                <data android:scheme="https" android:host="www.catalogshare.online" android:pathPrefix="/invoices" />
+            </intent-filter>
+        </activity>
+
+        <!--
+            AdMob application id.
+
+            !! REPLACE BEFORE RELEASE !!
+            This is Google's public TEST App ID. Swap it for the real `appId` from
+            src/native/adsConfig.ts (LIVE_IDS.appId) at the same time you flip
+            USE_LIVE_ADS to true - the two MUST match. The Google Mobile Ads SDK
+            throws at Application.onCreate() and hard-crashes the app on launch if
+            this meta-data tag is missing or malformed, which is why the test id
+            ships here rather than nothing at all.
+        -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-3940256099942544~3347511713"
+        />
+
+        <!--
+            Ads are only ever requested for free-tier users, and never for anyone
+            under 18, so the SDK is initialised lazily from JS rather than at
+            process start. This keeps cold start off the ads code path entirely.
+        -->
+        <meta-data android:name="com.google.android.gms.ads.flag.OPTIMIZE_INITIALIZATION" android:value="true" />
+        <meta-data android:name="com.google.android.gms.ads.flag.OPTIMIZE_AD_LOADING" android:value="true" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+
+    <!-- Permissions -->
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Drives the offline banner and the queued-sync retry in @/hooks/useNetwork. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Required by Play policy for any app that ships the Google Mobile Ads SDK. -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
+    <!--
+        Product and logo images are chosen with a plain <input type="file"> in
+        the WebView (see CompanyEditDialog / AdminDashboard / Register), which
+        needs read access to the gallery. There is deliberately no CAMERA
+        permission: nothing in the app opens the camera, and Play flags an
+        unused hardware permission in the Data Safety review.
+    -->
+    <!--
+        Biometric app lock (@/native/biometrics + @/components/AppLockGate).
+        The @capgo/capacitor-native-biometric manifest declares only its
+        AuthActivity, no permissions, so both names are declared here.
+        USE_FINGERPRINT is the pre-API-28 spelling and is what androidx.biometric
+        falls back to on API 24-27, which this app still supports (minSdk 24).
+        Neither is capped with maxSdkVersion: androidx.biometric declares
+        USE_FINGERPRINT itself, and a differing attribute here would fail the
+        manifest merge rather than merge silently.
+    -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <uses-permission android:name="android.permission.USE_FINGERPRINT" />
+    <!-- Picking an existing product photo from the gallery. Android 13+. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- Same thing on Android 12L and older, where READ_MEDIA_IMAGES does not exist. -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+
+    <!--
+        Package visibility (Android 11+). Without these, queryIntentActivities and
+        resolveActivity return nothing and the corresponding share/pay/call button
+        silently does nothing on a real device.
+    -->
+    <queries>
+        <!-- WhatsApp consumer + WhatsApp Business: openWhatsApp() in @/native/files. -->
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
+
+        <!-- "Email us" -> ACTION_SENDTO mailto:catalogshare123@gmail.com -->
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
+
+        <!-- "Call support" -> ACTION_DIAL tel:+917625025686 -->
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+
+        <!-- Opening the storefront / policy pages in the system browser. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+
+        <!-- Sharing a generated estimate or invoice PDF. -->
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="application/pdf" />
+        </intent>
+
+        <!-- Razorpay hands the payment off to GPay / PhonePe / Paytm over upi:. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="upi" />
+        </intent>
+    </queries>
+</manifest>

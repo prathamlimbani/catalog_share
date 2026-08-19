@@ -1,9 +1,12 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- viewport-fit=cover is required for env(safe-area-inset-*) to resolve to
+       anything other than 0 — without it the notch/gesture-bar padding is inert. -->
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0" />
   <title>CatalogShare — Create & Share Product Catalogs</title>
   <meta name="description"
     content="CatalogShare helps businesses create beautiful, shareable product catalogs with a single link." />
@@ -13,7 +16,22 @@
   <link rel="icon" type="image/png" href="/logo-icon.png" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-  <meta name="theme-color" content="#1a73e8" />
+  <meta name="theme-color" content="#FFFFFF" />
+  <script>
+    // Runs before the stylesheet paints, so the very first frame is already the
+    // right theme. Defaults to the device setting; an explicit choice wins.
+    (function () {
+      try {
+        var saved = localStorage.getItem('theme');
+        var dark = saved === 'dark' ||
+          (saved !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', dark);
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+        var m = document.querySelector('meta[name="theme-color"]');
+        if (m) m.setAttribute('content', dark ? '#0B1020' : '#FFFFFF');
+      } catch (e) { /* storage blocked - fall through to light */ }
+    })();
+  </script>
 
   <meta property="og:title" content="CatalogShare — Create & Share Product Catalogs" />
   <meta property="og:description"

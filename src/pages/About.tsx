@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Store, Heart, Linkedin, Globe, Send, AlertTriangle, Sparkles, Code2, ArrowLeft, Mail } from "lucide-react";
+import { Heart, Linkedin, Globe, Send, Sparkles, Code2, ArrowLeft } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 
 const About = () => {
@@ -59,7 +59,10 @@ const About = () => {
 
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-background to-accent">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(var(--primary),0.08),transparent_50%)]" />
+        {/* --primary is an HSL triplet ("25 95% 53%"), so it can only be used inside
+            hsl(). rgba(var(--primary), .08) expanded to an invalid colour and CSS
+            dropped the whole gradient, leaving the hero with no glow in any theme. */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,hsl(var(--primary)/0.08),transparent_50%)]" />
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 text-center relative z-10">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-sm text-primary mb-6">
             <Sparkles className="h-4 w-4" />

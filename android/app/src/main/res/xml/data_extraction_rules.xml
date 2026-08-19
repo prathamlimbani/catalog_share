@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android 12+ (API 31) backup / transfer rules.
+
+    android:allowBackup="false" in the manifest already blocks both channels; this
+    file exists so the intent survives anyone flipping that flag back on, and so
+    the "what leaves the device" answer stays reviewable in one place.
+
+    What must never leave the device:
+      * sharedpref CapacitorStorage - @capacitor/preferences writes here, and that
+        is where the Supabase session (access + refresh token) and the cached
+        entitlement live. A restored session on a stranger's phone is a full
+        account takeover.
+      * app_webview/ - the WebView profile directory. The offline estimate
+        database (IndexedDB via `idb`), localStorage and the HTTP cache all live
+        underneath it, so it carries customer names, phone numbers and pricing.
+      * The legacy WebView SQLite databases, same reasoning.
+-->
+<data-extraction-rules>
+
+    <!-- Google Drive / Play auto-backup. -->
+    <cloud-backup disableIfNoEncryptionCapabilities="true">
+        <exclude domain="sharedpref" path="CapacitorStorage.xml" />
+        <exclude domain="sharedpref" path="CapacitorStorage" />
+        <exclude domain="sharedpref" path="WebViewChromiumPrefs.xml" />
+        <exclude domain="root" path="app_webview" />
+        <exclude domain="root" path="app_textures" />
+        <exclude domain="database" path="webview.db" />
+        <exclude domain="database" path="webviewCache.db" />
+    </cloud-backup>
+
+    <!-- Direct device-to-device transfer when the user sets up a new phone. -->
+    <device-transfer>
+        <exclude domain="sharedpref" path="CapacitorStorage.xml" />
+        <exclude domain="sharedpref" path="CapacitorStorage" />
+        <exclude domain="sharedpref" path="WebViewChromiumPrefs.xml" />
+        <exclude domain="root" path="app_webview" />
+        <exclude domain="root" path="app_textures" />
+        <exclude domain="database" path="webview.db" />
+        <exclude domain="database" path="webviewCache.db" />
+    </device-transfer>
+
+</data-extraction-rules>
