@@ -7,7 +7,6 @@ import {
   Crown,
   FileText,
   Fingerprint,
-  LifeBuoy,
   LogOut,
   Mail,
   Pencil,
@@ -38,8 +37,14 @@ import {
   type BiometricStatus,
 } from "@/native/biometrics";
 import { isNative } from "@/native/platform";
-import { notify, openWhatsApp } from "@/native/files";
-import { SUPPORT_EMAIL, SUPPORT_PHONE, SUPPORT_PHONE_DIGITS, APP_VERSION } from "@/lib/appInfo";
+import { notify } from "@/native/files";
+import {
+  SUPPORT_EMAIL,
+  SUPPORT_PHONE,
+  SUPPORT_PHONE_DIGITS,
+  SUPPORT_PHONE_ENABLED,
+  APP_VERSION,
+} from "@/lib/appInfo";
 import { toast } from "sonner";
 
 interface RowProps {
@@ -393,23 +398,14 @@ const More = () => {
               window.location.href = `mailto:${SUPPORT_EMAIL}?subject=CatalogShare%20app%20support`;
             }}
           />
-          <Row
-            icon={<Phone className="h-4 w-4" />}
-            label="Call support"
-            hint={entitlement.supportPhoneUnlocked ? SUPPORT_PHONE : "Pro & Support plans only"}
-            onClick={handleCallSupport}
-          />
-          <Row
-            icon={<LifeBuoy className="h-4 w-4" />}
-            label="WhatsApp us"
-            hint="Fastest response"
-            onClick={() =>
-              void openWhatsApp(
-                SUPPORT_PHONE_DIGITS,
-                `Hi CatalogShare team, I need help with the app.\n\nBusiness: ${company?.name ?? "-"}\nApp version: ${APP_VERSION}`,
-              )
-            }
-          />
+          {SUPPORT_PHONE_ENABLED && (
+            <Row
+              icon={<Phone className="h-4 w-4" />}
+              label="Call support"
+              hint={entitlement.supportPhoneUnlocked ? SUPPORT_PHONE : "Pro & Support plans only"}
+              onClick={handleCallSupport}
+            />
+          )}
         </Section>
 
         {isNative && entitlement.adsEnabled && (

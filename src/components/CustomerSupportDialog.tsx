@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SUPPORT_PHONE, SUPPORT_PHONE_DIGITS, SUPPORT_PHONE_ENABLED } from "@/lib/appInfo";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Mail, Phone, Lock } from "lucide-react";
@@ -59,13 +60,13 @@ export function CustomerSupportDialog({ children, externalOpen, onExternalOpenCh
                         className={`h-auto py-5 flex flex-col gap-3 relative overflow-hidden group shadow-sm ${!canCall ? 'opacity-80 bg-muted/30 border-dashed cursor-not-allowed' : 'hover:border-primary/50'}`}
                     >
                         {canCall ? (
-                            <a href="tel:+917625025686">
+                            <a href={`tel:${SUPPORT_PHONE_DIGITS}`}>
                                 <div className="bg-primary/10 p-3 rounded-full group-hover:bg-primary/20 transition-colors">
                                     <Phone className="h-6 w-6 text-primary group-hover:scale-110 transition-transform" />
                                 </div>
                                 <div className="text-center">
                                     <span className="font-semibold block text-base border-b-0">Call Support</span>
-                                    <span className="text-sm text-muted-foreground mt-1 block">+91 76250 25686</span>
+                                    <span className="text-sm text-muted-foreground mt-1 block">{SUPPORT_PHONE}</span>
                                 </div>
                             </a>
                         ) : (

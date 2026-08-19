@@ -41,8 +41,8 @@ export interface ReceiptData {
   status: string;
 }
 
-const SUPPORT_EMAIL = "catalogshare123@gmail.com";
-const SUPPORT_PHONE = "+91 76250 25686";
+import { SUPPORT_EMAIL, SUPPORT_PHONE, SUPPORT_PHONE_ENABLED } from "@/lib/appInfo";
+
 const WEBSITE = "https://catalogshare.online";
 
 /**
@@ -341,7 +341,7 @@ export function buildReceiptHtml(data: ReceiptData): string {
   </div>
 
   <div class="cs-foot">
-    <div>Questions about this payment? Write to <strong>${escapeHtml(SUPPORT_EMAIL)}</strong> or call <strong>${escapeHtml(SUPPORT_PHONE)}</strong>.</div>
+    <div>Questions about this payment? Write to <strong>${escapeHtml(SUPPORT_EMAIL)}</strong>${SUPPORT_PHONE_ENABLED ? ` or call <strong>${escapeHtml(SUPPORT_PHONE)}</strong>` : ""}.</div>
     <div>Thank you for choosing <strong>CatalogShare</strong> &middot; ${escapeHtml(WEBSITE)}</div>
   </div>
 </div>
