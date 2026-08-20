@@ -222,7 +222,7 @@ const More = () => {
   const handleLogout = async () => {
     beginUserSignOut();
     await supabase.auth.signOut();
-    navigate("/login", { replace: true });
+    navigate("/", { replace: true });
   };
 
   // `company` is an untyped row and every one of these columns is nullable, so

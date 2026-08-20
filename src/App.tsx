@@ -9,6 +9,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { isAppBuild, isNative } from "@/native/platform";
 import { installAuthListener } from "@/native/bootstrap";
 import DeepLinkHandler from "@/components/DeepLinkHandler";
+import HomeRoute from "@/components/HomeRoute";
 import AppLockGate from "@/components/AppLockGate";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
@@ -79,17 +80,13 @@ const AuthWatcher = () => {
   useEffect(() => {
     return installAuthListener(() => {
       queryClient.clear();
-      window.location.replace("/login");
+      // Home, not /login: the welcome page offers both signing in and
+      // creating a new company, which a bare form does not.
+      window.location.replace("/");
     });
   }, []);
   return null;
 };
-
-/**
- * The app opens on Estimates, not on the marketing site — a packaged app has
- * no reason to show a landing page to someone who already installed it.
- */
-const AppHome = () => <Navigate to="/invoices" replace />;
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -109,9 +106,11 @@ const App = () => (
             <ErrorBoundary>
               <Suspense fallback={<Loading />}>
                 <Routes>
-                  {/* Home differs by target: marketing site on the web, straight to
-                      work in the app. */}
-                  <Route path="/" element={isAppBuild ? <AppHome /> : <Landing />} />
+                  {/* Same home page in both targets. In the app HomeRoute sends a
+                      signed-in merchant straight to work, and shows the welcome
+                      page — with its Login and Create Your Catalog actions — to
+                      everyone else. */}
+                  <Route path="/" element={isAppBuild ? <HomeRoute /> : <Landing />} />
 
                   <Route path="/about" element={<About />} />
                   <Route path="/pricing" element={<Pricing />} />

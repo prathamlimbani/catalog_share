@@ -292,7 +292,7 @@ const Invoices = () => {
   const handleLogout = async () => {
     beginUserSignOut();
     await supabase.auth.signOut();
-    navigate("/login", { replace: true });
+    navigate("/", { replace: true });
   };
 
   const filteredEstimates = useMemo(() => {
