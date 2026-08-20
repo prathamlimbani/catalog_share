@@ -93,7 +93,7 @@ const LegalPage = ({ title, effectiveDate, lastUpdated, children }: LegalPagePro
           className="mt-6 text-xs text-muted-foreground"
           style={{ paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom))" }}
         >
-          CatalogShare, India &middot; catalogshare123@gmail.com &middot; +91 76250 25686
+          CatalogShare, India &middot; catalogshare123@gmail.com
         </p>
       </main>
     </div>

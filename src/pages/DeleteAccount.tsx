@@ -285,9 +285,8 @@ const DeleteAccount = () => {
         <LegalStrong>Account deletion request</LegalStrong>, and include your company name and
         registered phone number. We verify that the request comes from the account holder, delete the
         account, and confirm by reply. Requests are actioned within{" "}
-        <LegalStrong>30 days</LegalStrong>. You can also call{" "}
-        <LegalStrong>+91 76250 25686</LegalStrong> (Monday to Saturday, 10:00 to 19:00 IST), though we
-        will still ask for the request in writing so the audit trail is clear.
+        <LegalStrong>30 days</LegalStrong>. We ask for deletion requests in writing so the audit
+        trail is clear.
       </LegalText>
 
       <LegalHeading>7. Deleting the app is not deleting your account</LegalHeading>

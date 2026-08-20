@@ -29,8 +29,7 @@ const Privacy = () => {
         CatalogShare (&ldquo;CatalogShare&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;) operates the
         CatalogShare app (Google Play package <LegalStrong>in.catalogshare.app</LegalStrong>) and the
         website <LegalStrong>https://catalogshare.online</LegalStrong>. We are based in Gujarat, India.
-        You can reach us at <LegalStrong>catalogshare123@gmail.com</LegalStrong> or{" "}
-        <LegalStrong>+91 76250 25686</LegalStrong>.
+        You can reach us at <LegalStrong>catalogshare123@gmail.com</LegalStrong>.
       </LegalText>
 
       <LegalHeading>2. Two different roles</LegalHeading>
@@ -348,9 +347,6 @@ const Privacy = () => {
           <LegalStrong>Email:</LegalStrong> catalogshare123@gmail.com
         </LegalItem>
         <LegalItem>
-          <LegalStrong>Phone:</LegalStrong> +91 76250 25686
-        </LegalItem>
-        <LegalItem>
           <LegalStrong>Address:</LegalStrong> CatalogShare, Gujarat, India (full postal address supplied
           on request)
         </LegalItem>
@@ -367,8 +363,7 @@ const Privacy = () => {
       <LegalHeading>16. Contact us</LegalHeading>
       <LegalText>
         Questions about this policy, or about anything we hold on you: email{" "}
-        <LegalStrong>catalogshare123@gmail.com</LegalStrong> or call{" "}
-        <LegalStrong>+91 76250 25686</LegalStrong>.
+        <LegalStrong>catalogshare123@gmail.com</LegalStrong>.
       </LegalText>
     </LegalPage>
   );

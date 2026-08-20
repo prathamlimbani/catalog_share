@@ -308,9 +308,8 @@ const Terms = () => {
 
       <LegalHeading>19. Contact</LegalHeading>
       <LegalText>
-        CatalogShare, Gujarat, India. Email <LegalStrong>catalogshare123@gmail.com</LegalStrong>, phone{" "}
-        <LegalStrong>+91 76250 25686</LegalStrong>, website{" "}
-        <LegalStrong>https://catalogshare.online</LegalStrong>.
+        CatalogShare, Gujarat, India. Email <LegalStrong>catalogshare123@gmail.com</LegalStrong>,
+        website <LegalStrong>https://catalogshare.online</LegalStrong>.
       </LegalText>
     </LegalPage>
   );

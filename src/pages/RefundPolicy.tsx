@@ -139,10 +139,6 @@ const RefundPolicy = () => {
         <LegalItem>what went wrong, with a screenshot if you have one.</LegalItem>
       </LegalList>
       <LegalText>
-        You can also call <LegalStrong>+91 76250 25686</LegalStrong> (Monday to Saturday, 10:00 to 19:00
-        IST), but please send the email as well so we have the payment id on record.
-      </LegalText>
-      <LegalText>
         We acknowledge within 24 hours and tell you our decision within 3 business days. If approved,
         the refund is processed through Razorpay back to the{" "}
         <LegalStrong>original payment method</LegalStrong> and reaches you in{" "}
@@ -195,9 +191,8 @@ const RefundPolicy = () => {
 
       <LegalHeading>11. Contact</LegalHeading>
       <LegalText>
-        CatalogShare, Gujarat, India. Email <LegalStrong>catalogshare123@gmail.com</LegalStrong>, phone{" "}
-        <LegalStrong>+91 76250 25686</LegalStrong>, website{" "}
-        <LegalStrong>https://catalogshare.online</LegalStrong>.
+        CatalogShare, Gujarat, India. Email <LegalStrong>catalogshare123@gmail.com</LegalStrong>,
+        website <LegalStrong>https://catalogshare.online</LegalStrong>.
       </LegalText>
     </LegalPage>
   );
