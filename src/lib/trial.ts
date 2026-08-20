@@ -17,6 +17,12 @@
  *     and pushed to the server on the next successful connection.
  *  3. The old `estimate_trial_start_${companyId}` localStorage key, migrated on
  *     first read so existing users keep the time they have already used.
+ *
+ * That order is enforced twice on purpose: here, and again in `getEntitlement`,
+ * which takes the device value only when `companies.trial_started_at` is null.
+ * Doing it in one place is not enough — the device stamp is readable and
+ * writable by anyone with the handset, so whichever layer trusted it last would
+ * be the one handing out endless trials.
  */
 
 import { supabase } from "@/integrations/supabase/client";
@@ -82,6 +88,13 @@ export async function readTrialStart(companyId: string): Promise<number> {
 }
 
 async function cacheStart(companyId: string, ms: number, confirmed: boolean): Promise<void> {
+  const previous = await prefGet(key(companyId));
+  const wasConfirmed = (await prefGet(confirmedKey(companyId))) === "1";
+  // `ensureTrialStarted` runs on every Estimates mount and on every promo
+  // mount, almost always with a value that has not moved. Re-writing and
+  // re-broadcasting it each time woke every entitlement subscriber for nothing.
+  if (previous === String(ms) && wasConfirmed === confirmed) return;
+
   await prefSet(key(companyId), String(ms));
   if (confirmed) await prefSet(confirmedKey(companyId), "1");
   // The single write point, so the single place to tell useEntitlement that the

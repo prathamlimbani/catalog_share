@@ -984,9 +984,20 @@ body.is-native textarea {
 }
 
 /* Lift a sticky action bar above the soft keyboard. */
+/* Keyboard handling.
+
+   capacitor.config.ts uses `resize: "native"`, which means ANDROID shrinks the
+   WebView itself when the keyboard opens — the visual viewport already excludes
+   it. Adding `padding-bottom: var(--keyboard-height)` on top double-counted the
+   keyboard: the sticky action bar grew by a full keyboard height, shoving the
+   content up so the field being typed into scrolled off screen. That is the
+   "screen jumps up and I cannot see what I wrote" bug.
+
+   So: no extra padding. The bar only needs to stop reserving space for the tab
+   bar, which hides itself while the keyboard is up. */
 body.keyboard-open .keyboard-aware {
-  padding-bottom: var(--keyboard-height);
-  transition: padding-bottom 150ms ease-out;
+  padding-bottom: 0;
+  bottom: env(safe-area-inset-bottom);
 }
 
 /* Minimum 44px touch targets on the app's own chrome. */
@@ -1157,4 +1168,23 @@ body,
 .break-anywhere {
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+
+/* Auto-scroll must not park the focused field under the sticky header. The
+   browser scrolls a focused input to the edge of the viewport by default, which
+   on this layout puts it directly behind the app bar. */
+input,
+textarea,
+select {
+  scroll-margin-top: 5rem;
+  scroll-margin-bottom: 5rem;
+}
+
+/* `scroll-behavior: smooth` on <html> turns the keyboard's viewport resize into
+   a visible slide, which is what reads as "the screen scrolled all the way up".
+   Snap instead while the keyboard is animating. */
+body.keyboard-open,
+body.keyboard-open * {
+  scroll-behavior: auto !important;
 }

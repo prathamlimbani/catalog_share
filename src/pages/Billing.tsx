@@ -8,8 +8,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Crown, CreditCard, Download, CalendarClock, RefreshCw, Receipt, CheckCircle2, XCircle, Clock, FileText, Loader2, Mail, Phone, Heart, WifiOff } from "lucide-react";
+import { Crown, CreditCard, Download, CalendarClock, RefreshCw, Receipt, CheckCircle2, XCircle, Clock, FileText, Loader2, Mail, Phone, Heart, WifiOff, RotateCcw, AlertTriangle, Timer } from "lucide-react";
 import { SubscriptionDialog } from "@/components/SubscriptionDialog";
+import { restorePurchase, type RestoreOutcome } from "@/hooks/useRazorpaySubscription";
 import { getPlanLimit, getPlanName } from "@/lib/plans";
 import { downloadInvoice, resolvePaidPlanId } from "@/lib/receipt";
 import { useNetwork } from "@/hooks/useNetwork";
@@ -59,6 +60,22 @@ const paymentKey = (payment: Record<string, unknown>): string =>
 
 const statusLabel = (status: unknown): string => normalizeStatus(status).toUpperCase() || "UNKNOWN";
 
+/**
+ * Trial remaining, in the coarsest unit that is still true. The entitlement
+ * clock advances on a boundary timer and a ten-minute safety net rather than
+ * every second, so anything finer than this would be confidently wrong.
+ */
+const formatTrialRemaining = (ms: number): string => {
+    const days = Math.floor(ms / 86_400_000);
+    if (days >= 1) return `${days} day${days === 1 ? "" : "s"} left`;
+    const hours = Math.floor(ms / 3_600_000);
+    if (hours >= 1) return `${hours} hour${hours === 1 ? "" : "s"} left`;
+    return "less than an hour left";
+};
+
+/** What the restore control is currently reporting. */
+type RestoreState = RestoreOutcome;
+
 const Billing = () => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
@@ -67,6 +84,8 @@ const Billing = () => {
     // Which receipt is being rendered right now. A PDF build takes a few seconds
     // on a mid-range phone, and without this the button looked inert.
     const [downloadingId, setDownloadingId] = useState<string | null>(null);
+    const [restoring, setRestoring] = useState(false);
+    const [restoreResult, setRestoreResult] = useState<RestoreState | null>(null);
 
     // Get current user
     const { data: session } = useQuery({
@@ -148,7 +167,9 @@ const Billing = () => {
     };
 
     // "payment made -> receipt shown": the moment the plan is active, the user
-    // lands on their receipt rather than back on a stale billing page.
+    // lands on their receipt rather than back on a stale billing page. The plan
+    // itself has already been re-read and pushed into every cache by the payment
+    // hook before this runs, so only the history list is left to refresh.
     const goToReceipt = (paymentId: string) => {
         queryClient.invalidateQueries({ queryKey: ["billing-payments"] });
         navigate(`/billing/receipt/${paymentId}`);
@@ -166,6 +187,52 @@ const Billing = () => {
     const companyId = str(companyRow?.id);
     const companyName = str(companyRow?.name);
     const companyEmail = str(companyRow?.email);
+
+    /**
+     * Re-check and repair entitlement.
+     *
+     * Idempotent by construction — it only ever asks the server to re-verify a
+     * payment it can prove, and never writes the plan itself — so hammering the
+     * button is harmless. The guard below is purely so the spinner means
+     * something.
+     */
+    const handleRestore = async () => {
+        if (restoring || !companyId) return;
+        setRestoring(true);
+        setRestoreResult(null);
+        try {
+            const outcome = await restorePurchase(queryClient, companyId);
+            setRestoreResult(outcome);
+
+            if (outcome.kind === "restored") {
+                toast.success(`${outcome.planName} restored — everything you paid for is unlocked.`);
+            } else if (outcome.kind === "already_active") {
+                toast.success(`You are already on the ${outcome.planName}. Nothing needed repairing.`);
+            } else if (outcome.kind === "unverified") {
+                toast.warning("We found your payment but could not confirm it automatically.", { duration: 10000 });
+            } else if (outcome.kind === "error") {
+                toast.error("Could not reach the server. Check your connection and try again.");
+            } else {
+                toast.info("No completed payment found on this account.");
+            }
+
+            void queryClient.invalidateQueries({ queryKey: ["billing-payments"] });
+        } catch (err) {
+            console.error("[billing] restore failed:", err);
+            setRestoreResult({ kind: "error" });
+            toast.error("Could not reach the server. Check your connection and try again.");
+        } finally {
+            setRestoring(false);
+        }
+    };
+
+    /** Support mail with the one detail they will ask for already filled in. */
+    const restoreMailto = (paymentId: string) =>
+        `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`Payment not activated - ${paymentId}`)}` +
+        `&body=${encodeURIComponent(
+            `Hello CatalogShare support,\n\nMy payment went through but my plan is not active.\n\n` +
+            `Razorpay payment ID: ${paymentId}\nBusiness: ${companyName || "-"}\nAccount email: ${companyEmail || "-"}\n\nThank you.`,
+        )}`;
 
     const handleDownload = async (payment: Record<string, unknown>) => {
         if (downloadingId) return;
@@ -255,6 +322,15 @@ const Billing = () => {
                                                 {productCount ?? "—"}/{planLimit === 9999 ? '∞' : planLimit} products used
                                             </span>
                                         </div>
+                                        {/* The one place a free-tier merchant can
+                                            see the trial clock without being sold
+                                            to first. Never shown to a paid plan. */}
+                                        {!entitlement.isPaid && entitlement.trialActive && (
+                                            <p className="mt-1 flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+                                                <Timer className="h-3 w-3 shrink-0" />
+                                                Free Estimates trial — {formatTrialRemaining(entitlement.trialMsRemaining)}
+                                            </p>
+                                        )}
                                         {expiresAt && currentPlan !== 'free' && (
                                             <p className={`text-xs mt-1 ${isExpired ? 'text-destructive font-bold' : 'text-muted-foreground'}`}>
                                                 <CalendarClock className="h-3 w-3 inline mr-1" />
@@ -306,6 +382,113 @@ const Billing = () => {
                                     )}
                                 </div>
                             </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Restore purchase.
+                    Activation can fail after the money has moved: the edge
+                    function is redeploying, the radio drops between the charge
+                    and the grant, or the capture webhook arrives late. This is
+                    the merchant's own way out of that instead of an email and a
+                    wait. It asks the SERVER to re-verify the payment — the plan
+                    is never written from here, which the guard trigger would
+                    reject anyway. */}
+                {companyId && (
+                    <Card className="border-dashed">
+                        <CardContent className="p-4 sm:p-6">
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                <div className="min-w-0">
+                                    <h2 className="font-semibold flex items-center gap-2">
+                                        <RotateCcw className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                        Paid but still locked?
+                                    </h2>
+                                    <p className="text-sm text-muted-foreground mt-1 max-w-md">
+                                        Re-checks your payments with our server and re-applies your plan.
+                                        You will never be charged again for tapping this.
+                                    </p>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    className="h-11 w-full font-semibold sm:w-auto sm:shrink-0"
+                                    disabled={restoring || offline}
+                                    onClick={() => void handleRestore()}
+                                >
+                                    {restoring ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Checking…
+                                        </>
+                                    ) : (
+                                        <>
+                                            <RotateCcw className="h-4 w-4 mr-2" /> Restore purchase
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+
+                            {offline && (
+                                <p className="mt-3 text-xs text-muted-foreground">
+                                    Restoring needs a connection — reconnect and try again.
+                                </p>
+                            )}
+
+                            {restoreResult?.kind === "restored" && (
+                                <div className="mt-4 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
+                                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                                    <span>
+                                        Your {restoreResult.planName} is active again. Estimates are unlocked
+                                        right now — no restart needed.
+                                    </span>
+                                </div>
+                            )}
+
+                            {restoreResult?.kind === "already_active" && (
+                                <div className="mt-4 flex items-start gap-2 rounded-lg border bg-muted/50 p-3 text-sm text-muted-foreground">
+                                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                                    <span>
+                                        Nothing needed repairing — your {restoreResult.planName} was already
+                                        up to date.
+                                    </span>
+                                </div>
+                            )}
+
+                            {restoreResult?.kind === "unverified" && (
+                                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+                                    <div className="flex items-start gap-2">
+                                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                                        <span>
+                                            We found a payment on this account but your bank has not
+                                            confirmed it yet. Try again in a few minutes — if it still
+                                            will not go through, support can finish it off with this ID.
+                                        </span>
+                                    </div>
+                                    <p className="break-anywhere mt-2 font-mono text-xs">
+                                        {restoreResult.paymentId}
+                                    </p>
+                                    <Button asChild variant="outline" className="mt-3 h-11 w-full font-semibold sm:w-auto">
+                                        <a href={restoreMailto(restoreResult.paymentId)}>
+                                            <Mail className="h-4 w-4 mr-2" /> Email support with this ID
+                                        </a>
+                                    </Button>
+                                </div>
+                            )}
+
+                            {restoreResult?.kind === "none" && (
+                                <div className="mt-4 flex items-start gap-2 rounded-lg border bg-muted/50 p-3 text-sm text-muted-foreground">
+                                    <Receipt className="mt-0.5 h-4 w-4 shrink-0" />
+                                    <span>
+                                        No completed payment found on this account. If you paid while signed
+                                        in as someone else, sign in with that account and try again.
+                                    </span>
+                                </div>
+                            )}
+
+                            {restoreResult?.kind === "error" && (
+                                <div className="mt-4 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                                    <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                                    <span>We could not reach the server. Check your connection and try again.</span>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 )}

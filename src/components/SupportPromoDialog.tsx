@@ -114,9 +114,9 @@ export function SupportPromoDialog({ company }: { company: PromoCompany | null |
 
     return (
         <Dialog open={open} onOpenChange={(next) => (next ? setOpen(true) : dismiss())}>
-            <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto border-rose-200 shadow-xl shadow-rose-500/10">
+            <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto border-rose-200 shadow-xl shadow-rose-500/10 dark:border-rose-900">
                 <DialogHeader>
-                    <DialogTitle className="flex items-center justify-center gap-2 text-2xl font-bold text-rose-600 mb-1">
+                    <DialogTitle className="flex items-center justify-center gap-2 text-2xl font-bold text-rose-600 dark:text-rose-400 mb-1">
                         <Heart className="h-6 w-6 fill-rose-500 text-rose-500" />
                         {trialEnded ? "Keep Your Estimates" : "Unlock Estimates"}
                     </DialogTitle>
@@ -128,14 +128,14 @@ export function SupportPromoDialog({ company }: { company: PromoCompany | null |
                 </DialogHeader>
 
                 {/* Countdown */}
-                <div className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg border ${trialEnded ? "bg-muted border-border" : "bg-amber-50 border-amber-200"}`}>
-                    <Clock className={`h-4 w-4 shrink-0 ${trialEnded ? "text-muted-foreground" : "text-amber-600"}`} />
+                <div className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg border ${trialEnded ? "bg-muted border-border" : "bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:border-amber-900"}`}>
+                    <Clock className={`h-4 w-4 shrink-0 ${trialEnded ? "text-muted-foreground" : "text-amber-600 dark:text-amber-400"}`} />
                     {trialEnded ? (
                         <span className="text-sm font-semibold text-muted-foreground">Free trial finished</span>
                     ) : (
                         <div className="flex items-center gap-1.5">
-                            <span className="text-amber-700 font-medium text-sm">Trial ends in</span>
-                            <span className="font-mono font-bold text-amber-900 text-sm tracking-wide">
+                            <span className="text-amber-700 dark:text-amber-300 font-medium text-sm">Trial ends in</span>
+                            <span className="font-mono font-bold text-amber-900 dark:text-amber-100 text-sm tracking-wide">
                                 {formatRemaining(entitlement.trialMsRemaining)}
                             </span>
                         </div>
@@ -144,24 +144,24 @@ export function SupportPromoDialog({ company }: { company: PromoCompany | null |
 
                 {/* Plans */}
                 <div className="space-y-3 py-1">
-                    <div className="rounded-xl border-2 border-indigo-200 bg-indigo-50/50 p-4">
+                    <div className="rounded-xl border-2 border-indigo-200 bg-indigo-50/50 p-4 dark:border-indigo-900 dark:bg-indigo-950/30">
                         <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
-                                <FileText className="h-5 w-5 text-indigo-600" />
-                                <span className="font-bold text-indigo-900">Estimate Generator</span>
+                                <FileText className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                                <span className="font-bold text-indigo-900 dark:text-indigo-200">Estimate Generator</span>
                             </div>
-                            <span className="text-lg font-bold text-indigo-700">
+                            <span className="text-lg font-bold text-indigo-700 dark:text-indigo-300">
                                 ₹{getPlanPrice("estimate_generate")}
                                 <span className="text-xs font-normal text-indigo-500">/mo</span>
                             </span>
                         </div>
-                        <ul className="space-y-1.5 text-xs text-indigo-800 mb-3">
+                        <ul className="space-y-1.5 text-xs text-indigo-800 dark:text-indigo-300 mb-3">
                             <li>✅ Unlimited Estimates</li>
                             <li>✅ PDF Generation &amp; WhatsApp Sharing</li>
                             <li>✅ Estimate History &amp; Management</li>
                         </ul>
                         <Button
-                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md shadow-indigo-500/20"
+                            className="h-11 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md shadow-indigo-500/20"
                             disabled={loading}
                             onClick={() =>
                                 subscribe("estimate_generate", "Estimate Generator Plan", getPlanPrice("estimate_generate"), () => setOpen(false))
@@ -172,26 +172,26 @@ export function SupportPromoDialog({ company }: { company: PromoCompany | null |
                         </Button>
                     </div>
 
-                    <div className="rounded-xl border-2 border-rose-200 bg-rose-50/50 p-4 relative overflow-hidden">
+                    <div className="rounded-xl border-2 border-rose-200 bg-rose-50/50 p-4 relative overflow-hidden dark:border-rose-900 dark:bg-rose-950/30">
                         <div className="absolute top-0 right-0 bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-bl-lg">BEST VALUE</div>
                         <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
-                                <Crown className="h-5 w-5 text-rose-600" />
-                                <span className="font-bold text-rose-900">Support Plan</span>
+                                <Crown className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+                                <span className="font-bold text-rose-900 dark:text-rose-200">Support Plan</span>
                             </div>
-                            <span className="text-lg font-bold text-rose-700">
+                            <span className="text-lg font-bold text-rose-700 dark:text-rose-300">
                                 ₹{getPlanPrice("support")}
                                 <span className="text-xs font-normal text-rose-500">/mo</span>
                             </span>
                         </div>
-                        <ul className="space-y-1.5 text-xs text-rose-800 mb-3">
+                        <ul className="space-y-1.5 text-xs text-rose-800 dark:text-rose-300 mb-3">
                             <li>✅ Everything in Estimate Plan</li>
                             <li>✅ Priority Support &amp; Call Assistance</li>
                             <li>✅ Unlimited Products &amp; Custom Branding</li>
                             <li>✅ All Pro Features</li>
                         </ul>
                         <Button
-                            className="w-full bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white font-bold shadow-md shadow-rose-500/20"
+                            className="h-11 w-full bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white font-bold shadow-md shadow-rose-500/20"
                             disabled={loading}
                             onClick={() =>
                                 subscribe("support", "Monthly Support Subscription", getPlanPrice("support"), () => setOpen(false))
@@ -205,7 +205,7 @@ export function SupportPromoDialog({ company }: { company: PromoCompany | null |
 
                 <DialogFooter className="flex-col gap-2 pt-1">
                     {/* The always-available exit. Never gate, delay or hide this. */}
-                    <Button variant="outline" className="w-full text-sm" onClick={dismiss}>
+                    <Button variant="outline" className="h-11 w-full text-sm" onClick={dismiss}>
                         Maybe later
                     </Button>
                     <p className="text-[11px] text-center text-muted-foreground">

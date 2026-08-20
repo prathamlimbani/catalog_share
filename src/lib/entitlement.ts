@@ -60,6 +60,16 @@ export interface CachedEntitlement {
   trial_started_at: string | null;
   /** Epoch ms when this snapshot was taken from the server. */
   fetched_at: number;
+  /**
+   * Which company the snapshot belongs to.
+   *
+   * Optional because snapshots written by older builds do not carry it. It is
+   * what lets the offline path find the device-local trial stamp when the
+   * company row itself has not loaded yet — without it, a trial that started
+   * offline reads as "never started" and locks a merchant who is still inside
+   * their five days.
+   */
+  company_id?: string | null;
 }
 
 function parseTs(value: string | null | undefined): number {
@@ -73,12 +83,13 @@ function parseTs(value: string | null | undefined): number {
  *
  * @param company     the `companies` row (or the offline mirror of it)
  * @param now         injected for testability
- * @param trialStart  epoch ms of trial start; falls back to company.trial_started_at
+ * @param localTrialStart  the DEVICE-local trial stamp, used only as a fallback
+ *                    when the server has no start recorded (see below)
  */
 export function getEntitlement(
   company: CompanyLike | null | undefined,
   now: number = Date.now(),
-  trialStart?: number | null,
+  localTrialStart?: number | null,
 ): Entitlement {
   const plan = (company?.subscription_plan ?? "free") as PlanId;
   const planDef = getPlan(plan);
@@ -86,7 +97,19 @@ export function getEntitlement(
 
   const isPaid = isPaidPlanId(plan) && expiresAt > now;
 
-  const startedAt = trialStart ?? parseTs(company?.trial_started_at);
+  // Authority order for the trial clock is the same as in src/lib/trial.ts:
+  // the server column first, the device stamp only when the server has none.
+  // The other way round — which is how this read for a while — any device that
+  // could write `cs_trial_start_<id>` could hand itself an unlimited trial, and
+  // clearing app data handed out a brand-new one. `start_estimate_trial` exists
+  // precisely so the start cannot be moved from the device, so the device value
+  // must never be allowed to override it.
+  const serverStart = parseTs(company?.trial_started_at);
+  // A device-only start is additionally clamped to the present: a phone whose
+  // clock is wound forward would otherwise push the end date out with it.
+  const localStart = localTrialStart && localTrialStart > 0 ? Math.min(localTrialStart, now) : 0;
+  const startedAt = serverStart > 0 ? serverStart : localStart;
+
   const trialEndsAt = startedAt > 0 ? startedAt + TRIAL_DURATION_MS : 0;
   const trialMsRemaining = trialEndsAt > 0 ? Math.max(0, trialEndsAt - now) : 0;
   const trialActive = trialMsRemaining > 0;
@@ -124,6 +147,7 @@ export function getEntitlement(
 export function getEntitlementFromCache(
   cached: CachedEntitlement | null | undefined,
   now: number = Date.now(),
+  localTrialStart?: number | null,
 ): Entitlement | null {
   if (!cached) return null;
 
@@ -141,10 +165,32 @@ export function getEntitlementFromCache(
       trial_started_at: cached.trial_started_at,
     },
     now,
+    localTrialStart,
   );
 }
 
 /** The entitlement of a signed-out / unknown account. */
 export function freeEntitlement(now: number = Date.now()): Entitlement {
   return getEntitlement({ subscription_plan: "free" }, now);
+}
+
+/**
+ * The next instant at which this entitlement can change on its own — the trial
+ * running out, or the subscription lapsing. 0 when nothing is counting down.
+ *
+ * Entitlement used to be computed once and then never re-evaluated, so a
+ * merchant with the app open when their trial expired kept working until the
+ * next cold start. `useEntitlement` arms a single timer on this value instead
+ * of polling, which is what makes the lock appear on time without a 1s tick
+ * running all day.
+ *
+ * The returned instant is relative to the clock the entitlement was computed
+ * with, so it can be in the past if that clock has since gone stale — callers
+ * must treat a non-positive delay as "re-evaluate now".
+ */
+export function nextEntitlementBoundary(entitlement: Entitlement): number {
+  const boundaries: number[] = [];
+  if (entitlement.trialActive && entitlement.trialEndsAt > 0) boundaries.push(entitlement.trialEndsAt);
+  if (entitlement.isPaid && entitlement.expiresAt > 0) boundaries.push(entitlement.expiresAt);
+  return boundaries.length > 0 ? Math.min(...boundaries) : 0;
 }

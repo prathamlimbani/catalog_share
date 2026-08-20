@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Clock, Crown, FileText, Heart, Lock, WifiOff } from "lucide-react";
+import { Clock, Crown, FileText, Heart, Lock, RotateCcw, Timer, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -27,11 +27,28 @@ import {
 } from "@/lib/offline/estimates";
 import { getMirroredProducts } from "@/lib/offline/mirror";
 import { syncNow } from "@/lib/sync/syncEngine";
+import { getPlanPrice } from "@/lib/plans";
 import { ensureTrialStarted } from "@/lib/trial";
 import { hideBanner, maybeShowInterstitial, showBanner } from "@/native/ads";
 import { notify } from "@/native/files";
 
 type ViewMode = "list" | "create" | "edit" | "preview";
+
+/**
+ * How much trial is left, in the coarsest unit that is still true.
+ *
+ * The entitlement clock is re-read on a boundary timer and a ten-minute safety
+ * net, not every second, so a "43 minutes left" here could be eight minutes out
+ * of date. Under an hour it therefore stops counting and says so — vague and
+ * correct beats precise and wrong on a countdown someone is trusting.
+ */
+function formatTrialRemaining(ms: number): string {
+  const days = Math.floor(ms / 86_400_000);
+  if (days >= 1) return `${days} day${days === 1 ? "" : "s"} left`;
+  const hours = Math.floor(ms / 3_600_000);
+  if (hours >= 1) return `${hours} hour${hours === 1 ? "" : "s"} left`;
+  return "less than an hour left";
+}
 
 /**
  * Estimates — the app's offline-first surface.
@@ -368,7 +385,7 @@ const Invoices = () => {
                   </span>
                 </div>
                 <p className="mb-3 text-2xl font-bold text-indigo-700 dark:text-indigo-300">
-                  ₹399
+                  ₹{getPlanPrice("estimate_generate")}
                   <span className="text-xs font-normal text-indigo-500">/month</span>
                 </p>
                 <ul className="mb-4 flex-1 space-y-1.5 text-xs text-indigo-800 dark:text-indigo-300">
@@ -381,13 +398,17 @@ const Invoices = () => {
                   className="w-full bg-indigo-600 font-bold text-white hover:bg-indigo-700"
                   disabled={subLoading}
                   onClick={() =>
-                    subscribe("estimate_generate", "Estimate Generator Plan", 399, undefined, (id) =>
-                      navigate(`/billing/receipt/${id}`),
+                    subscribe(
+                      "estimate_generate",
+                      "Estimate Generator Plan",
+                      getPlanPrice("estimate_generate"),
+                      undefined,
+                      (id) => navigate(`/billing/receipt/${id}`),
                     )
                   }
                 >
                   <FileText className="mr-2 h-4 w-4" />
-                  {subLoading ? "Processing..." : "Get for ₹399/mo"}
+                  {subLoading ? "Processing..." : `Get for ₹${getPlanPrice("estimate_generate")}/mo`}
                 </Button>
               </div>
 
@@ -400,7 +421,8 @@ const Invoices = () => {
                   <span className="font-bold text-rose-900 dark:text-rose-200">Support Plan</span>
                 </div>
                 <p className="mb-3 text-2xl font-bold text-rose-700 dark:text-rose-300">
-                  ₹499<span className="text-xs font-normal text-rose-500">/month</span>
+                  ₹{getPlanPrice("support")}
+                  <span className="text-xs font-normal text-rose-500">/month</span>
                 </p>
                 <ul className="mb-4 flex-1 space-y-1.5 text-xs text-rose-800 dark:text-rose-300">
                   <li>✅ Everything in Estimate plan</li>
@@ -415,17 +437,29 @@ const Invoices = () => {
                     subscribe(
                       "support",
                       "Monthly Support Subscription",
-                      499,
+                      getPlanPrice("support"),
                       undefined,
                       (id) => navigate(`/billing/receipt/${id}`),
                     )
                   }
                 >
                   <Heart className="mr-2 h-4 w-4" />
-                  {subLoading ? "Processing..." : "Get for ₹499/mo"}
+                  {subLoading ? "Processing..." : `Get for ₹${getPlanPrice("support")}/mo`}
                 </Button>
               </div>
             </div>
+
+            {/* Someone who has already been debited must never have to guess.
+                Restore lives on Billing, so send them there rather than making
+                a second payment look like the only way forward. */}
+            <Button
+              variant="ghost"
+              className="h-11 w-full font-semibold sm:w-auto"
+              onClick={() => navigate("/billing")}
+            >
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Already paid? Restore purchase
+            </Button>
 
             <p className="text-xs text-muted-foreground">
               Instant access after payment • 30-day plan, no auto-debit • Your data is always safe
@@ -445,6 +479,26 @@ const Invoices = () => {
       showSearch={false}
       title="Estimates"
     >
+      {/* The trial is otherwise invisible between promo dialogs, which appear at
+          most once a day — a merchant deserves to know how long they have
+          without being sold to. Paid plans never see it. */}
+      {viewMode === "list" && entitlement.trialActive && !entitlement.isPaid && (
+        <div className="mx-auto mb-3 flex w-full max-w-2xl flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-900 dark:bg-amber-950/40 sm:flex-row sm:items-center sm:gap-3">
+          <Timer className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <p className="min-w-0 flex-1 text-xs leading-relaxed text-amber-800 dark:text-amber-200">
+            <span className="font-semibold">Free Estimates trial</span> —{" "}
+            {formatTrialRemaining(entitlement.trialMsRemaining)}. Subscribe any time to keep going.
+          </p>
+          <Button
+            variant="outline"
+            className="h-11 w-full shrink-0 text-xs font-semibold sm:w-auto"
+            onClick={() => navigate("/billing")}
+          >
+            See plans
+          </Button>
+        </div>
+      )}
+
       {lockedOffline && viewMode === "list" && (
         <div className="mx-auto mb-3 flex w-full max-w-2xl items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-900 dark:bg-amber-950/40">
           <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />

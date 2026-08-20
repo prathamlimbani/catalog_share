@@ -3,6 +3,7 @@ import {
   freeEntitlement,
   getEntitlement,
   getEntitlementFromCache,
+  nextEntitlementBoundary,
   type CachedEntitlement,
   type CompanyLike,
   type Entitlement,
@@ -13,12 +14,58 @@ import { useCurrentCompany } from "@/hooks/useCompany";
 import { onTrialChange, readTrialStart } from "@/lib/trial";
 
 /**
+ * Safety net for the boundary timer.
+ *
+ * Android freezes JS timers while the app is backgrounded, so a `setTimeout`
+ * armed for the trial's last second can come back minutes late. A coarse
+ * interval plus the resume/visibility hooks below cover that. Ten minutes, not
+ * one second: this only ever moves a lock screen that is already overdue, and
+ * a per-second timer on a phone is pure battery drain.
+ */
+const COARSE_RECHECK_MS = 10 * 60 * 1000;
+
+/**
+ * `setTimeout` overflows its 32-bit delay past ~24.8 days and then fires
+ * immediately, which would spin. A 30-day subscription expiry is well past
+ * that, so long waits are re-armed in chunks instead.
+ */
+const MAX_TIMER_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * Write the offline entitlement snapshot for a company row.
+ *
+ * Exported because the payment flow refreshes the plan outside of React (see
+ * `activateEntitlementNow` in useRazorpaySubscription.ts) and the Preferences
+ * copy has to move at the same moment — otherwise the app unlocks now and then
+ * re-locks itself from a stale cache the next time it starts offline.
+ */
+export async function cacheEntitlementSnapshot(
+  company: CompanyLike | null | undefined,
+): Promise<void> {
+  if (!company) return;
+  const snapshot: CachedEntitlement = {
+    plan: company.subscription_plan ?? "free",
+    expires_at: company.subscription_expires_at ?? null,
+    trial_started_at: company.trial_started_at ?? null,
+    fetched_at: Date.now(),
+    company_id: company.id ?? null,
+  };
+  await prefSetJSON(PREF_KEYS.entitlement, snapshot);
+}
+
+/**
  * Resolve what the signed-in account is entitled to, and keep the ad layer in
  * step with it.
  *
  * Online, the live `companies` row is authoritative and is snapshotted into
  * native Preferences. Offline, that snapshot is used (bounded by a staleness
  * grace period) so a paying user is not demoted to ads mid-flight.
+ *
+ * The entitlement is also RE-EVALUATED over time, not only when the row
+ * changes. It used to be computed against a `Date.now()` frozen inside a memo,
+ * so a merchant whose trial lapsed while the app was open kept working until
+ * they relaunched — and an expired subscription kept its features just as long.
+ * See the boundary timer below.
  */
 export function useEntitlement(): {
   entitlement: Entitlement;
@@ -48,11 +95,13 @@ export function useEntitlement(): {
   // Snapshot the live row whenever it arrives.
   useEffect(() => {
     if (!company) return;
+    const row = company as CompanyLike;
     const snapshot: CachedEntitlement = {
-      plan: (company as CompanyLike).subscription_plan ?? "free",
-      expires_at: (company as CompanyLike).subscription_expires_at ?? null,
-      trial_started_at: (company as CompanyLike).trial_started_at ?? null,
+      plan: row.subscription_plan ?? "free",
+      expires_at: row.subscription_expires_at ?? null,
+      trial_started_at: row.trial_started_at ?? null,
       fetched_at: Date.now(),
+      company_id: row.id ?? null,
     };
     setCached(snapshot);
     void prefSetJSON(PREF_KEYS.entitlement, snapshot);
@@ -63,7 +112,11 @@ export function useEntitlement(): {
   const [trialStart, setTrialStart] = useState<number | null>(null);
   /** False until the trial clock has actually been read from storage. */
   const [trialResolved, setTrialResolved] = useState(false);
-  const companyId = (company as { id?: string } | null | undefined)?.id;
+  const liveCompanyId = (company as { id?: string } | null | undefined)?.id;
+  // Offline before the row loads there is no live id, but the snapshot knows
+  // which company it belongs to — without that fallback a trial that started
+  // offline reads as "never started" and locks a merchant mid-trial.
+  const companyId = liveCompanyId ?? cached?.company_id ?? undefined;
 
   useEffect(() => {
     if (!companyId) return;
@@ -89,11 +142,67 @@ export function useEntitlement(): {
 
   const usingCache = !company && (isError || !isPending);
 
+  /**
+   * The clock the entitlement is evaluated against. Advanced by the boundary
+   * timer below rather than by a ticking interval.
+   */
+  const [clock, setClock] = useState(() => Date.now());
+
   const entitlement = useMemo(() => {
-    if (company) return getEntitlement(company as CompanyLike, Date.now(), trialStart);
-    const fromCache = getEntitlementFromCache(cached);
-    return fromCache ?? freeEntitlement();
-  }, [company, cached, trialStart]);
+    if (company) return getEntitlement(company as CompanyLike, clock, trialStart);
+    const fromCache = getEntitlementFromCache(cached, clock, trialStart);
+    return fromCache ?? freeEntitlement(clock);
+  }, [company, cached, trialStart, clock]);
+
+  /** 0 when nothing is counting down, so no timer is armed at all. */
+  const boundary = nextEntitlementBoundary(entitlement);
+
+  // Re-evaluate exactly when access can change hands: one timeout aimed at the
+  // trial's last second (or the subscription's), re-armed in <= 6h chunks.
+  useEffect(() => {
+    if (!boundary) return;
+    const delay = boundary - Date.now();
+    if (delay <= 0) {
+      // The clock this entitlement was computed with is already past the
+      // boundary — recompute now rather than arming a zero-length timer.
+      setClock(Date.now());
+      return;
+    }
+    const id = window.setTimeout(() => setClock(Date.now()), Math.min(delay, MAX_TIMER_MS));
+    return () => window.clearTimeout(id);
+  }, [boundary, clock]);
+
+  // Timers frozen while the app is backgrounded cannot be trusted, so re-check
+  // on resume and on a coarse interval as well.
+  useEffect(() => {
+    if (!boundary) return;
+    let disposed = false;
+    const bump = () => setClock(Date.now());
+
+    const interval = window.setInterval(bump, COARSE_RECHECK_MS);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") bump();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    let removeResume: (() => void) | undefined;
+    void import("@capacitor/app")
+      .then(({ App }) => App.addListener("resume", bump))
+      .then((handle) => {
+        if (disposed) void handle.remove();
+        else removeResume = () => void handle.remove();
+      })
+      .catch(() => {
+        /* web build or plugin unavailable — the interval still covers us */
+      });
+
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
+      removeResume?.();
+    };
+  }, [boundary]);
 
   // An entitlement we have not established yet is treated as AD-FREE, never as
   // "free plan". `cacheLoaded` only says the Preferences read RESOLVED — it is
@@ -103,7 +212,9 @@ export function useEntitlement(): {
   // is in hand.
   const entitlementKnown = !!company || !!cached;
 
-  // The single place ads are switched on or off.
+  // The single place ads are switched on or off. It runs off the SAME
+  // entitlement as the estimate lock, so a payment tears the banner down at the
+  // exact moment the paywall disappears.
   useEffect(() => {
     if (!entitlementKnown) return;
     void applyEntitlement(entitlement.adsEnabled);

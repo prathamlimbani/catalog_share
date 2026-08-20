@@ -132,7 +132,7 @@ export async function saveBlob(blob: Blob, fileName: string): Promise<SaveResult
  * Write to the cache directory — for files that only exist to be handed to the
  * share sheet and should not clutter the user's Documents folder.
  */
-async function writeToCache(blob: Blob, fileName: string): Promise<string | null> {
+export async function writeToCache(blob: Blob, fileName: string): Promise<string | null> {
   try {
     const data = await blobToBase64(blob);
     const result = await Filesystem.writeFile({

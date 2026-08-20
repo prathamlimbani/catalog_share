@@ -19,7 +19,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import InvoicePreview from "@/components/InvoicePreview";
 import { elementToPdfBlob } from "@/lib/pdf";
-import { shareBlob, safeFileName, openWhatsApp } from "@/native/files";
+import { shareBlob, safeFileName, openWhatsApp, writeToCache } from "@/native/files";
+import { sendEstimateToNumber } from "@/native/whatsapp";
 import { isNative } from "@/native/platform";
 
 const WhatsappIcon = ({ className }: { className?: string }) => (
@@ -171,6 +172,32 @@ const InvoiceHistory = ({
       const pdfBlob = await elementToPdfBlob(element, { name: number });
 
       if (isNative) {
+        // Send to the number the merchant actually typed. The plain share sheet
+        // ignores it and asks them to find the customer again by hand, which is
+        // the whole complaint this replaces.
+        const fileUri = await writeToCache(pdfBlob, safeFileName(number));
+        const sent = await sendEstimateToNumber({
+          phone: cleanNumber,
+          text: message,
+          fileUri: fileUri ?? undefined,
+        });
+
+        if (sent.ok) {
+          if (sent.mode === "chat_without_file") {
+            // The chat opened but WhatsApp refused the attachment, so say so
+            // rather than let the merchant assume the PDF went with it.
+            toast.warning("Opened the chat, but the PDF could not be attached", {
+              description: "Send it from the estimate's Share button if you need the file.",
+            });
+          } else if (sent.mode === "picker_with_file") {
+            toast.info("Pick the contact in WhatsApp to finish sending.");
+          }
+          closeWhatsappDialog();
+          return;
+        }
+
+        // WhatsApp missing or the intent refused: fall back to the share sheet
+        // rather than losing the estimate the merchant just prepared.
         const result = await shareBlob(pdfBlob, safeFileName(number), {
           title: `Estimate ${number}`,
           text: message,
@@ -178,7 +205,7 @@ const InvoiceHistory = ({
         });
 
         if (!result.ok && result.error && result.error !== "cancelled") {
-          throw new Error(result.error);
+          throw new Error(sent.error ?? result.error);
         }
         closeWhatsappDialog();
         return;
