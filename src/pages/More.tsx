@@ -30,6 +30,8 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import CompanyEditDialog from "@/components/CompanyEditDialog";
 import { ThemeSetting } from "@/components/ThemeSetting";
+import { useRewardsConfig } from "@/hooks/useRewards";
+import { Coins } from "lucide-react";
 import { hideBanner, openPrivacyOptions } from "@/native/ads";
 import {
   isBiometricAvailable,
@@ -170,6 +172,7 @@ const More = () => {
   const pending = useSyncPending();
   const { lastSyncAt } = useSyncState();
   const { run: syncRun, busy: syncBusy } = useManualSync(company?.id);
+  const { config: rewardsConfig } = useRewardsConfig();
   const [editOpen, setEditOpen] = useState(false);
   const [lockStatus, setLockStatus] = useState<BiometricStatus | null>(null);
   const [lockOn, setLockOn] = useState(false);
@@ -347,6 +350,17 @@ const More = () => {
             </Button>
           </div>
         </Card>
+
+        {rewardsConfig.enabled && (
+          <Section title="Rewards">
+            <Row
+              icon={<Coins className="h-[18px] w-[18px]" />}
+              label={`Earn ${rewardsConfig.pointsLabel}`}
+              hint={`Watch a short ad to earn ${rewardsConfig.pointsLabel}, then spend them on a plan`}
+              to="/earn"
+            />
+          </Section>
+        )}
 
         <Section title="Appearance">
           <ThemeSetting />

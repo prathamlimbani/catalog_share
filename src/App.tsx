@@ -27,6 +27,9 @@ const Terms = lazy(() => import("./pages/Terms"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const RefundPolicy = lazy(() => import("./pages/RefundPolicy"));
 const DeleteAccount = lazy(() => import("./pages/DeleteAccount"));
+// Earn pulls in the rewards data layer and the ad controller; lazy so it
+// stays out of the first paint for merchants who never open it.
+const Earn = lazy(() => import("./pages/Earn"));
 const CustomerCare = lazy(() => import("./pages/CustomerCare"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
@@ -173,6 +176,7 @@ const App = () => (
                     already linking to it. */}
                 <Route path="/more" element={<Navigate to="/account" replace />} />
                   <Route path="/billing" element={<Billing />} />
+                  <Route path="/earn" element={<Earn />} />
                   <Route path="/billing/receipt/:paymentId" element={<Receipt />} />
 
                   {/* Public storefront */}

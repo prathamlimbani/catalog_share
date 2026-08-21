@@ -467,10 +467,17 @@ interface CreatedOrder {
  * Returns null rather than throwing when the function is not deployed yet, so
  * the caller can decide whether to continue in the unverifiable legacy mode.
  */
-async function createOrder(planId: string, companyId: string): Promise<CreatedOrder | null> {
+async function createOrder(
+    planId: string,
+    companyId: string,
+    couponCode?: string | null,
+): Promise<CreatedOrder | null> {
     try {
         const { data, error } = await supabase.functions.invoke("create-razorpay-order", {
-            body: { planId, companyId },
+            // The code travels as text only. The DISCOUNT is derived server-side
+            // from the coupon row, both when the order is created and again when
+            // the payment is verified — nothing here is trusted.
+            body: { planId, companyId, couponCode: couponCode ?? "" },
         });
         if (error || !data?.orderId) {
             console.warn("[billing] create-razorpay-order failed:", error ?? data);
@@ -500,6 +507,13 @@ export function useRazorpaySubscription(companyId: string, companyName: string, 
         planPrice: number,
         onDialogCloseRequest?: () => void,
         onSuccess?: SubscribeSuccessHandler,
+        /**
+         * Optional coupon code. Passed through as TEXT only — the server looks
+         * the coupon up and computes the discount itself, twice (once to create
+         * the order, once to verify the payment), so a tampered value here can
+         * only ever be rejected, never honoured.
+         */
+        couponCode?: string | null,
     ) => {
         setLoading(true);
 
@@ -522,7 +536,7 @@ export function useRazorpaySubscription(companyId: string, companyName: string, 
             return;
         }
 
-        const createdOrder = await createOrder(planId, companyId);
+        const createdOrder = await createOrder(planId, companyId, couponCode);
         if (!createdOrder) {
             // Loud on purpose. The documented rollout gate is "make a test payment,
             // confirm it activates, THEN apply the lock migration". A fallback that

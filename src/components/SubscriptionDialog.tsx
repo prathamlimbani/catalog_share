@@ -6,6 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Check, Crown, FileText, Zap, Sparkles, Heart } from "lucide-react";
 import { PLANS, PLAN_RANK, type PlanDef, type PlanId } from "@/lib/plans";
 import { useRazorpaySubscription } from "@/hooks/useRazorpaySubscription";
+import CouponField, { type AppliedCoupon } from "@/components/CouponField";
+import { claimFullCoupon } from "@/lib/rewards";
+import { toast } from "sonner";
+import { ArrowLeft } from "lucide-react";
 
 // MasterAdmin.tsx imports these from here. They are thin re-exports of the
 // catalogue so there is exactly one definition of what a plan is; new code
@@ -83,15 +87,81 @@ export function SubscriptionDialog({ companyId, companyName, companyEmail, curre
     const [open, setOpen] = useState(false);
     const { subscribe, loading } = useRazorpaySubscription(companyId, companyName, companyEmail);
 
+    /**
+     * The confirm step.
+     *
+     * A coupon has to be checked against a SPECIFIC plan - codes can be scoped
+     * to one - so there is no correct planId for a single field floating above a
+     * grid of five. Picking a plan first gives the coupon something to be valid
+     * against, and gives the merchant a price to look at before they pay.
+     */
+    const [selected, setSelected] = useState<PlanDef | null>(null);
+    const [coupon, setCoupon] = useState<AppliedCoupon | null>(null);
+    const [claiming, setClaiming] = useState(false);
+
     const currentRank = PLAN_RANK[currentPlan as PlanId] ?? 0;
+
+    const closeAll = () => {
+        setOpen(false);
+        setSelected(null);
+        setCoupon(null);
+    };
 
     const handleSubscribe = (plan: PlanDef) => {
         if (plan.price <= 0 || plan.id === currentPlan) return;
-        subscribe(plan.id, plan.name, plan.price, () => setOpen(false), onPaymentSuccess);
+        setCoupon(null);
+        setSelected(plan);
+    };
+
+    const handlePay = async () => {
+        if (!selected || loading || claiming) return;
+
+        // A 100% coupon has nothing to charge, and Razorpay cannot create an
+        // order below one rupee. Charging a token rupee would be a lie on the
+        // receipt and would leave a real payment to refund, so this takes a
+        // separate server path that grants the plan directly.
+        if (coupon?.isFullDiscount) {
+            setClaiming(true);
+            try {
+                const result = await claimFullCoupon(coupon.code, selected.id);
+                if (!result.ok) {
+                    toast.error(result.reason ?? "Could not apply that coupon.");
+                    return;
+                }
+                toast.success(selected.name + " activated", {
+                    description: result.until
+                        ? "Active until " + new Date(result.until).toLocaleDateString() + "."
+                        : undefined,
+                });
+                closeAll();
+                onPaymentSuccess?.("coupon");
+            } finally {
+                setClaiming(false);
+            }
+            return;
+        }
+
+        // The code travels as text only; the discount is derived server-side
+        // twice - once to create the order, once to verify the payment.
+        subscribe(
+            selected.id,
+            selected.name,
+            selected.price,
+            closeAll,
+            onPaymentSuccess,
+            coupon?.code ?? null,
+        );
+    };
+
+    /** Price to display and charge, in rupees, honouring any applied coupon. */
+    const payableRupees = (plan: PlanDef): string => {
+        if (!coupon) return String(plan.price);
+        const rupees = coupon.finalPaise / 100;
+        return coupon.finalPaise % 100 === 0 ? String(rupees) : rupees.toFixed(2);
     };
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) { setSelected(null); setCoupon(null); } }}>
             <DialogTrigger asChild>{children}</DialogTrigger>
             <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
@@ -103,6 +173,68 @@ export function SubscriptionDialog({ companyId, companyName, companyEmail, curre
                     </p>
                 </DialogHeader>
 
+                {selected ? (
+                    <div className="space-y-4 py-4">
+                        <button
+                            type="button"
+                            onClick={() => { setSelected(null); setCoupon(null); }}
+                            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                        >
+                            <ArrowLeft className="h-4 w-4" />
+                            All plans
+                        </button>
+
+                        <Card>
+                            <CardContent className="p-5">
+                                <div className="flex items-baseline justify-between gap-3">
+                                    <h3 className="text-lg font-bold">{selected.name}</h3>
+                                    <p className="text-2xl font-extrabold tabular-nums">
+                                        &#8377;{payableRupees(selected)}
+                                        <span className="text-sm font-normal text-muted-foreground">/month</span>
+                                    </p>
+                                </div>
+                                {coupon && (
+                                    <p className="mt-1 text-right text-sm text-muted-foreground">
+                                        <span className="line-through">&#8377;{selected.price}</span>{" "}
+                                        <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                                            {coupon.percentOff}% off
+                                        </span>
+                                    </p>
+                                )}
+
+                                <ul className="mt-4 space-y-2">
+                                    {selected.features.map((f, i) => (
+                                        <li key={i} className="flex items-center gap-2 text-sm">
+                                            <Check className="h-4 w-4 shrink-0 text-emerald-500" />
+                                            <span>{f}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </CardContent>
+                        </Card>
+
+                        <CouponField
+                            planId={selected.id}
+                            priceRupees={selected.price}
+                            onChange={setCoupon}
+                            disabled={loading || claiming}
+                        />
+
+                        <Button
+                            className="h-12 w-full font-bold"
+                            onClick={handlePay}
+                            disabled={loading || claiming}
+                        >
+                            {claiming
+                                ? "Activating..."
+                                : loading
+                                    ? "Processing..."
+                                    : coupon?.isFullDiscount
+                                        ? "Activate " + selected.name + " free"
+                                        : "Pay \u20B9" + payableRupees(selected)}
+                        </Button>
+                    </div>
+                ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 py-4">
                     {DISPLAY_PLANS.map((plan) => {
                         const look = PRESENTATION[plan.id];
@@ -176,6 +308,7 @@ export function SubscriptionDialog({ companyId, companyName, companyEmail, curre
                         );
                     })}
                 </div>
+                )}
 
                 <p className="text-center text-xs text-muted-foreground">
                     🔒 Safe & Secure Payments via Razorpay · GPay · Visa · Mastercard

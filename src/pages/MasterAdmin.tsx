@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { LogOut, Store, Phone, Mail, MapPin, FileText, ExternalLink, Trash2, MessageSquare, Star, ClipboardList, BarChart3, Download, Crown, ChevronDown, Zap, Sparkles, Send, BookOpen, CheckCircle2, Tag } from "lucide-react";
+import { LogOut, Store, Phone, Mail, MapPin, FileText, ExternalLink, Trash2, MessageSquare, Star, ClipboardList, BarChart3, Download, Crown, ChevronDown, Zap, Sparkles, Send, BookOpen, CheckCircle2, Tag, Coins } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { exportMasterDataToExcel } from "@/lib/exportUtils";
@@ -19,13 +19,14 @@ import { downloadInvoice } from "@/lib/receipt";
 import { getPlanName } from "@/components/SubscriptionDialog";
 
 import PlansAdmin from "@/components/admin/PlansAdmin";
+import RewardsAdmin from "@/components/admin/RewardsAdmin";
 
 const MasterAdmin = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [confirmText, setConfirmText] = useState("");
-  const [activeTab, setActiveTab] = useState<"companies" | "suggestions" | "surveys" | "analytics" | "subscriptions" | "plans">("companies");
+  const [activeTab, setActiveTab] = useState<"companies" | "suggestions" | "surveys" | "analytics" | "subscriptions" | "plans" | "rewards">("companies");
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | "all">("all");
   const [planChangeTarget, setPlanChangeTarget] = useState<{ id: string; name: string; newPlan: string } | null>(null);
   const [bulkEmailSending, setBulkEmailSending] = useState(false);
@@ -220,6 +221,7 @@ const MasterAdmin = () => {
     { key: "analytics" as const, label: "Analytics", icon: BarChart3, count: 0 },
     { key: "subscriptions" as const, label: "Subscriptions", icon: Crown, count: companies?.length || 0 },
     { key: "plans" as const, label: "Plans", icon: Tag, count: 0 },
+    { key: "rewards" as const, label: "Rewards & Ads", icon: Coins, count: 0 },
   ];
 
   return (
@@ -673,6 +675,8 @@ const MasterAdmin = () => {
 
       {/* Subscriptions Tab */}
       {activeTab === "plans" && <PlansAdmin />}
+
+      {activeTab === "rewards" && <RewardsAdmin />}
 
       {activeTab === "subscriptions" && (
         <>

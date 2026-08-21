@@ -651,3 +651,105 @@ $$;
 
 REVOKE ALL ON FUNCTION public.increment_coupon_redemption(UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.increment_coupon_redemption(UUID) TO service_role;
+
+
+-- -----------------------------------------------------------------------------
+-- claim_full_coupon — a 100% coupon, which has no payment to verify
+--
+-- Razorpay cannot create an order below one rupee, so a 100%-off code cannot go
+-- through the normal buy flow at all. Charging one rupee instead would be a lie
+-- on the receipt and would leave a real payment to refund.
+--
+-- Everything the paid path checks is checked here too — validity window, plan
+-- scope, per-company limit, global quota — and it is checked IN THE DATABASE,
+-- because this function grants a plan without any money changing hands and is
+-- therefore the single most attractive thing in the schema to attack.
+--
+-- SECURITY DEFINER with auth.uid() as the only identity input: the caller
+-- cannot name a company, only be one.
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.claim_full_coupon(p_code TEXT, p_plan_id TEXT)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  c            public.coupons%ROWTYPE;
+  v_company    public.companies%ROWTYPE;
+  v_used       INTEGER;
+  v_until      TIMESTAMPTZ;
+  v_days       INTEGER := 30;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'Not signed in.');
+  END IF;
+
+  -- FOR UPDATE serialises two taps of Redeem from the same account.
+  SELECT * INTO v_company FROM public.companies
+   WHERE owner_id = auth.uid() LIMIT 1 FOR UPDATE;
+  IF v_company.id IS NULL THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'Set up your company first.');
+  END IF;
+
+  SELECT * INTO c FROM public.coupons
+   WHERE upper(code) = upper(trim(p_code)) LIMIT 1 FOR UPDATE;
+
+  IF c.id IS NULL THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'That coupon code does not exist.');
+  END IF;
+
+  -- A coupon that is not actually 100% must go through the paid flow. Granting
+  -- here on a partial discount would hand out a free plan for a 10% code.
+  IF c.percent_off < 100 THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'This coupon needs a payment. Please continue to checkout.');
+  END IF;
+
+  IF NOT c.active THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'This coupon is no longer active.');
+  END IF;
+  IF c.starts_at IS NOT NULL AND now() < c.starts_at THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'This coupon is not valid yet.');
+  END IF;
+  IF c.expires_at IS NOT NULL AND now() > c.expires_at THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'This coupon has expired.');
+  END IF;
+  IF c.max_redemptions IS NOT NULL AND c.redeemed_count >= c.max_redemptions THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'This coupon has been fully claimed.');
+  END IF;
+  IF c.applies_to_plans IS NOT NULL AND NOT (p_plan_id = ANY (c.applies_to_plans)) THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'This coupon does not apply to that plan.');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.plans WHERE id = p_plan_id AND price > 0) THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'That plan cannot be claimed.');
+  END IF;
+
+  SELECT count(*) INTO v_used
+    FROM public.coupon_redemptions
+   WHERE coupon_id = c.id AND company_id = v_company.id;
+
+  IF c.per_company_limit > 0 AND v_used >= c.per_company_limit THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'You have already used this coupon.');
+  END IF;
+
+  -- Extend rather than overwrite, so claiming does not shorten time already
+  -- paid for.
+  v_until := GREATEST(COALESCE(v_company.subscription_expires_at, now()), now())
+             + (v_days || ' days')::INTERVAL;
+
+  UPDATE public.companies
+     SET subscription_plan = p_plan_id, subscription_expires_at = v_until
+   WHERE id = v_company.id;
+
+  INSERT INTO public.coupon_redemptions
+    (coupon_id, company_id, plan_id, percent_off, original_amount, final_amount, razorpay_order_id)
+  SELECT c.id, v_company.id, p_plan_id, c.percent_off, pl.price * 100, 0, NULL
+    FROM public.plans pl WHERE pl.id = p_plan_id;
+
+  UPDATE public.coupons SET redeemed_count = redeemed_count + 1 WHERE id = c.id;
+
+  RETURN jsonb_build_object('ok', true, 'plan', p_plan_id, 'days', v_days, 'until', v_until);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.claim_full_coupon(TEXT, TEXT) TO authenticated;
