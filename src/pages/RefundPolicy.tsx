@@ -192,7 +192,7 @@ const RefundPolicy = () => {
       <LegalHeading>11. Contact</LegalHeading>
       <LegalText>
         CatalogShare, Gujarat, India. Email <LegalStrong>catalogshare123@gmail.com</LegalStrong>,
-        website <LegalStrong>https://catalogshare.online</LegalStrong>.
+        website <LegalStrong>https://app.catalogshare.online</LegalStrong>.
       </LegalText>
     </LegalPage>
   );

@@ -117,7 +117,7 @@ const DeleteAccount = () => {
       <LegalText>
         This page explains how to permanently delete your CatalogShare account (Google Play package{" "}
         <LegalStrong>in.catalogshare.app</LegalStrong>, website{" "}
-        <LegalStrong>https://catalogshare.online</LegalStrong>) and everything stored with it. You can
+        <LegalStrong>https://app.catalogshare.online</LegalStrong>) and everything stored with it. You can
         do it yourself from inside the app, or ask us to do it by email.
       </LegalText>
 

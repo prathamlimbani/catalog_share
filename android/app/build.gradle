@@ -33,8 +33,8 @@ android {
         // Play rejects a bundle whose versionCode is <= one already uploaded to
         // the same track, and a rejected upload cannot be reused - you have to
         // bump and rebuild. versionName is the human-facing string and may repeat.
-        versionCode 8
-        versionName "1.0.7"
+        versionCode 10
+        versionName "1.0.9"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

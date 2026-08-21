@@ -19,7 +19,7 @@ const Privacy = () => {
     <LegalPage title="Privacy Policy" effectiveDate="19 August 2026" lastUpdated="19 August 2026">
       <LegalText>
         This Privacy Policy explains what CatalogShare collects when you use the CatalogShare Android
-        app or the website at catalogshare.online, why we collect it, who we share it with and what
+        app or the website at app.catalogshare.online, why we collect it, who we share it with and what
         control you have over it. CatalogShare is a catalogue, storefront and estimate tool sold to
         businesses in India.
       </LegalText>
@@ -28,7 +28,7 @@ const Privacy = () => {
       <LegalText>
         CatalogShare (&ldquo;CatalogShare&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;) operates the
         CatalogShare app (Google Play package <LegalStrong>in.catalogshare.app</LegalStrong>) and the
-        website <LegalStrong>https://catalogshare.online</LegalStrong>. We are based in Gujarat, India.
+        website <LegalStrong>https://app.catalogshare.online</LegalStrong>. We are based in Gujarat, India.
         You can reach us at <LegalStrong>catalogshare123@gmail.com</LegalStrong>.
       </LegalText>
 
@@ -309,8 +309,8 @@ const Privacy = () => {
       <LegalText>
         You can delete your CatalogShare account and everything in it at any time. In the app open{" "}
         <LegalStrong>Settings &rarr; Delete account</LegalStrong>, or visit{" "}
-        <LegalStrong>https://catalogshare.online/account-deletion</LegalStrong> (standalone copy:{" "}
-        <LegalStrong>https://catalogshare.online/legal/account-deletion.html</LegalStrong>). That page
+        <LegalStrong>https://app.catalogshare.online/account-deletion</LegalStrong> (standalone copy:{" "}
+        <LegalStrong>https://app.catalogshare.online/legal/account-deletion.html</LegalStrong>). That page
         lists exactly what is deleted, what is retained for tax purposes and how long it takes. Deletion
         is permanent.
       </LegalText>

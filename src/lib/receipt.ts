@@ -41,9 +41,9 @@ export interface ReceiptData {
   status: string;
 }
 
-import { SUPPORT_EMAIL, SUPPORT_PHONE, SUPPORT_PHONE_ENABLED } from "@/lib/appInfo";
+import { SUPPORT_EMAIL, SUPPORT_PHONE, SUPPORT_PHONE_ENABLED, WEBSITE_URL } from "@/lib/appInfo";
 
-const WEBSITE = "https://catalogshare.online";
+const WEBSITE = WEBSITE_URL;
 
 /**
  * HTML-escape an untrusted value.

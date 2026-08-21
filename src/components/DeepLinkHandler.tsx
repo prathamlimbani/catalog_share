@@ -1,7 +1,7 @@
 /**
  * App Links → in-app routes.
  *
- * AndroidManifest.xml claims https://catalogshare.online/store/… and /invoices/…
+ * AndroidManifest.xml claims https://app.catalogshare.online/store/… and /invoices/…
  * with autoVerify, so Android hands those taps to this app instead of the
  * browser. Until something reads the incoming URL, though, the app simply opened
  * on whatever screen it opens on — a shared storefront link took the recipient
@@ -18,7 +18,12 @@ import { App as CapApp } from "@capacitor/app";
 import { isNative } from "@/native/platform";
 
 /** Must stay in step with the App Links intent-filter in AndroidManifest.xml. */
-const APP_LINK_HOSTS = new Set(["catalogshare.online", "www.catalogshare.online"]);
+const APP_LINK_HOSTS = new Set([
+  "app.catalogshare.online",
+  // Kept so storefront links shared before the move still open in the app.
+  "catalogshare.online",
+  "www.catalogshare.online",
+]);
 
 /**
  * A cold-start link arrives twice on some Android versions — once as the launch

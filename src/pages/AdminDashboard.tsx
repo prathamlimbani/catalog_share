@@ -31,6 +31,7 @@ import { SubscriptionDialog } from "@/components/SubscriptionDialog";
 import ProductImage from "@/components/ProductImage";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { getPlanName } from "@/lib/plans";
+import { storeUrl as buildStoreUrl } from "@/lib/appInfo";
 import {
   asNumber,
   asText,
@@ -100,7 +101,7 @@ const AdminDashboard = () => {
 
   // A company row saved before slugs were mandatory has no store address yet.
   const storeSlug = asText(company?.slug).trim();
-  const storeUrl = storeSlug ? `https://catalogshare.online/store/${encodeURIComponent(storeSlug)}` : "";
+  const storeUrl = storeSlug ? buildStoreUrl(encodeURIComponent(storeSlug)) : "";
 
   const copyLink = async () => {
     // The clipboard API rejects outright in a WebView served over plain http,

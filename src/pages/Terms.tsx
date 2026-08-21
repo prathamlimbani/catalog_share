@@ -20,7 +20,7 @@ const Terms = () => {
       <LegalText>
         These Terms &amp; Conditions govern your use of CatalogShare &mdash; the Android app (Google
         Play package <LegalStrong>in.catalogshare.app</LegalStrong>), the website at{" "}
-        <LegalStrong>https://catalogshare.online</LegalStrong>, the public storefront pages we host for
+        <LegalStrong>https://app.catalogshare.online</LegalStrong>, the public storefront pages we host for
         you, and every related service. Please read them before you create an account.
       </LegalText>
 
@@ -309,7 +309,7 @@ const Terms = () => {
       <LegalHeading>19. Contact</LegalHeading>
       <LegalText>
         CatalogShare, Gujarat, India. Email <LegalStrong>catalogshare123@gmail.com</LegalStrong>,
-        website <LegalStrong>https://catalogshare.online</LegalStrong>.
+        website <LegalStrong>https://app.catalogshare.online</LegalStrong>.
       </LegalText>
     </LegalPage>
   );

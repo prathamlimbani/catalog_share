@@ -97,7 +97,7 @@ const App = () => (
         <BrowserRouter>
           <ScrollToTop />
           <AuthWatcher />
-          {/* Routes an incoming App Link (https://catalogshare.online/store/...) to the
+          {/* Routes an incoming App Link (https://app.catalogshare.online/store/...) to the
               matching in-app screen. Must live inside the router to navigate. */}
           <DeepLinkHandler />
           {/* Biometric app lock. Inside the router so the lock screen's own

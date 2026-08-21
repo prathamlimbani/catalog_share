@@ -24,6 +24,7 @@ import BottomNav from "@/components/mobile/BottomNav";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { onBannerHeightChange } from "@/native/ads";
 import { useSyncScheduler } from "@/hooks/useSync";
+import { useEntitlementLive } from "@/hooks/useEntitlementLive";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -71,6 +72,10 @@ export const AdminLayout = ({
   // Keep the offline queue draining in the background for as long as the user
   // is inside the app shell.
   useSyncScheduler(company?.id);
+  // Keeps the plan current while the app is open, so a payment captured after
+  // verify (or a plan granted from the admin console) drops the paywall
+  // without the merchant having to restart the app.
+  useEntitlementLive(company?.id);
 
   // Publish the live AdMob banner height so the bottom tab bar and the scroll
   // container can both stay clear of it. Free users only — for paid users the

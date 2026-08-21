@@ -220,12 +220,74 @@ async function retryWithFreshNumber(
   write: WriteFn,
 ): Promise<{ number: string | null; message: string | null }> {
   const fresh = await freshInvoiceNumber(local.company_id);
-  const { error } = await write({ ...payload, invoice_number: fresh });
+  const { error } = await writeTolerantOfMissingColumns({ ...payload, invoice_number: fresh }, write);
   if (error) return { number: null, message: error.message };
   return { number: fresh, message: null };
 }
 
 const insertInvoice: WriteFn = (payload) => supabase.from("invoices").insert(payload as never);
+
+/**
+ * Columns the client knows about that a database may not have yet, in the order
+ * it is safe to drop them.
+ *
+ * `advance_payment` is the one that actually bit: it has its own migration, and
+ * against a database where that migration was never applied EVERY push failed
+ * with 42703. The push path only recovered from 23505, so each estimate burned
+ * its eight attempts and parked — silently, because a parked entry still counts
+ * as "pending" rather than as an error. No estimate reached the server at all.
+ *
+ * Dropping the column loses that one field for that one row rather than losing
+ * the whole estimate, and the legacy items sentinel still carries the advance
+ * for older readers. The proper fix is to apply the migration; this only stops
+ * a missing column from taking the entire feature down with it.
+ */
+const OPTIONAL_COLUMNS = ["advance_payment"] as const;
+
+/** The column PostgREST is complaining about, if we can tell. */
+function missingColumnName(error: { code?: string; message: string }): string | null {
+  const m = /column "?(?:invoices\.)?([a-z_]+)"? does not exist/i.exec(error.message)
+    ?? /Could not find the '([a-z_]+)' column/i.exec(error.message);
+  return m ? m[1] : null;
+}
+
+/**
+ * Run a write, retrying without any column the database turns out not to have.
+ *
+ * Returns the error from the last attempt, so a genuine failure still reports
+ * the real reason rather than a column complaint.
+ */
+async function writeTolerantOfMissingColumns(
+  payload: Record<string, unknown>,
+  write: WriteFn,
+): Promise<{ error: { code?: string; message: string } | null; dropped: string[] }> {
+  let body = { ...payload };
+  const dropped: string[] = [];
+
+  // Bounded by the number of optional columns plus one, so a database that is
+  // missing something we cannot drop fails fast instead of looping.
+  for (let attempt = 0; attempt <= OPTIONAL_COLUMNS.length; attempt += 1) {
+    const { error } = await write(body);
+    if (!error || !isMissingColumn(error)) return { error, dropped };
+
+    const column = missingColumnName(error);
+    const droppable = column && (OPTIONAL_COLUMNS as readonly string[]).includes(column);
+    if (!droppable || !(column in body)) {
+      // A required column is missing — the schema is too old to write to at
+      // all, and saying so beats retrying forever.
+      return { error, dropped };
+    }
+
+    console.warn(
+      `[sync] invoices.${column} does not exist on the server; ` +
+        "pushing without it. Apply the pending migrations in supabase/migrations/.",
+    );
+    delete body[column];
+    dropped.push(column);
+  }
+
+  return { error: null, dropped };
+}
 
 /**
  * Insert with full 23505 recovery. Used both for a first push and for
@@ -240,7 +302,7 @@ async function insertWithRecovery(
   // again treat this row as one the server has not seen.
   await markPushAttempted(local.id);
 
-  const { error } = await insertInvoice(payload);
+  const { error } = await writeTolerantOfMissingColumns(payload, insertInvoice);
 
   if (!error) {
     await markSynced(local.id);
@@ -347,7 +409,7 @@ async function pushEntry(entry: OutboxEntry): Promise<"done" | "retry" | "drop">
       .update(p as never)
       .eq("id", local.id);
 
-  const { error: updateError } = await updateInvoice(payload);
+  const { error: updateError } = await writeTolerantOfMissingColumns(payload, updateInvoice);
 
   if (updateError?.code === PG_UNIQUE_VIOLATION) {
     const retried = await retryWithFreshNumber(local, payload, updateInvoice);

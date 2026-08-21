@@ -37,15 +37,23 @@
             <!--
                 App Links. Shared storefront and invoice links open inside the app
                 instead of the browser. autoVerify requires
-                https://catalogshare.online/.well-known/assetlinks.json to list the
-                SHA-256 of the signing certificate (use the Play App Signing cert,
-                not the upload cert) - see RELEASE.md.
+                https://app.catalogshare.online/.well-known/assetlinks.json to list
+                the SHA-256 of the signing certificate (use the Play App Signing
+                cert, not the upload cert) - see RELEASE.md. Every host listed
+                below needs its own assetlinks.json, and verification for the whole
+                filter fails if any one of them cannot be fetched.
+
+                app.catalogshare.online is where the app now lives; the bare and
+                www hosts stay claimed so links shared by earlier builds keep
+                opening in the app instead of bouncing to the browser.
             -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
+                <data android:scheme="https" android:host="app.catalogshare.online" android:pathPrefix="/store" />
+                <data android:scheme="https" android:host="app.catalogshare.online" android:pathPrefix="/invoices" />
                 <data android:scheme="https" android:host="catalogshare.online" android:pathPrefix="/store" />
                 <data android:scheme="https" android:host="catalogshare.online" android:pathPrefix="/invoices" />
                 <data android:scheme="https" android:host="www.catalogshare.online" android:pathPrefix="/store" />

@@ -1,0 +1,15 @@
+# Play Console → Release → Production → Release notes (max 500 chars per language)
+
+## en-IN — version 1.0.8 (versionCode 9)
+
+CatalogShare now runs on its own home at app.catalogshare.online.
+
+• Faster, more reliable storefront and estimate loading
+• Storefront links you share now open in the app more consistently
+• Updated privacy policy, terms and refund policy links
+• Stability and performance fixes throughout
+
+Existing links you have already shared keep working exactly as before.
+
+---
+*(388 characters — inside the 500 limit.)*

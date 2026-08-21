@@ -9,12 +9,12 @@
 export const APP_NAME = "CatalogShare";
 
 /** Keep in step with android/app/build.gradle versionName. */
-export const APP_VERSION = "1.0.7";
+export const APP_VERSION = "1.0.9";
 
 /** Permanent Play Store identity. Never change this. */
 export const ANDROID_PACKAGE = "in.catalogshare.app";
 
-export const WEBSITE_URL = "https://catalogshare.online";
+export const WEBSITE_URL = "https://app.catalogshare.online";
 
 export const SUPPORT_EMAIL = "catalogshare123@gmail.com";
 
