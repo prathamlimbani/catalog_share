@@ -9,7 +9,7 @@
 export const APP_NAME = "CatalogShare";
 
 /** Keep in step with android/app/build.gradle versionName. */
-export const APP_VERSION = "2.0.0";
+export const APP_VERSION = "2.0.1";
 
 /** Permanent Play Store identity. Never change this. */
 export const ANDROID_PACKAGE = "in.catalogshare.app";
