@@ -1,12 +1,19 @@
 # Moving off Supabase
 
-A self-hosted backend is **running and verified** on 103.233.65.233. This
-document is what it is, what still depends on Supabase, and how to switch.
+**The migration is done.** As of 22 Aug 2026 the app runs entirely on the
+self-hosted backend at 103.233.65.233. Supabase is no longer in the request
+path — the shipped bundle contains zero references to `supabase.co`.
 
-The app is not pointed at it yet, for one reason: **the 14 existing merchants'
-login accounts are still in the Supabase project**, and nothing can move them
-without credentials for that project. Switching today means every merchant has
-to register again. That is the whole gate — everything else is done.
+Migrated: 43 accounts, 14 companies, 85 products, 30 invoices, 29 subscriptions,
+2,584 analytics events, 6 suggestions, 18 surveys, and 77 image files.
+
+**Every account was issued a new password.** Supabase does not export bcrypt
+hashes to a service_role key, so they could not come across. The list is in
+`supabase-export/PASSWORDS.txt` (gitignored) — hand them out, then wire SMTP so
+people can reset their own.
+
+The Supabase project is untouched and is the rollback: restore the two values
+from `.env.supabase-backup` and rebuild.
 
 ---
 

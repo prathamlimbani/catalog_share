@@ -52,3 +52,8 @@ release-output/
 # where deleting them later does not actually remove them.
 full-database-backup-*.json
 Master_Data_Export_*.xlsx
+
+# Supabase export: real merchant PII, plus the temporary passwords issued during
+# the migration. Never commit - git history does not forget, and this is exactly
+# the data a leaked repo would be judged on.
+supabase-export/
