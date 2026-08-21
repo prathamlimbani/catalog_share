@@ -36,8 +36,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { companyKey } from "@/hooks/useCompany";
 import { isOnline } from "@/native/net";
 
-/** The backstop poll. Matches useCurrentCompany's staleTime. */
-const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+/**
+ * The backstop poll.
+ *
+ * Forty-five seconds, not five minutes. Realtime is the mechanism that was
+ * supposed to make a plan change instant, and it is not running on the
+ * self-hosted backend — there is no realtime service in that stack — so this
+ * interval IS the propagation delay in practice. An admin who grants a plan and
+ * then watches the merchant's phone was waiting up to five minutes for it to
+ * appear, which reads as "it didn't work" and invites them to grant it twice.
+ *
+ * The cost is one indexed single-row select per open app per 45s, and only
+ * while the app is in the foreground (see below) — a backgrounded app polls
+ * nothing, because `resume` already forces a refresh the moment it comes back.
+ */
+const REFRESH_INTERVAL_MS = 45 * 1000;
 
 /**
  * Ignore repeat triggers inside this window.
@@ -56,8 +69,11 @@ export function useEntitlementLive(companyId: string | null | undefined): void {
 
     let disposed = false;
 
-    const refresh = () => {
+    const refresh = (opts?: { background?: boolean }) => {
       if (disposed) return;
+      // Nothing to update on a screen nobody is looking at, and Android throttles
+      // these timers anyway. `resume` and `visibilitychange` cover the return.
+      if (opts?.background && document.visibilityState !== "visible") return;
       // Offline there is nothing to fetch, and letting the query run would
       // replace the row with the mirrored copy for no reason.
       if (!isOnline()) return;
@@ -116,13 +132,15 @@ export function useEntitlementLive(companyId: string | null | undefined): void {
     const onVisibility = () => {
       if (document.visibilityState === "visible") refresh();
     };
+    // A named handler, so removeEventListener can actually find it.
+    const onWake = () => refresh();
     document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("focus", refresh);
-    window.addEventListener("online", refresh);
+    window.addEventListener("focus", onWake);
+    window.addEventListener("online", onWake);
 
     let removeResume: (() => void) | undefined;
     void import("@capacitor/app")
-      .then(({ App }) => App.addListener("resume", refresh))
+      .then(({ App }) => App.addListener("resume", onWake))
       .then((handle) => {
         if (disposed) void handle.remove();
         else removeResume = () => void handle.remove();
@@ -132,14 +150,14 @@ export function useEntitlementLive(companyId: string | null | undefined): void {
       });
 
     // ---- 3. Interval backstop ----------------------------------------------
-    const interval = window.setInterval(refresh, REFRESH_INTERVAL_MS);
+    const interval = window.setInterval(() => refresh({ background: true }), REFRESH_INTERVAL_MS);
 
     return () => {
       disposed = true;
       void supabase.removeChannel(channel);
       document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("focus", refresh);
-      window.removeEventListener("online", refresh);
+      window.removeEventListener("focus", onWake);
+      window.removeEventListener("online", onWake);
       removeResume?.();
       window.clearInterval(interval);
     };

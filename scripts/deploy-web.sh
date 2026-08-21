@@ -15,6 +15,11 @@ set -euo pipefail
 DEPLOY_USER="${DEPLOY_USER:-dhairya}"
 DEPLOY_HOST="${DEPLOY_HOST:-103.233.65.233}"
 REMOTE_ROOT="/var/www/app.catalogshare.online"
+# The document root is ${REMOTE_ROOT}/public, NOT ${REMOTE_ROOT} itself: the site
+# directory also holds ./acme, the webroot certbot renews the certificate through.
+# Unpacking a build over ${REMOTE_ROOT} destroys both — every route 404s because
+# nginx's root no longer exists, and renewal breaks silently until the cert lapses.
+# Use this script rather than doing it by hand; that mistake has been made once.
 
 cd "$(dirname "$0")/.."
 

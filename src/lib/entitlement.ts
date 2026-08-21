@@ -11,8 +11,15 @@
  */
 
 import { getPlan, getPlanLimit, isPaidPlanId, type PlanId } from "@/lib/plans";
+import { trialConfig, trialDurationMs } from "@/lib/trialConfig";
 
-/** Length of the free estimate trial. */
+/**
+ * Length of the free estimate trial as SHIPPED.
+ *
+ * The live value comes from `trialDurationMs()`, which the admin console can
+ * change without a release. This constant remains the fallback and the figure
+ * the tests pin, so a config outage cannot silently shorten anyone's trial.
+ */
 export const TRIAL_DURATION_MS = 5 * 24 * 60 * 60 * 1000;
 
 /**
@@ -110,9 +117,13 @@ export function getEntitlement(
   const localStart = localTrialStart && localTrialStart > 0 ? Math.min(localTrialStart, now) : 0;
   const startedAt = serverStart > 0 ? serverStart : localStart;
 
-  const trialEndsAt = startedAt > 0 ? startedAt + TRIAL_DURATION_MS : 0;
+  const trialEndsAt = startedAt > 0 ? startedAt + trialDurationMs() : 0;
   const trialMsRemaining = trialEndsAt > 0 ? Math.max(0, trialEndsAt - now) : 0;
-  const trialActive = trialMsRemaining > 0;
+  // An admin who switches the trial off ends the ones already running. That is
+  // the point of the switch — otherwise turning it off would take five days to
+  // have any effect and there would be no way to stop an abused promotion.
+  const trial = trialConfig();
+  const trialActive = trialMsRemaining > 0 && trial.enabled;
 
   return {
     plan,
@@ -125,13 +136,15 @@ export function getEntitlement(
     // unambiguous reading of "ads for free users, none for paid users".
     adsEnabled: !isPaid,
 
-    estimatesUnlocked: (isPaid && planDef.unlocksEstimates) || trialActive,
+    // What the trial is worth is configurable too, so a promotion can widen or
+    // narrow it without a release.
+    estimatesUnlocked: (isPaid && planDef.unlocksEstimates) || (trialActive && trial.unlocksEstimates),
     trialActive,
     trialEndsAt,
     trialMsRemaining,
 
-    productLimit: isPaid ? getPlanLimit(plan) : 40,
-    premiumThemes: isPaid,
+    productLimit: isPaid ? getPlanLimit(plan) : trial.productLimit,
+    premiumThemes: isPaid || (trialActive && trial.unlocksPremiumThemes),
     premiumSkins: isPaid && planDef.unlocksPremiumSkins,
     supportPhoneUnlocked: isPaid && planDef.unlocksCallSupport,
   };

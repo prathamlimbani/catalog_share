@@ -39,7 +39,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { hideBanner, prepareRewarded, showRewarded } from "@/native/ads";
+import { prepareRewarded, showRewarded } from "@/native/ads";
 import { isNative } from "@/native/platform";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -145,14 +145,6 @@ const Earn = () => {
     return () => {
       alive.current = false;
     };
-  }, []);
-
-  // No banner on this screen. The one ad here is the one the merchant opted
-  // into, and a banner parked under a full-width "Watch an ad" button collects
-  // mistaps — which read as an accident to the user and as an invalid click to
-  // Google. Deliberately no cleanup: a screen may only ever turn the banner off.
-  useEffect(() => {
-    void hideBanner();
   }, []);
 
   // Warm an ad up front so the first tap opens one instead of sitting on a

@@ -29,7 +29,9 @@ import { getMirroredProducts } from "@/lib/offline/mirror";
 import { syncNow } from "@/lib/sync/syncEngine";
 import { getPlanPrice } from "@/lib/plans";
 import { ensureTrialStarted } from "@/lib/trial";
-import { hideBanner, maybeShowInterstitial, prepareRewarded, showBanner, showRewarded } from "@/native/ads";
+import { maybeShowInterstitial, prepareRewarded, showRewarded } from "@/native/ads";
+import { useSuppressAds } from "@/hooks/useAdSurface";
+import { adPolicy } from "@/lib/adPolicy";
 import {
   decideGate,
   loadGateConfig,
@@ -177,19 +179,12 @@ const Invoices = () => {
   // load asynchronously, and treating "not loaded yet" as "no access" is what
   // showed a brand-new user "Free trial ended" on a trial that had just begun.
   const estimatesLocked = entitlementResolved && !entitlement.estimatesUnlocked;
-  useEffect(() => {
-    const suppress = viewMode === "preview" || estimatesLocked;
-    if (suppress || !entitlement.adsEnabled) {
-      void hideBanner();
-    } else {
-      void showBanner();
-    }
-    // The banner belongs to this screen only. Without this teardown it outlived
-    // the Estimates tab and sat on top of Billing and the Razorpay checkout.
-    return () => {
-      void hideBanner();
-    };
-  }, [viewMode, estimatesLocked, entitlement.adsEnabled]);
+  // The shell owns the banner now (see useAdSurface.ts); this screen only
+  // declares the two states in which it must not be there. The PDF preview is
+  // a document the merchant is about to send a customer, and the lock screen is
+  // a sales pitch — a banner on either one is noise on top of the message.
+  useSuppressAds("estimate-preview", viewMode === "preview");
+  useSuppressAds("estimates-locked", estimatesLocked);
 
   /**
    * Trial over, no plan, and no connection to buy one.
@@ -352,7 +347,9 @@ const Invoices = () => {
     // The one moment an interstitial is acceptable: the task is finished and
     // the user is back between screens, not on top of the preview they came to
     // read. Free tier only, and heavily rate limited (see native/adsConfig.ts).
-    if (leavingPreview && entitlement.adsEnabled) void maybeShowInterstitial();
+    if (leavingPreview && entitlement.adsEnabled && adPolicy().interstitial) {
+      void maybeShowInterstitial();
+    }
   };
 
   const handleLogout = async () => {

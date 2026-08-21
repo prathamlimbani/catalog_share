@@ -22,6 +22,9 @@ import { CustomerSupportDialog } from "@/components/CustomerSupportDialog";
 import BottomNav from "@/components/mobile/BottomNav";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { onBannerHeightChange } from "@/native/ads";
+import { useAdBanner } from "@/hooks/useAdSurface";
+import { getEntitlement } from "@/lib/entitlement";
+import UpgradeToRemoveAds from "@/components/UpgradeToRemoveAds";
 import { useSyncScheduler } from "@/hooks/useSync";
 import { useEntitlementLive } from "@/hooks/useEntitlementLive";
 
@@ -75,6 +78,17 @@ export const AdminLayout = ({
   // verify (or a plan granted from the admin console) drops the paywall
   // without the merchant having to restart the app.
   useEntitlementLive(company?.id);
+
+  /**
+   * The banner is owned by the shell, not by individual screens.
+   *
+   * It was previously mounted by the Estimates screen alone, which is why most
+   * of the app showed no ads at all. `useAdBanner` shows it on every signed-in
+   * screen the plan's ad policy allows, minus the routes and screens that must
+   * stay ad-free (payment, receipts, the rewarded-ad screen, the PDF preview).
+   */
+  const entitlement = getEntitlement(company as any);
+  const { showingAds } = useAdBanner(entitlement);
 
   // Publish the live AdMob banner height so the bottom tab bar and the scroll
   // container can both stay clear of it. Free users only — for paid users the
@@ -231,6 +245,9 @@ export const AdminLayout = ({
         </header>
 
         <OfflineBanner companyId={company?.id} className="print:hidden" />
+
+        {/* Only ever rendered while an ad is genuinely on screen. */}
+        <UpgradeToRemoveAds visible={showingAds} className="print:hidden" />
 
         {/* Phone-width search sits under the header rather than competing with
             the title for space in it. */}

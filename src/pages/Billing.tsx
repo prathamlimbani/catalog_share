@@ -16,7 +16,6 @@ import { downloadInvoice, resolvePaidPlanId } from "@/lib/receipt";
 import { useNetwork } from "@/hooks/useNetwork";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { SUPPORT_EMAIL, SUPPORT_PHONE } from "@/lib/appInfo";
-import { hideBanner } from "@/native/ads";
 import { beginUserSignOut } from "@/native/bootstrap";
 
 // Re-exported so MasterAdmin.tsx's historical `import { downloadInvoice } from "@/pages/Billing"`
@@ -136,12 +135,6 @@ const Billing = () => {
         },
         enabled: !!company?.id,
     });
-
-    // No ads on the payment screen: a banner next to a "Pay ₹399" button reads
-    // as part of the checkout, and Play treats that as a dark pattern.
-    useEffect(() => {
-        void hideBanner();
-    }, []);
 
     // Bounce to /login only when we KNOW there is no session. Offline, or when
     // the session lookup itself fails, /login is a dead end — the user cannot

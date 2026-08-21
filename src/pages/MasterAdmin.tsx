@@ -958,10 +958,34 @@ const MasterAdmin = () => {
                     new_plan: planChangeTarget.newPlan,
                   });
                   if (error) throw error;
-                  await queryClient.invalidateQueries({ queryKey: ["all-companies"] });
-                  await queryClient.refetchQueries({ queryKey: ["all-companies"] });
+
                   const planLabel = planChangeTarget.newPlan === 'free' ? 'Free Plan' : planChangeTarget.newPlan === 'growth' ? 'Growth Plan' : 'Pro Plan';
+
+                  // Show the result now, reconcile with the server after.
+                  //
+                  // This used to `await invalidateQueries` and then `await
+                  // refetchQueries` BEFORE the toast, so the dialog sat open
+                  // through two round trips with no feedback. On a slow
+                  // connection that reads as "nothing happened", and the
+                  // obvious response - clicking Confirm again - grants the plan
+                  // a second time. The RPC has already succeeded by this point;
+                  // the refetch is only there to pick up the columns the server
+                  // computed, so it does not need to be waited on.
+                  const grantedExpiry = planChangeTarget.newPlan === 'free'
+                    ? null
+                    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+                  queryClient.setQueryData(["all-companies"], (rows: any) =>
+                    Array.isArray(rows)
+                      ? rows.map((c: any) =>
+                          c.id === planChangeTarget.id
+                            ? { ...c, subscription_plan: planChangeTarget.newPlan, subscription_expires_at: grantedExpiry }
+                            : c,
+                        )
+                      : rows,
+                  );
+                  setPlanChangeTarget(null);
                   toast.success(`${planChangeTarget.name} set to ${planLabel}`);
+                  void queryClient.invalidateQueries({ queryKey: ["all-companies"] });
 
                   // Send plan change email with PDF bill to company + admin (fire-and-forget)
                   const now = new Date();
@@ -980,8 +1004,6 @@ const MasterAdmin = () => {
                       expiresAt: expiresAt,
                     },
                   }).catch((e: any) => console.warn("Plan change email failed (non-blocking):", e));
-
-                  setPlanChangeTarget(null);
                 } catch (err: any) {
                   toast.error(err.message || "Failed to update plan");
                 }

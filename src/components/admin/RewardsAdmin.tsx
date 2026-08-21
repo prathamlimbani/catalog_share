@@ -61,6 +61,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { invalidateGateConfig, type GateMode } from "@/lib/rewardedGate";
+import { applyTrialConfig } from "@/lib/trialConfig";
+import { invalidateAdPolicy } from "@/lib/adPolicy";
 
 /** The generated types predate these tables; describe what we use and cast. */
 type Loose = {
@@ -166,6 +168,21 @@ const DEFAULT_REWARDS = {
   pointsPerAd: 10,
   dailyAdCap: 10,
   pointsLabel: "Coins",
+};
+
+/**
+ * The trial's terms, editable here rather than compiled into the app.
+ *
+ * These mirror `app_settings.trial` and the defaults in src/lib/trialConfig.ts;
+ * both sides fall back to the same five days if the row is missing.
+ */
+const DEFAULT_TRIAL_FORM = {
+  enabled: true,
+  durationDays: "5",
+  unlocksEstimates: true,
+  unlocksPremiumThemes: false,
+  productLimit: "40",
+  autoStart: true,
 };
 
 const DEFAULT_ADS = {
@@ -318,6 +335,8 @@ export function RewardsAdmin() {
 
   const [ads, setAds] = useState<AdsForm>(BLANK_ADS);
   const [savingAds, setSavingAds] = useState(false);
+  const [trial, setTrial] = useState({ ...DEFAULT_TRIAL_FORM });
+  const [savingTrial, setSavingTrial] = useState(false);
 
   const [policies, setPolicies] = useState<PolicyDraft[]>([]);
   const [planNames, setPlanNames] = useState<Record<string, string>>({});
@@ -380,7 +399,7 @@ export function RewardsAdmin() {
       if (!silent) setLoading(true);
       try {
         const [settingsRes, policyRes, couponRes, offerRes, planRes] = await Promise.all([
-          db.from("app_settings").select("key, value").in("key", ["rewards", "ads"]),
+          db.from("app_settings").select("key, value").in("key", ["rewards", "ads", "trial"]),
           db.from("plan_ad_policy").select("*").order("plan_id", { ascending: true }),
           db.from("coupons").select("*").order("created_at", { ascending: false }),
           db.from("reward_offers").select("*").order("sort_order", { ascending: true }),
@@ -414,6 +433,16 @@ export function RewardsAdmin() {
 
         const rewardsValue = raw.rewards ?? {};
         const adsValue = raw.ads ?? {};
+        const trialValue = raw.trial ?? {};
+
+        setTrial({
+          enabled: trialValue.enabled !== false,
+          durationDays: String(intOr(trialValue.duration_days, 5)),
+          unlocksEstimates: trialValue.unlocks_estimates !== false,
+          unlocksPremiumThemes: trialValue.unlocks_premium_themes === true,
+          productLimit: String(intOr(trialValue.product_limit, 40)),
+          autoStart: trialValue.auto_start !== false,
+        });
 
         setRewards({
           enabled: rewardsValue.enabled !== false,
@@ -541,6 +570,52 @@ export function RewardsAdmin() {
     }
   };
 
+  const saveTrial = async () => {
+    const days = parseIntField(trial.durationDays);
+    if (days === null || days < 1 || days > 365) {
+      toast.error("Trial length must be a whole number of days, from 1 to 365.");
+      return;
+    }
+    const limit = parseIntField(trial.productLimit);
+    if (limit === null || limit < 1) {
+      toast.error("The product limit during the trial must be at least 1.");
+      return;
+    }
+
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setSavingTrial(true);
+    try {
+      await writeSetting("trial", {
+        enabled: trial.enabled,
+        duration_days: days,
+        unlocks_estimates: trial.unlocksEstimates,
+        unlocks_premium_themes: trial.unlocksPremiumThemes,
+        product_limit: limit,
+        auto_start: trial.autoStart,
+      });
+      // Push it into this session as well, so the console reflects the terms it
+      // just wrote rather than the ones it loaded with.
+      applyTrialConfig({
+        enabled: trial.enabled,
+        duration_days: days,
+        unlocks_estimates: trial.unlocksEstimates,
+        unlocks_premium_themes: trial.unlocksPremiumThemes,
+        product_limit: limit,
+        auto_start: trial.autoStart,
+      });
+      toast.success("Trial plan saved", {
+        description: `New and running trials now last ${days} day${days === 1 ? "" : "s"}.`,
+      });
+      await refresh(true);
+    } catch (err: any) {
+      toast.error("Could not save the trial plan", { description: describeError(err) });
+    } finally {
+      inFlight.current = false;
+      setSavingTrial(false);
+    }
+  };
+
   const saveAds = async () => {
     const free = parseIntField(ads.freeDailyEstimates);
     if (free === null || free < 0) {
@@ -562,6 +637,7 @@ export function RewardsAdmin() {
       // The gate config is cached for five minutes per plan; drop it so this
       // session sees the change now instead of on the next cold start.
       invalidateGateConfig();
+      invalidateAdPolicy();
       await refresh(true);
     } catch (err: any) {
       toast.error("Could not save the ad settings", { description: describeError(err) });
@@ -598,6 +674,7 @@ export function RewardsAdmin() {
       dirtyPolicies.current.delete(row.plan_id);
       toast.success(`Saved the ad policy for ${planNames[row.plan_id] ?? row.plan_id}`);
       invalidateGateConfig();
+      invalidateAdPolicy();
       await refresh(true);
     } catch (err: any) {
       toast.error("Could not save the ad policy", { description: describeError(err) });
@@ -1120,6 +1197,109 @@ export function RewardsAdmin() {
               <Check className="mr-2 h-4 w-4" />
             )}
             Save ad settings
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* ---------------- Trial plan ---------------- */}
+      <Card>
+        <CardContent className="space-y-4 p-5">
+          <div className="flex items-center gap-2">
+            <Clapperboard className="h-5 w-5 text-primary" />
+            <h3 className="font-semibold">Trial plan</h3>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            What a merchant gets before they pay. These terms used to be fixed in the
+            app, so changing them meant a Play release. Edits here reach every
+            installed copy the next time it comes to the foreground.
+          </p>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+              <Label htmlFor="trial-enabled" className="cursor-pointer text-sm">
+                Trial is offered
+              </Label>
+              <Switch
+                id="trial-enabled"
+                checked={trial.enabled}
+                onCheckedChange={(v) => setTrial({ ...trial, enabled: v })}
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+              <Label htmlFor="trial-auto" className="cursor-pointer text-sm">
+                Starts on first use
+              </Label>
+              <Switch
+                id="trial-auto"
+                checked={trial.autoStart}
+                onCheckedChange={(v) => setTrial({ ...trial, autoStart: v })}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="trial-days" className="text-sm">
+                Length in days
+              </Label>
+              <Input
+                id="trial-days"
+                inputMode="numeric"
+                value={trial.durationDays}
+                onChange={(e) => setTrial({ ...trial, durationDays: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="trial-limit" className="text-sm">
+                Product limit during the trial
+              </Label>
+              <Input
+                id="trial-limit"
+                inputMode="numeric"
+                value={trial.productLimit}
+                onChange={(e) => setTrial({ ...trial, productLimit: e.target.value })}
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+              <Label htmlFor="trial-estimates" className="cursor-pointer text-sm">
+                Unlocks estimates
+              </Label>
+              <Switch
+                id="trial-estimates"
+                checked={trial.unlocksEstimates}
+                onCheckedChange={(v) => setTrial({ ...trial, unlocksEstimates: v })}
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+              <Label htmlFor="trial-themes" className="cursor-pointer text-sm">
+                Unlocks premium themes
+              </Label>
+              <Switch
+                id="trial-themes"
+                checked={trial.unlocksPremiumThemes}
+                onCheckedChange={(v) => setTrial({ ...trial, unlocksPremiumThemes: v })}
+              />
+            </div>
+          </div>
+
+          <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+            Changing the length moves the end date of trials that are ALREADY
+            running, because the app stores a start date and adds the current
+            length to it. Shortening it can therefore end someone's trial today.
+            Turning the trial off ends every running trial at once &mdash; which is
+            the point of the switch, but it is not reversible for the merchants
+            it cuts short.
+          </p>
+
+          <Button onClick={saveTrial} disabled={savingTrial}>
+            {savingTrial ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Check className="mr-2 h-4 w-4" />
+            )}
+            Save trial plan
           </Button>
         </CardContent>
       </Card>

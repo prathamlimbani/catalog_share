@@ -22,7 +22,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { hideBanner } from "@/native/ads";
 import { getPlanName } from "@/lib/plans";
 import { SUPPORT_EMAIL } from "@/lib/appInfo";
 import { downloadReceipt, receiptDataFromRow, resolvePaidPlanId } from "@/lib/receipt";
@@ -100,12 +99,6 @@ const Receipt = () => {
   const [gaveUp, setGaveUp] = useState(!paymentId);
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
-
-  // This screen must never carry an ad — it is the payment confirmation, and a
-  // banner here reads as a scam. Clear anything the previous screen left up.
-  useEffect(() => {
-    void hideBanner();
-  }, []);
 
   const { data: subscription } = useQuery({
     queryKey: ["receipt-subscription", paymentId],

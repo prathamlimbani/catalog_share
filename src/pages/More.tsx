@@ -32,7 +32,7 @@ import CompanyEditDialog from "@/components/CompanyEditDialog";
 import { ThemeSetting } from "@/components/ThemeSetting";
 import { useRewardsConfig } from "@/hooks/useRewards";
 import { Coins } from "lucide-react";
-import { hideBanner, openPrivacyOptions } from "@/native/ads";
+import { openPrivacyOptions } from "@/native/ads";
 import {
   isBiometricAvailable,
   isLockEnabled,
@@ -177,16 +177,6 @@ const More = () => {
   const [lockStatus, setLockStatus] = useState<BiometricStatus | null>(null);
   const [lockOn, setLockOn] = useState(false);
   const [lockBusy, setLockBusy] = useState(false);
-
-  // This screen is chrome, not content — no ads here.
-  //
-  // Deliberately no cleanup: a screen may only ever turn the banner OFF. Re-
-  // showing it on unmount planted a banner on whatever came next, which from
-  // here is Terms, Privacy, Account deletion or Billing — exactly the surfaces
-  // that must stay ad-free. The destination screen decides if it wants one.
-  useEffect(() => {
-    void hideBanner();
-  }, []);
 
   // What this phone can do, and whether the lock is already armed. Both are
   // native-only reads that answer instantly on web.
