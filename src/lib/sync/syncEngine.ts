@@ -54,6 +54,17 @@ const PULL_PAGE_SIZE = 500;
 const PG_UNIQUE_VIOLATION = "23505";
 /** Postgres undefined-column — the database has not had the migration applied. */
 const PG_UNDEFINED_COLUMN = "42703";
+/**
+ * PostgREST's OWN missing-column code.
+ *
+ * A read names the column in the SQL it builds, so Postgres raises 42703
+ * ("column invoices.x does not exist"). A write is validated against the
+ * cached schema BEFORE any SQL is built, so it never reaches Postgres and comes
+ * back as PGRST204 ("Could not find the 'x' column of 'invoices' in the schema
+ * cache") instead. Same condition, two codes and two wordings — matching only
+ * the read form is why the push path never recognised it.
+ */
+const PGRST_MISSING_COLUMN = "PGRST204";
 
 /** An estimate the server renumbered during a push, for the UI to surface. */
 export interface Renumbering {
@@ -242,10 +253,10 @@ const insertInvoice: WriteFn = (payload) => supabase.from("invoices").insert(pay
  * for older readers. The proper fix is to apply the migration; this only stops
  * a missing column from taking the entire feature down with it.
  */
-const OPTIONAL_COLUMNS = ["advance_payment"] as const;
+export const OPTIONAL_COLUMNS = ["advance_payment"] as const;
 
 /** The column PostgREST is complaining about, if we can tell. */
-function missingColumnName(error: { code?: string; message: string }): string | null {
+export function missingColumnName(error: { code?: string; message: string }): string | null {
   const m = /column "?(?:invoices\.)?([a-z_]+)"? does not exist/i.exec(error.message)
     ?? /Could not find the '([a-z_]+)' column/i.exec(error.message);
   return m ? m[1] : null;
@@ -535,8 +546,13 @@ type PageQuery = (from: number, to: number) => PromiseLike<PageResult>;
  * than one code for it; deliberately narrow, so a missing TABLE still surfaces
  * as an error rather than quietly pulling nothing.
  */
-function isMissingColumn(error: { code?: string; message: string }): boolean {
-  return error.code === PG_UNDEFINED_COLUMN || /column .* does not exist/i.test(error.message);
+export function isMissingColumn(error: { code?: string; message: string }): boolean {
+  return (
+    error.code === PG_UNDEFINED_COLUMN ||
+    error.code === PGRST_MISSING_COLUMN ||
+    /column .* does not exist/i.test(error.message) ||
+    /could not find the '.*' column/i.test(error.message)
+  );
 }
 
 /**
