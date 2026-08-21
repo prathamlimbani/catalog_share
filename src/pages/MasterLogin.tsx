@@ -35,11 +35,20 @@ const MasterLogin = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
-      const { data: roles } = await supabase
+      const { data: roles, error: roleError } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
         .eq("role", "admin");
+
+      if (roleError) {
+        // Signed in, but the role lookup failed. Signing the user out here
+        // would throw away a perfectly good session over a transient error.
+        toast.error("Signed in, but could not verify admin access", {
+          description: "Reload the page to try again.",
+        });
+        return;
+      }
 
       if (!roles || roles.length === 0) {
         // Access denied, not a user logout — must not wipe the offline store.

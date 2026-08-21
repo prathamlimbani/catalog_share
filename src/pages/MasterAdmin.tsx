@@ -33,16 +33,52 @@ const MasterAdmin = () => {
   const [bulkEmailSending, setBulkEmailSending] = useState(false);
 
   useEffect(() => {
+    /**
+     * Admit or reject, and tell the difference between the two.
+     *
+     * This used to read `const { data: roles }` and discard the error, so a
+     * FAILED query looked exactly like "you are not an admin": both produced an
+     * empty array. A rejected token therefore bounced the owner to "/", which
+     * forwards to /invoices, which shows the company-setup screen because the
+     * admin account owns no company - three redirects away from the real cause,
+     * with "Access denied" as the only clue.
+     *
+     * An error is now treated as "could not check", never as "denied".
+     */
     const checkAdmin = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { navigate("/master-login"); return; }
-      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin");
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        // No usable session. Clear whatever is left so the login page starts
+        // clean rather than reading a token the server will not accept - a
+        // stale session from the previous backend behaves exactly like this.
+        await supabase.auth.signOut().catch(() => undefined);
+        navigate("/master-login");
+        return;
+      }
+
+      const { data: roles, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin");
+
+      if (error) {
+        // Could not verify. Denying here would be a guess, and the guess that
+        // was being made was the wrong one.
+        console.warn("[master-admin] role check failed:", error.message);
+        toast.error("Could not verify your access", {
+          description: "The server did not answer. Reload to try again.",
+        });
+        return;
+      }
+
       if (!roles || roles.length === 0) {
         toast.error("Access denied. Master admin privileges required.");
         navigate("/");
       }
     };
-    checkAdmin();
+    void checkAdmin();
   }, [navigate]);
 
   const { data: companies, isLoading } = useQuery({

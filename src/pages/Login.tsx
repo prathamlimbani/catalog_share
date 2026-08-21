@@ -58,11 +58,16 @@ const Login = () => {
       // back to the login form even though the session was already live.
       try {
         // Check if master admin
-        const { data: roles } = await supabase
+        // An admin signing in through the merchant login still belongs in the
+        // console. The error is captured so a failed lookup does not silently
+        // route the owner into the company-setup flow.
+        const { data: roles, error: roleError } = await supabase
           .from("user_roles")
           .select("role")
           .eq("user_id", user.id)
           .eq("role", "admin");
+
+        if (roleError) throw roleError;
 
         if (roles && roles.length > 0) {
           navigate("/master-admin");
