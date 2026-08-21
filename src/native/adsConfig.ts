@@ -70,14 +70,26 @@ export const TEST_IDS: AdIds = {
 
 /** ⬇⬇⬇  PASTE YOUR REAL ADMOB IDS HERE  ⬇⬇⬇ */
 export const LIVE_IDS: AdIds = {
-  appId: "ca-app-pub-0000000000000000~0000000000",
-  bannerId: "ca-app-pub-0000000000000000/0000000000",
-  interstitialId: "ca-app-pub-0000000000000000/0000000000",
-  rewardedId: "ca-app-pub-0000000000000000/0000000000",
+  appId: "ca-app-pub-2661237450938842~7907658560",
+  bannerId: "ca-app-pub-2661237450938842/5700976244",
+  interstitialId: "ca-app-pub-2661237450938842/4735484131",
+  rewardedId: "ca-app-pub-2661237450938842/9640221258",
 };
 
-/** ⬇⬇⬇  FLIP THIS TO true WHEN THE IDS ABOVE ARE REAL  ⬇⬇⬇ */
-export const USE_LIVE_ADS = false;
+/**
+ * Live ads are ON.
+ *
+ * These ids are ALSO stored in the admin console under Integrations, but the
+ * app cannot read them from there: the Google Mobile Ads SDK reads the app id
+ * out of AndroidManifest.xml at process start and hard-crashes if it is missing
+ * or malformed, so it has to be compiled in. The console copy is the record;
+ * this is what actually ships.
+ *
+ * If these two ever disagree, the app wins. Run `npm run android:manifest-ids`
+ * after changing them so the manifest matches - a mismatch means ads request
+ * against one app and report against another, and simply never fill.
+ */
+export const USE_LIVE_ADS = true;
 
 /**
  * A real AdMob id is `ca-app-pub-<16 digits><~ or /><10 digits>`. Anything that

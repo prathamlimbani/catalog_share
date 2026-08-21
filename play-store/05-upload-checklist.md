@@ -4,10 +4,10 @@
 
 | Field | Value |
 |---|---|
-| File | `release-output/catalogshare-1.0.8-vc9-release.aab` |
+| File | `release-output/catalogshare-2.1.0-vc17-release.aab` |
 | Size | 14.7 MB |
-| versionName | 1.0.8 |
-| versionCode | **9** (was 8 — Play rejects a re-used or lower code) |
+| versionName | 2.1.0 |
+| versionCode | **17** |
 | Package | `in.catalogshare.app` |
 | minSdk | 24 (Android 7.0) |
 | targetSdk | 36 (Android 16) |
@@ -58,17 +58,15 @@ drop those two hosts from `AndroidManifest.xml`.
 
 ## Two things to decide
 
-### 1. AdMob is still on Google's test IDs
-`src/native/adsConfig.ts` has `USE_LIVE_ADS = false` and `LIVE_IDS` full of
-placeholder zeros. The app will show **Google test ads and earn nothing**.
+### 1. AdMob is LIVE  (resolved 22 Aug 2026)
+Publisher `ca-app-pub-2661237450938842`. All four ids are in
+`src/native/adsConfig.ts`, `USE_LIVE_ADS = true`, and the manifest's
+APPLICATION_ID was synced with `npm run android:manifest-ids` - verified
+present in the packaged APK with the test id absent.
 
-This will not get you rejected and will not crash — the manifest and the config
-agree, which is the thing that actually breaks builds. But if you expect ad
-revenue from this release, before rebuilding:
-1. Put the real IDs into `LIVE_IDS` in `src/native/adsConfig.ts`
-2. Set `USE_LIVE_ADS = true`
-3. Run `npm run android:manifest-ids` (copies the App ID into the manifest — they must match)
-4. Rebuild
+Those two MUST match. The Google Mobile Ads SDK hard-crashes at process
+start on a missing or malformed manifest id, and a mismatched one requests
+against one app while reporting against another, so ads simply never fill.
 
 ### 2. Razorpay instead of Google Play Billing
 Subscriptions are charged through Razorpay. Play's Payments policy generally
