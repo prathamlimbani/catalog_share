@@ -18,9 +18,12 @@ import {
   BannerAdPosition,
   BannerAdSize,
   MaxAdContentRating,
+  RewardAdPluginEvents,
   type AdMobBannerSize,
+  type AdMobRewardItem,
 } from "@capacitor-community/admob";
 
+import { supabase } from "@/integrations/supabase/client";
 import { isNative } from "./platform";
 import { AD_FREQUENCY, getAdIds, isTestAdMode } from "./adsConfig";
 import { PREF_KEYS, prefGetJSON, prefSetJSON } from "./prefs";
@@ -156,6 +159,11 @@ export async function teardownAds(): Promise<void> {
   if (!isNative) return;
   bannerVisible = false;
   interstitialReady = false;
+  // The preloaded rewarded ad is tagged with the signed-in user's id for SSV,
+  // so it must not survive a sign-out — the next viewer would be credited as
+  // the previous one.
+  rewardedReady = false;
+  rewardedPreparedFor = null;
   setBannerHeight(0);
   try {
     await AdMob.hideBanner();
@@ -297,6 +305,175 @@ export async function maybeShowInterstitial(): Promise<boolean> {
  * Opens the UMP privacy options form so an EEA user can change their ad
  * consent. Surfaced from Settings — required by Google's consent policy.
  */
+// ---------------------------------------------------------------- rewarded
+
+/**
+ * Rewarded ads.
+ *
+ * The reward is NEVER granted here. Finishing the ad only tells us the user is
+ * probably owed something; the authority is AdMob's server-side verification
+ * callback, which posts to /api/admob-ssv and credits points through
+ * `credit_ad_reward()`. A device can fake the `Rewarded` event with a patched
+ * build in about a minute, so anything granted client-side is free money for
+ * anyone who wants it.
+ *
+ * What this function returns is therefore "the ad completed", not "you have
+ * been paid". The caller polls the wallet for the credit to land.
+ */
+let rewardedReady = false;
+let rewardedPreparing: Promise<boolean> | null = null;
+/**
+ * Which user the loaded ad was prepared for.
+ *
+ * The SSV identity is baked in at prepare time — there is no setter to change
+ * it afterwards — so a preloaded ad belongs to whoever was signed in when it
+ * was requested. Showing it to a different account would credit the points to
+ * the previous one, which is why every show re-checks this.
+ */
+let rewardedPreparedFor: string | null = null;
+
+export interface RewardedOutcome {
+  /** The user watched to the end and AdMob reported a reward. */
+  earned: boolean;
+  /** Why not, when `earned` is false — for a message the user can act on. */
+  reason?: "unavailable" | "no-fill" | "dismissed" | "error" | "not-signed-in";
+}
+
+async function currentUserId(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.user?.id ?? null;
+}
+
+/**
+ * Preload so the Earn button does not sit spinning for five seconds.
+ *
+ * Passing `ssv.userId` is the single most important line in the rewards flow.
+ * Without it Google's callback arrives with no user_id, `credit_ad_reward()`
+ * cannot resolve a company, and every ad watched credits nobody — silently,
+ * because the ad itself plays perfectly.
+ */
+export async function prepareRewarded(): Promise<boolean> {
+  if (!isNative) return false;
+
+  const userId = await currentUserId();
+  if (!userId) return false;
+
+  if (rewardedReady && rewardedPreparedFor === userId) return true;
+  if (rewardedPreparing) return rewardedPreparing;
+
+  rewardedPreparing = (async () => {
+    const ok = await initAds();
+    if (!ok) return false;
+    try {
+      await AdMob.prepareRewardVideoAd({
+        adId: getAdIds().rewardedId,
+        isTesting: isTestAdMode,
+        ssv: { userId, customData: "catalogshare" },
+      });
+      rewardedReady = true;
+      rewardedPreparedFor = userId;
+      return true;
+    } catch (err) {
+      console.warn("[ads] prepareRewardVideoAd failed:", err);
+      rewardedReady = false;
+      rewardedPreparedFor = null;
+      return false;
+    } finally {
+      rewardedPreparing = null;
+    }
+  })();
+
+  return rewardedPreparing;
+}
+
+/**
+ * Show a rewarded ad and resolve once it closes.
+ *
+ * The reward is NEVER granted here. Finishing the ad only means the user is
+ * probably owed something; the authority is AdMob's server-side verification
+ * callback, which posts to /api/admob-ssv and credits points through
+ * `credit_ad_reward()`. A patched build can fire the `Rewarded` event in about
+ * a minute, so anything granted client-side is free money for whoever wants it.
+ *
+ * So `earned: true` means "the ad completed", not "you have been paid" — the
+ * caller watches the wallet for the credit to land.
+ *
+ * Unlike the banner and interstitial this does NOT check `adsAllowed`: a paying
+ * merchant may still choose to earn points. An ad someone opts into is a
+ * different thing from an ad shown at them.
+ */
+export async function showRewarded(): Promise<RewardedOutcome> {
+  if (!isNative) return { earned: false, reason: "unavailable" };
+
+  const userId = await currentUserId();
+  if (!userId) return { earned: false, reason: "not-signed-in" };
+
+  // Re-prepare when the loaded ad belongs to a different account.
+  if (rewardedPreparedFor !== userId) {
+    rewardedReady = false;
+    rewardedPreparedFor = null;
+  }
+
+  const ready = rewardedReady || (await prepareRewarded());
+  if (!ready) return { earned: false, reason: "no-fill" };
+
+  return new Promise<RewardedOutcome>((resolve) => {
+    let settled = false;
+    const listeners: Array<{ remove: () => void }> = [];
+
+    const finish = (outcome: RewardedOutcome) => {
+      if (settled) return;
+      settled = true;
+      listeners.forEach((l) => {
+        try {
+          void l.remove();
+        } catch {
+          /* already gone */
+        }
+      });
+      rewardedReady = false;
+      rewardedPreparedFor = null;
+      // Warm the next one straight away; the Earn screen is usually a run of
+      // several ads back to back.
+      void prepareRewarded();
+      resolve(outcome);
+    };
+
+    void (async () => {
+      try {
+        listeners.push(
+          await AdMob.addListener(RewardAdPluginEvents.Rewarded, (_item: AdMobRewardItem) => {
+            finish({ earned: true });
+          }),
+        );
+        listeners.push(
+          await AdMob.addListener(RewardAdPluginEvents.Dismissed, () => {
+            // Dismissed also fires after Rewarded when the ad was watched
+            // through, and `settled` makes that a no-op. On its own it means
+            // they closed the ad early.
+            finish({ earned: false, reason: "dismissed" });
+          }),
+        );
+        listeners.push(
+          await AdMob.addListener(RewardAdPluginEvents.FailedToShow, () => {
+            finish({ earned: false, reason: "no-fill" });
+          }),
+        );
+
+        await AdMob.showRewardVideoAd();
+      } catch (err) {
+        console.warn("[ads] showRewardVideoAd failed:", err);
+        finish({ earned: false, reason: "error" });
+      }
+    })();
+  });
+}
+
+/** True when a rewarded ad is loaded and can be shown immediately. */
+export function isRewardedReady(): boolean {
+  return rewardedReady;
+}
+
 export async function openPrivacyOptions(): Promise<boolean> {
   if (!isNative) return false;
   try {

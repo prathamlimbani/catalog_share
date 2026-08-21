@@ -29,6 +29,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import CompanyEditDialog from "@/components/CompanyEditDialog";
+import { ThemeSetting } from "@/components/ThemeSetting";
 import { hideBanner, openPrivacyOptions } from "@/native/ads";
 import {
   isBiometricAvailable,
@@ -346,6 +347,10 @@ const More = () => {
             </Button>
           </div>
         </Card>
+
+        <Section title="Appearance">
+          <ThemeSetting />
+        </Section>
 
         <Section title="Data & sync">
           <Row

@@ -16,7 +16,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import ThemeToggle from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 import CompanyEditDialog from "@/components/CompanyEditDialog";
 import { CustomerSupportDialog } from "@/components/CustomerSupportDialog";
@@ -216,7 +215,6 @@ export const AdminLayout = ({
               </div>
             )}
 
-            <ThemeToggle />
 
             <button
               onClick={() => navigate("/account")}

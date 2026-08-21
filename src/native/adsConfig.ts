@@ -46,6 +46,16 @@ export interface AdIds {
   appId: string;
   bannerId: string;
   interstitialId: string;
+  /**
+   * Rewarded unit.
+   *
+   * Create this one in AdMob as a REWARDED ad unit and turn on Server-Side
+   * Verification, pointing it at:
+   *     https://app.catalogshare.online/api/admob-ssv
+   * Points are credited by that callback and never by the app, because a
+   * client claiming "I watched an ad" is trivially forged.
+   */
+  rewardedId: string;
 }
 
 /** Google's official Android test ids. Safe to ship in development builds. */
@@ -53,6 +63,9 @@ export const TEST_IDS: AdIds = {
   appId: "ca-app-pub-3940256099942544~3347511713",
   bannerId: "ca-app-pub-3940256099942544/6300978111",
   interstitialId: "ca-app-pub-3940256099942544/1033173712",
+  // Google's official rewarded test unit. Test rewarded ads DO fire the SSV
+  // callback, so the whole points flow is testable before the real unit exists.
+  rewardedId: "ca-app-pub-3940256099942544/5224354917",
 };
 
 /** ⬇⬇⬇  PASTE YOUR REAL ADMOB IDS HERE  ⬇⬇⬇ */
@@ -60,6 +73,7 @@ export const LIVE_IDS: AdIds = {
   appId: "ca-app-pub-0000000000000000~0000000000",
   bannerId: "ca-app-pub-0000000000000000/0000000000",
   interstitialId: "ca-app-pub-0000000000000000/0000000000",
+  rewardedId: "ca-app-pub-0000000000000000/0000000000",
 };
 
 /** ⬇⬇⬇  FLIP THIS TO true WHEN THE IDS ABOVE ARE REAL  ⬇⬇⬇ */
@@ -79,7 +93,8 @@ export function liveIdsArePlaceholders(): boolean {
   return (
     isPlaceholderId(LIVE_IDS.appId) ||
     isPlaceholderId(LIVE_IDS.bannerId) ||
-    isPlaceholderId(LIVE_IDS.interstitialId)
+    isPlaceholderId(LIVE_IDS.interstitialId) ||
+    isPlaceholderId(LIVE_IDS.rewardedId)
   );
 }
 
