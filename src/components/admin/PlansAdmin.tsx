@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { loadPlanCatalogue } from "@/lib/planCatalogue";
+import { PLANS } from "@/lib/plans";
 
 interface PlanRecord {
   id: string;
@@ -224,26 +225,59 @@ export function PlansAdmin() {
   }
 
   if (missing) {
+    // The table is absent, but the app is still SELLING plans - the ones
+    // compiled into the bundle. Showing those is the difference between "this
+    // console is broken" and "this console is read-only right now", and the
+    // second is the truth.
     return (
-      <Card className="border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40">
-        <CardContent className="flex items-start gap-3 p-5">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
-          <div className="text-sm">
-            <p className="font-semibold text-amber-900 dark:text-amber-200">
-              The plans table does not exist yet
-            </p>
-            <p className="mt-1 text-amber-800 dark:text-amber-300">
-              Run{" "}
-              <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">
-                supabase/migrations/20260821010000_plans_table.sql
-              </code>{" "}
-              in the Supabase SQL editor, then reload. Until then the app uses the
-              plan catalogue built into the bundle, so nothing is broken — it just
-              cannot be edited here.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <Card className="border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40">
+          <CardContent className="flex items-start gap-3 p-5">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <div className="text-sm">
+              <p className="font-semibold text-amber-900 dark:text-amber-200">
+                Plans are read-only until the database is migrated
+              </p>
+              <p className="mt-1 text-amber-800 dark:text-amber-300">
+                These are the plans currently in force, compiled into the app.
+                Selling, pricing and entitlement all work normally — they just
+                cannot be edited from here yet.
+              </p>
+              <p className="mt-2 text-amber-800 dark:text-amber-300">
+                To make them editable, apply{" "}
+                <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">
+                  supabase/migrations/20260821010000_plans_table.sql
+                </code>{" "}
+                to whichever database this app is pointed at, then reload.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid gap-3">
+          {PLANS.map((plan) => (
+            <Card key={plan.id} className="opacity-90">
+              <CardContent className="p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold">{plan.name}</span>
+                  <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
+                    {plan.id}
+                  </code>
+                  {plan.popular && <Badge variant="secondary">Popular</Badge>}
+                  <Badge variant="outline">Read-only</Badge>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {plan.price > 0 ? `\u20B9${plan.price}/month` : "Free"} &middot;{" "}
+                  {plan.productLimit >= 9999 ? "Unlimited" : plan.productLimit} products
+                  {plan.unlocksEstimates && " \u00B7 Estimates"}
+                  {plan.unlocksPremiumSkins && " \u00B7 Premium skins"}
+                  {plan.unlocksCallSupport && " \u00B7 Call support"}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
     );
   }
 

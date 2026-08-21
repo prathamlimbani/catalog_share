@@ -873,26 +873,72 @@ export function RewardsAdmin() {
   }
 
   if (missing) {
+    // Report what is ACTUALLY in force rather than only what is absent. The
+    // effective behaviour here is not "nothing" - rewards are off and saving is
+    // ungated, which is a real configuration an operator needs to know about,
+    // and the difference between a broken page and a read-only one.
+    const effective: Array<[string, string]> = [
+      ["Rewarded ads", "Off - no points can be earned"],
+      ["Save gate", "Off - every estimate saves, no ad"],
+      ["Banner and interstitial ads", "Free tier only, as built into the app"],
+      ["Coupons", "Unavailable - codes report themselves as not available"],
+      ["Points wallet", "Hidden - the Earn entry does not appear"],
+    ];
+
     return (
-      <Card className="border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40">
-        <CardContent className="flex items-start gap-3 p-5">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
-          <div className="text-sm">
-            <p className="font-semibold text-amber-900 dark:text-amber-200">
-              The monetization tables do not exist yet
+      <div className="space-y-4">
+        <Card className="border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40">
+          <CardContent className="flex items-start gap-3 p-5">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <div className="text-sm">
+              <p className="font-semibold text-amber-900 dark:text-amber-200">
+                Monetization is read-only until the database is migrated
+              </p>
+              <p className="mt-1 text-amber-800 dark:text-amber-300">
+                The app is running with the safe defaults below. Nothing is
+                broken - rewards simply fail closed, which is deliberate: an Earn
+                screen that cannot credit anything would have merchants watching
+                ads for nothing.
+              </p>
+              <p className="mt-2 text-amber-800 dark:text-amber-300">
+                To make these editable, apply{" "}
+                <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">
+                  supabase/migrations/20260821000000_monetization.sql
+                </code>{" "}
+                and{" "}
+                <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">
+                  20260822000000_coupon_seed.sql
+                </code>{" "}
+                to whichever database this app points at, then reload.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-5">
+            <h3 className="mb-3 font-semibold">What is in force right now</h3>
+            <div className="divide-y divide-border">
+              {effective.map(([label, value]) => (
+                <div
+                  key={label}
+                  className="flex flex-wrap items-center justify-between gap-2 py-2.5"
+                >
+                  <span className="text-sm font-medium">{label}</span>
+                  <span className="text-sm text-muted-foreground">{value}</span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-4 text-xs text-muted-foreground">
+              Once migrated, the defaults become {DEFAULT_REWARDS.pointsPerAd}{" "}
+              {DEFAULT_REWARDS.pointsLabel} per ad, a cap of{" "}
+              {DEFAULT_REWARDS.dailyAdCap} ads per day, and{" "}
+              {DEFAULT_ADS.freeDailyEstimates} free estimates before the gate
+              applies.
             </p>
-            <p className="mt-1 text-amber-800 dark:text-amber-300">
-              Run{" "}
-              <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">
-                supabase/migrations/20260821000000_monetization.sql
-              </code>{" "}
-              in the Supabase SQL editor, then reload. Until then the app runs with
-              rewards off and no ad gate, so nothing is broken — there is simply
-              nothing to configure.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
