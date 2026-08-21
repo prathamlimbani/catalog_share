@@ -57,10 +57,20 @@ INSERT INTO public.app_settings (key, value) VALUES
       'enabled',              true,
       -- Ask before a rewarded ad rather than autoplaying it.
       'rewarded_prompt',      true,
-      -- Estimates a free user may save per day before the app offers a
-      -- rewarded ad. See the note on plan_ad_policy below about WHY this is a
-      -- soft quota and not a hard gate.
-      'free_daily_estimates', 3
+      -- Estimates a free user may save per day before the rewarded-ad gate
+      -- applies. Per-plan values live in plan_ad_policy.daily_estimates.
+      'free_daily_estimates', 3,
+      -- How the gate behaves once the quota is used up:
+      --   'required' - the estimate is not saved until an ad is watched
+      --   'offered'  - the ad is offered; declining still saves
+      --   'off'      - no gate
+      --
+      -- 'required' earns the most and is the configured default. It is also the
+      -- pattern Google Play's Ads policy calls interfering with app
+      -- functionality, so if a review is rejected on that policy, switch this
+      -- to 'offered' in the console: it takes effect immediately on every
+      -- installed copy, with no release and no Play review.
+      'save_gate_mode', 'required'
   ))
 ON CONFLICT (key) DO NOTHING;
 
@@ -618,3 +628,26 @@ UNION ALL SELECT 'reward_redemptions',  CASE WHEN to_regclass('public.reward_red
 UNION ALL SELECT 'credit_ad_reward()',  CASE WHEN EXISTS (SELECT 1 FROM pg_proc WHERE proname='credit_ad_reward')  THEN 'OK' ELSE 'MISSING' END
 UNION ALL SELECT 'validate_coupon()',   CASE WHEN EXISTS (SELECT 1 FROM pg_proc WHERE proname='validate_coupon')   THEN 'OK' ELSE 'MISSING' END
 UNION ALL SELECT 'redeem_reward_offer()', CASE WHEN EXISTS (SELECT 1 FROM pg_proc WHERE proname='redeem_reward_offer') THEN 'OK' ELSE 'MISSING' END;
+
+
+-- -----------------------------------------------------------------------------
+-- increment_coupon_redemption — bump the usage counter atomically
+--
+-- A read-modify-write from the edge function would let two concurrent
+-- redemptions of a last-remaining coupon both see the same count and both
+-- succeed. One statement in the database cannot.
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.increment_coupon_redemption(p_coupon_id UUID)
+RETURNS INTEGER
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  UPDATE public.coupons
+     SET redeemed_count = redeemed_count + 1
+   WHERE id = p_coupon_id
+  RETURNING redeemed_count;
+$$;
+
+REVOKE ALL ON FUNCTION public.increment_coupon_redemption(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.increment_coupon_redemption(UUID) TO service_role;

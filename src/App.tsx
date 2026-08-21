@@ -10,6 +10,8 @@ import { isAppBuild, isNative } from "@/native/platform";
 import { installAuthListener } from "@/native/bootstrap";
 import DeepLinkHandler from "@/components/DeepLinkHandler";
 import HomeRoute from "@/components/HomeRoute";
+import WrongPage from "./pages/WrongPage";
+import { watchPlanCatalogue } from "@/lib/planCatalogue";
 import AppLockGate from "@/components/AppLockGate";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
@@ -88,6 +90,27 @@ const AuthWatcher = () => {
   return null;
 };
 
+/**
+ * Keeps the plan catalogue in step with the database for the life of the app.
+ *
+ * Mounted above the router so prices are already correct on the first paint of
+ * the pricing screen, and so a price edited in the console reaches a merchant
+ * who is looking at it — otherwise they tap Buy on one number, Razorpay charges
+ * another, and verification rejects a mismatch they never saw.
+ */
+const PlanCatalogueWatcher = (): null => {
+  useEffect(() => watchPlanCatalogue(), []);
+  return null;
+};
+
+/**
+ * `/` shows a holding notice instead of the landing page.
+ *
+ * Read once at module load: it is a build-time constant, and treating it as one
+ * keeps it out of every render.
+ */
+const showRootNotice = import.meta.env.VITE_ROOT_NOTICE === "1";
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -97,6 +120,7 @@ const App = () => (
         <BrowserRouter>
           <ScrollToTop />
           <AuthWatcher />
+          <PlanCatalogueWatcher />
           {/* Routes an incoming App Link (https://app.catalogshare.online/store/...) to the
               matching in-app screen. Must live inside the router to navigate. */}
           <DeepLinkHandler />
@@ -110,7 +134,16 @@ const App = () => (
                       signed-in merchant straight to work, and shows the welcome
                       page — with its Login and Create Your Catalog actions — to
                       everyone else. */}
-                  <Route path="/" element={isAppBuild ? <HomeRoute /> : <Landing />} />
+                  {/* The app build always goes to HomeRoute. On the web, VITE_ROOT_NOTICE
+                      swaps the marketing landing page for a "wrong page" notice, because
+                      this host serves the application and catalogshare.online serves the
+                      site. Only `/` is affected — /login and /store/<slug> are not. */}
+                  <Route
+                    path="/"
+                    element={
+                      isAppBuild ? <HomeRoute /> : showRootNotice ? <WrongPage /> : <Landing />
+                    }
+                  />
 
                   <Route path="/about" element={<About />} />
                   <Route path="/pricing" element={<Pricing />} />

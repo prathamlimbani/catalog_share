@@ -38,13 +38,103 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-/** Mirror of src/lib/plans.ts — prices in whole rupees. Keep the two in sync. */
-const PLAN_PRICES: Record<string, number> = {
+/**
+ * Fallback prices, in whole rupees.
+ *
+ * The `plans` table is the source of truth; this is what the function uses when
+ * that table does not exist yet. Without the fallback, deploying this before
+ * the migration would reject every payment.
+ */
+const FALLBACK_PLAN_PRICES: Record<string, number> = {
   growth: 199,
   pro: 349,
   estimate_generate: 399,
   support: 499,
 };
+
+/** Razorpay will not create an order below ₹1. */
+const MIN_ORDER_PAISE = 100;
+
+/**
+ * The plan's current price, preferring the editable catalogue.
+ *
+ * This is what lets the owner change a price in the admin console without a
+ * redeploy: the check below compares Razorpay's amount against THIS, so the two
+ * cannot drift the way a hardcoded copy did.
+ */
+async function planPriceRupees(admin: Admin, planId: string): Promise<number | null> {
+  try {
+    const { data, error } = await admin
+      .from("plans")
+      .select("price")
+      .eq("id", planId)
+      .maybeSingle();
+    if (!error && data && typeof (data as { price?: number }).price === "number") {
+      return (data as { price: number }).price;
+    }
+  } catch (err) {
+    console.warn("[verify] plans table unavailable, using fallback prices:", err);
+  }
+  return FALLBACK_PLAN_PRICES[planId] ?? null;
+}
+
+/**
+ * Re-derive what a coupon-discounted order should have cost.
+ *
+ * The discount is recomputed here from the coupon row rather than trusted from
+ * the order notes. A client that could name its own `percent_off` could buy any
+ * plan for ₹1, and the order notes are written by that client.
+ */
+async function expectedAmountPaise(
+  admin: Admin,
+  planId: string,
+  priceRupees: number,
+  couponCode: string,
+): Promise<{ paise: number; percentOff: number; couponId: string | null }> {
+  const full = priceRupees * 100;
+  if (!couponCode) return { paise: full, percentOff: 0, couponId: null };
+
+  try {
+    const { data, error } = await admin
+      .from("coupons")
+      .select("id, percent_off, applies_to_plans, active, starts_at, expires_at, max_redemptions, redeemed_count")
+      .ilike("code", couponCode)
+      .maybeSingle();
+
+    if (error || !data) return { paise: full, percentOff: 0, couponId: null };
+
+    const c = data as {
+      id: string;
+      percent_off: number;
+      applies_to_plans: string[] | null;
+      active: boolean;
+      starts_at: string | null;
+      expires_at: string | null;
+      max_redemptions: number | null;
+      redeemed_count: number;
+    };
+
+    const now = Date.now();
+    const usable =
+      c.active &&
+      (!c.starts_at || Date.parse(c.starts_at) <= now) &&
+      (!c.expires_at || Date.parse(c.expires_at) >= now) &&
+      (c.max_redemptions === null || c.redeemed_count < c.max_redemptions) &&
+      (!c.applies_to_plans || c.applies_to_plans.includes(planId));
+
+    if (!usable) return { paise: full, percentOff: 0, couponId: null };
+
+    const discounted = Math.round((full * (100 - c.percent_off)) / 100);
+    return {
+      paise: Math.max(discounted, MIN_ORDER_PAISE),
+      percentOff: c.percent_off,
+      couponId: c.id,
+    };
+  } catch (err) {
+    console.warn("[verify] coupon lookup failed:", err);
+    return { paise: full, percentOff: 0, couponId: null };
+  }
+}
 
 /**
  * Plan ids an unmigrated database still accepts. Identical shim to the one in
@@ -230,21 +320,39 @@ serve(async (req) => {
 
     const planId = String(order?.notes?.plan_id ?? "");
     const companyId = String(order?.notes?.company_id ?? "");
-    const priceRupees = PLAN_PRICES[planId];
+    const couponCode = String(order?.notes?.coupon_code ?? "").trim();
 
-    if (!priceRupees || !companyId) {
+    if (!planId || !companyId) {
       console.error("[verify] order notes are missing plan_id / company_id:", order?.notes);
       return json({ error: "This order was not created by CatalogShare" }, 400);
-    }
-    if (Number(order.amount) !== priceRupees * 100) {
-      console.error("[verify] amount/plan mismatch:", order.amount, planId);
-      return json({ error: "Order amount does not match the plan price" }, 400);
     }
 
     // ---- 3. Grant, with the service role. -----------------------------------
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
+
+    const priceRupees = await planPriceRupees(supabaseAdmin, planId);
+    if (!priceRupees) {
+      console.error("[verify] unknown plan:", planId);
+      return json({ error: "This order was not created by CatalogShare" }, 400);
+    }
+
+    const expected = await expectedAmountPaise(supabaseAdmin, planId, priceRupees, couponCode);
+
+    if (Number(order.amount) !== expected.paise) {
+      console.error(
+        "[verify] amount/plan mismatch:",
+        order.amount,
+        "expected",
+        expected.paise,
+        "plan",
+        planId,
+        "coupon",
+        couponCode || "none",
+      );
+      return json({ error: "Order amount does not match the plan price" }, 400);
+    }
 
     const { data: company } = await supabaseAdmin
       .from("companies")
@@ -342,6 +450,30 @@ serve(async (req) => {
     if (grant.error) {
       console.error("[verify] company plan update failed:", grant.error);
       return json({ error: "Payment verified but the plan could not be activated. Please contact support." }, 500);
+    }
+
+    // Record the coupon use AFTER the plan is safely granted. Recording first
+    // would burn a single-use code on a grant that then failed, leaving the
+    // customer charged, unentitled, and unable to retry with their own coupon.
+    //
+    // Best-effort on purpose: the payment is complete and the plan is live, so
+    // a bookkeeping failure here must not turn a successful purchase into an
+    // error the customer sees.
+    if (expected.couponId && !duplicate) {
+      try {
+        await supabaseAdmin.from("coupon_redemptions").insert({
+          coupon_id: expected.couponId,
+          company_id: companyId,
+          plan_id: storedPlan,
+          percent_off: expected.percentOff,
+          original_amount: priceRupees * 100,
+          final_amount: expected.paise,
+          razorpay_order_id: orderId,
+        });
+        await supabaseAdmin.rpc("increment_coupon_redemption", { p_coupon_id: expected.couponId });
+      } catch (err) {
+        console.warn("[verify] coupon redemption not recorded:", err);
+      }
     }
 
     return json({ ok: true, paymentId, plan: storedPlan, expiresAt: effectiveExpiry, duplicate });

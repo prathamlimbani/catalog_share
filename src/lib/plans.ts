@@ -28,7 +28,7 @@ export interface PlanDef {
   popular?: boolean;
 }
 
-export const PLANS: PlanDef[] = [
+const BUILT_IN_PLANS: PlanDef[] = [
   {
     id: "free",
     name: "Free Plan",
@@ -117,10 +117,116 @@ export const PLANS: PlanDef[] = [
   },
 ];
 
+/**
+ * The live catalogue.
+ *
+ * Seeded from BUILT_IN_PLANS and replaced IN PLACE by `applyPlanCatalogue()`
+ * when the database has its own. In place, because ten modules import this
+ * array directly — reassigning the binding would leave every one of them
+ * holding the stale one, and the bug would only show up as prices that update
+ * on some screens and not others.
+ */
+export const PLANS: PlanDef[] = [...BUILT_IN_PLANS];
+
 /** Plans that represent a paid entitlement. `free` is deliberately absent. */
 export const PAID_PLANS: PlanId[] = ["growth", "pro", "estimate_generate", "support"];
 
-const PLAN_BY_ID = new Map<string, PlanDef>(PLANS.map((p) => [p.id, p]));
+let PLAN_BY_ID = new Map<string, PlanDef>(PLANS.map((p) => [p.id, p]));
+
+type CatalogueListener = () => void;
+const catalogueListeners = new Set<CatalogueListener>();
+
+/** Re-render hook for components rendering prices. */
+export function onPlanCatalogueChange(fn: CatalogueListener): () => void {
+  catalogueListeners.add(fn);
+  return () => catalogueListeners.delete(fn);
+}
+
+/** A row from the `plans` table, in its database shape. */
+export interface PlanRow {
+  id: string;
+  name: string | null;
+  price: number | null;
+  price_label: string | null;
+  product_limit: number | null;
+  features: string[] | null;
+  unlocks_estimates: boolean | null;
+  unlocks_premium_skins: boolean | null;
+  unlocks_call_support: boolean | null;
+  popular: boolean | null;
+  rank: number | null;
+  active: boolean | null;
+  sort_order: number | null;
+}
+
+/**
+ * Replace the catalogue with rows from the database.
+ *
+ * Ignores an empty list rather than emptying the catalogue: a failed query, a
+ * table that does not exist yet, or RLS hiding everything must leave the app on
+ * the built-in plans, not on no plans at all. A merchant with no plan
+ * definitions cannot be told what they are entitled to.
+ */
+export function applyPlanCatalogue(rows: PlanRow[] | null | undefined): boolean {
+  if (!rows || rows.length === 0) return false;
+
+  const mapped: PlanDef[] = rows
+    .filter((r) => r && typeof r.id === "string" && r.id)
+    .map((r) => ({
+      id: r.id as PlanId,
+      name: r.name ?? r.id,
+      price: Number(r.price ?? 0),
+      priceLabel: r.price_label ?? (Number(r.price ?? 0) > 0 ? `₹${r.price}/month` : "FREE"),
+      productLimit: Number(r.product_limit ?? 40),
+      features: Array.isArray(r.features) ? r.features : [],
+      unlocksEstimates: Boolean(r.unlocks_estimates),
+      unlocksPremiumSkins: Boolean(r.unlocks_premium_skins),
+      unlocksCallSupport: Boolean(r.unlocks_call_support),
+      popular: Boolean(r.popular),
+    }));
+
+  if (!mapped.some((p) => p.id === "free")) {
+    // Everything falls back to `free`; a catalogue without it would resolve
+    // every unknown plan to undefined and crash getPlan().
+    const builtInFree = BUILT_IN_PLANS.find((p) => p.id === "free");
+    if (builtInFree) mapped.unshift(builtInFree);
+  }
+
+  const ordered = [...rows]
+    .filter((r) => mapped.some((m) => m.id === r.id))
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    .map((r) => mapped.find((m) => m.id === r.id)!)
+    .filter(Boolean);
+
+  const finalList = ordered.length ? ordered : mapped;
+
+  PLANS.length = 0;
+  PLANS.push(...finalList);
+  PLAN_BY_ID = new Map(finalList.map((p) => [p.id, p]));
+
+  // Rank drives upgrade/downgrade comparisons, so it follows the table too.
+  for (const row of rows) {
+    if (row?.id) PLAN_RANK[row.id as PlanId] = Number(row.rank ?? 0);
+  }
+
+  // Keep PAID_PLANS in step: anything priced above zero is a paid entitlement.
+  PAID_PLANS.length = 0;
+  PAID_PLANS.push(...finalList.filter((p) => p.price > 0).map((p) => p.id));
+
+  catalogueListeners.forEach((fn) => {
+    try {
+      fn();
+    } catch {
+      /* a listener must not break the catalogue */
+    }
+  });
+  return true;
+}
+
+/** Plans offered for purchase, in display order. `free` is never sold. */
+export function purchasablePlans(): PlanDef[] {
+  return PLANS.filter((p) => p.id !== "free" && p.price > 0);
+}
 
 export function getPlan(planId: string | null | undefined): PlanDef {
   return PLAN_BY_ID.get(planId ?? "free") ?? PLAN_BY_ID.get("free")!;
@@ -139,7 +245,7 @@ export function getPlanPrice(planId: string | null | undefined): number {
 }
 
 /** Ordering used to decide whether a plan change is an upgrade or a downgrade. */
-export const PLAN_RANK: Record<PlanId, number> = {
+export const PLAN_RANK: Record<string, number> = {
   free: 0,
   growth: 1,
   pro: 2,

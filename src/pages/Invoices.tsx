@@ -29,7 +29,16 @@ import { getMirroredProducts } from "@/lib/offline/mirror";
 import { syncNow } from "@/lib/sync/syncEngine";
 import { getPlanPrice } from "@/lib/plans";
 import { ensureTrialStarted } from "@/lib/trial";
-import { hideBanner, maybeShowInterstitial, showBanner } from "@/native/ads";
+import { hideBanner, maybeShowInterstitial, prepareRewarded, showBanner, showRewarded } from "@/native/ads";
+import {
+  decideGate,
+  loadGateConfig,
+  noteEstimateSaved,
+  noteRewardWatched,
+  quotaState,
+  type GateConfig,
+} from "@/lib/rewardedGate";
+import RewardedSaveDialog from "@/components/RewardedSaveDialog";
 import { notify } from "@/native/files";
 
 type ViewMode = "list" | "create" | "edit" | "preview";
@@ -72,6 +81,22 @@ const Invoices = () => {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   const [saving, setSaving] = useState(false);
+  /**
+   * The rewarded-ad gate, held open across an await.
+   *
+   * `resolve` is the continuation of handleSave: the dialog calls it with true
+   * to carry on saving and false to go back to the form. Keeping it here rather
+   * than threading callbacks keeps the save path readable as one sequence.
+   */
+  const [gate, setGate] = useState<
+    | null
+    | {
+        mode: "required" | "offered";
+        used: number;
+        allowance: number;
+        resolve: (proceed: boolean) => void;
+      }
+  >(null);
   const [nextNumber, setNextNumber] = useState("INV-0001");
 
   const companyId = company?.id as string | undefined;
@@ -187,12 +212,49 @@ const Invoices = () => {
 
   // --------------------------------------------------------------- actions
 
+  // Preload while the merchant is typing. By the time they hit Save the ad is
+  // usually already in memory, which is the difference between a prompt that
+  // feels instant and one that looks broken.
+  useEffect(() => {
+    if (viewMode !== "create" && viewMode !== "edit") return;
+    void prepareRewarded();
+  }, [viewMode]);
+
   const handleSave = async (invoiceData: Record<string, any>) => {
     if (!companyId || saving) return;
     if (lockedOffline) {
       notifyLocked();
       return;
     }
+
+    // The gate runs BEFORE `saving` is set: the dialog can sit open for the
+    // length of a video, and a spinner on the Save button for thirty seconds
+    // reads as a hang.
+    let gateConfig: GateConfig | null = null;
+    try {
+      gateConfig = await loadGateConfig(company as never);
+    } catch {
+      /* loadGateConfig already fails open; this is belt and braces */
+    }
+
+    if (gateConfig) {
+      const decision = decideGate(gateConfig);
+      if (decision.action !== "save") {
+        const q = quotaState();
+        const proceed = await new Promise<boolean>((resolve) => {
+          setGate({
+            mode: decision.action === "require" ? "required" : "offered",
+            used: q.used,
+            allowance: gateConfig!.dailyQuota + q.unlocked,
+            resolve,
+          });
+        });
+        setGate(null);
+        // "Back to estimate" — the form still holds everything they typed.
+        if (!proceed) return;
+      }
+    }
+
     setSaving(true);
 
     try {
@@ -218,6 +280,10 @@ const Invoices = () => {
       };
 
       const saved = await saveEstimate(payload);
+
+      // Counted only on a save that actually happened, so a failed save never
+      // costs the merchant one of the day's free estimates.
+      noteEstimateSaved();
 
       refresh();
       setSelectedInvoice(saved);
@@ -539,6 +605,29 @@ const Invoices = () => {
       )}
 
       {viewMode === "list" && <SupportPromoDialog company={company} />}
+
+      {/* The rewarded-ad gate. `gate` is non-null only while handleSave is
+          waiting on the user's answer. */}
+      {gate && (
+        <RewardedSaveDialog
+          open
+          mode={gate.mode}
+          used={gate.used}
+          allowance={gate.allowance}
+          onWatch={async () => {
+            const outcome = await showRewarded();
+            if (!outcome.earned) return false;
+            // Buys one more save today. The POINTS for the same ad are credited
+            // separately by AdMob's server-side callback — this only lifts the
+            // local quota, and is deliberately not treated as proof of payment.
+            noteRewardWatched();
+            gate.resolve(true);
+            return true;
+          }}
+          onSkip={() => gate.resolve(true)}
+          onCancel={() => gate.resolve(false)}
+        />
+      )}
     </AdminLayout>
   );
 };
