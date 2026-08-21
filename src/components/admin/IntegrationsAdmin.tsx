@@ -24,12 +24,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Check,
+  Copy,
   CreditCard,
   Loader2,
   Mail,
   MonitorPlay,
   Save,
   Settings2,
+  ShieldCheck,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -83,6 +85,112 @@ const GROUPS: Array<{ title: string; icon: typeof Mail; blurb: string; keys: str
     keys: ["SUPPORT_EMAIL"],
   },
 ];
+
+/** The callback URL AdMob asks for when enabling server-side verification. */
+const SSV_CALLBACK_URL = "https://app.catalogshare.online/api/admob-ssv";
+
+/**
+ * AdMob's "Set up and verify callback URL" dialog, answered.
+ *
+ * This is here because the answer is a fact about our infrastructure, not
+ * something to look up: the endpoint is already deployed, and the two optional
+ * boxes in that dialog are a trap - filling them makes AdMob send a test ping
+ * with a fake user id, which verifies fine and teaches nothing, while the real
+ * SDK sends the actual values at runtime.
+ *
+ * The reachability check is the useful part. If the endpoint is down, AdMob's
+ * verification fails with a message that does not say why.
+ */
+function AdmobSsvCard() {
+  const [copied, setCopied] = useState(false);
+  const [probe, setProbe] = useState<"idle" | "checking" | "ok" | "bad">("idle");
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(SSV_CALLBACK_URL);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Could not copy", { description: SSV_CALLBACK_URL });
+    }
+  };
+
+  const check = async () => {
+    setProbe("checking");
+    try {
+      const res = await fetch(`${SSV_CALLBACK_URL}/health`, { cache: "no-store" });
+      setProbe(res.ok ? "ok" : "bad");
+    } catch {
+      setProbe("bad");
+    }
+  };
+
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="mb-1 flex items-center gap-2">
+          <ShieldCheck className="h-5 w-5 text-primary" />
+          <h3 className="font-semibold">Rewarded ads: callback URL</h3>
+        </div>
+        <p className="mb-4 text-sm text-muted-foreground">
+          AdMob asks for this when you turn on server-side verification for a
+          rewarded ad unit. It is what actually credits a merchant after they
+          watch an ad — the app is never trusted to do that, because a modified
+          build could simply claim the reward.
+        </p>
+
+        <Label className="text-sm font-medium">Callback URL</Label>
+        <div className="mt-1.5 flex gap-2">
+          <code className="flex min-w-0 flex-1 items-center overflow-x-auto whitespace-nowrap rounded-md border border-border bg-muted px-3 py-2 font-mono text-xs">
+            {SSV_CALLBACK_URL}
+          </code>
+          <Button variant="outline" onClick={() => void copy()} aria-label="Copy the callback URL">
+            {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+          </Button>
+        </div>
+
+        <div className="mt-4 rounded-lg border border-border p-4">
+          <p className="mb-2 text-sm font-medium">What to put in the other two boxes</p>
+          <p className="text-sm text-muted-foreground">
+            Nothing. <span className="font-medium text-foreground">Leave user ID and
+            custom data blank.</span> They only exist so you can fire a test ping
+            by hand; the SDK sends the real values at runtime. Filling them in
+            verifies a request that no user ever makes.
+          </p>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={() => void check()} disabled={probe === "checking"}>
+            {probe === "checking" ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Checking
+              </>
+            ) : (
+              "Check the endpoint is up"
+            )}
+          </Button>
+          {probe === "ok" && (
+            <Badge variant="secondary" className="gap-1">
+              <Check className="h-3 w-3" /> Reachable — AdMob will verify
+            </Badge>
+          )}
+          {probe === "bad" && (
+            <Badge variant="outline" className="gap-1 border-destructive text-destructive">
+              <AlertTriangle className="h-3 w-3" /> Not reachable
+            </Badge>
+          )}
+        </div>
+
+        <p className="mt-4 text-xs text-muted-foreground">
+          Set this on each rewarded ad unit under{" "}
+          <span className="font-medium">Ad unit &rarr; Server-side verification</span>.
+          Points are only credited once Google calls this URL with a signature we
+          verify against Google&apos;s public keys, so a forged call earns nothing.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
 
 export function IntegrationsAdmin() {
   const db = supabase as unknown as Loose;
@@ -344,6 +452,8 @@ export function IntegrationsAdmin() {
           </Card>
         );
       })}
+
+      <AdmobSsvCard />
     </div>
   );
 }
