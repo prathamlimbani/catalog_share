@@ -23,7 +23,7 @@ import BottomNav from "@/components/mobile/BottomNav";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { onBannerHeightChange } from "@/native/ads";
 import { useAdBanner } from "@/hooks/useAdSurface";
-import { getEntitlement } from "@/lib/entitlement";
+import { useEntitlement } from "@/hooks/useEntitlement";
 import UpgradeToRemoveAds from "@/components/UpgradeToRemoveAds";
 import { useSyncScheduler } from "@/hooks/useSync";
 import { useEntitlementLive } from "@/hooks/useEntitlementLive";
@@ -87,7 +87,18 @@ export const AdminLayout = ({
    * screen the plan's ad policy allows, minus the routes and screens that must
    * stay ad-free (payment, receipts, the rewarded-ad screen, the PDF preview).
    */
-  const entitlement = getEntitlement(company as any);
+  /**
+   * `useEntitlement`, not `getEntitlement(company)`.
+   *
+   * The hook is what calls `applyEntitlement`, and `applyEntitlement` is what
+   * sets the flag `showBanner()` refuses to run without. It was mounted by four
+   * screens and not by My Store, so a cold start that landed on /store left ads
+   * switched off with no way to notice. It also waits for a real company row or
+   * a real cached snapshot before touching ads, so a paying subscriber does not
+   * get a flash of banner while their plan is still loading — which computing
+   * the entitlement straight from a not-yet-loaded prop would do.
+   */
+  const { entitlement } = useEntitlement();
   const { showingAds } = useAdBanner(entitlement);
 
   // Publish the live AdMob banner height so the bottom tab bar and the scroll
