@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { AlertTriangle, Loader2, Store } from "lucide-react";
 import { useAuthRedirect } from "@/hooks/useAuthRedirect";
+import { checkConnection, type ConnectionReport } from "@/lib/connectionCheck";
 import { authErrorMessage } from "@/lib/errorMessages";
 
 /** Deliberately loose: the server is the authority, this only catches typos. */
@@ -20,6 +21,14 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const [formError, setFormError] = useState<string | null>(null);
+  /**
+   * Filled in only when a login fails for a reason that looks like the network.
+   * "Failed to fetch" covers DNS, TLS, a refused connection and a blocked CORS
+   * preflight - four different problems the browser refuses to distinguish - so
+   * the app probes for itself rather than telling the user to check their wifi.
+   */
+  const [diagnosis, setDiagnosis] = useState<ConnectionReport | null>(null);
+  const [diagnosing, setDiagnosing] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -32,6 +41,7 @@ const Login = () => {
     if (!password) errors.password = "Enter your password.";
     setFieldErrors(errors);
     setFormError(null);
+    setDiagnosis(null);
     if (Object.keys(errors).length > 0) return;
 
     setLoading(true);
@@ -78,6 +88,22 @@ const Login = () => {
       // to miss, and "nothing happened" is the worst possible feedback here.
       const message = authErrorMessage(error, "Login failed. Please try again.");
       setFormError(message);
+
+      // Only for the network-shaped failures. A wrong password needs no probe,
+      // and running one would just add a delay to the common case.
+      const raw = String((error as { message?: string })?.message ?? error).toLowerCase();
+      if (
+        raw.includes("fetch") ||
+        raw.includes("network") ||
+        raw.includes("load failed")
+      ) {
+        setDiagnosing(true);
+        try {
+          setDiagnosis(await checkConnection());
+        } finally {
+          setDiagnosing(false);
+        }
+      }
       toast.error(message);
     } finally {
       setLoading(false);
@@ -111,6 +137,21 @@ const Login = () => {
               >
                 <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
                 <span className="break-anywhere">{formError}</span>
+              </div>
+            )}
+
+            {diagnosing && (
+              <p className="text-xs text-muted-foreground">Checking the connection...</p>
+            )}
+
+            {diagnosis && (
+              <div className="rounded-md border border-border bg-muted/50 p-3 text-xs">
+                <p className="font-medium text-foreground">{diagnosis.diagnosis}</p>
+                <p className="mt-1 text-muted-foreground">{diagnosis.detail}</p>
+                <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+                  reachable: {String(diagnosis.reachable)} &middot; cors:{" "}
+                  {String(diagnosis.preflightOk)} &middot; api: {String(diagnosis.apiOk)}
+                </p>
               </div>
             )}
             <div className="space-y-2">
