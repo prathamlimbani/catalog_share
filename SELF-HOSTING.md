@@ -17,6 +17,8 @@ to register again. That is the whole gate — everything else is done.
 | Database | System PostgreSQL 16, database `catalogshare` | `127.0.0.1:5432` |
 | Auth | GoTrue `v2.177.0` (the same service Supabase runs) | `127.0.0.1:9999` |
 | Data API | PostgREST `v12.2.3` (ditto) | `127.0.0.1:3002` |
+| Storage | Purpose-built 150-line service + nginx | `127.0.0.1:5013` |
+| Backups | `pg_dump` + uploads, nightly at 02:30 | `/var/backups/catalogshare` |
 | Public entry | nginx on the existing certificate | `https://app.catalogshare.online/backend` |
 
 Both services are `network_mode: host` and bind **loopback only**, so nothing is
@@ -74,12 +76,21 @@ the bcrypt password hashes, which transfer as-is) can be exported.
 Without that, the options are: everyone re-registers, or accounts are recreated
 and everyone resets their password — and password reset needs SMTP, see below.
 
-### 2. Storage — product images
-One bucket, `product-images`, used for product photos, company logos, UPI QR
-codes and invoice PDFs. `storage-api` is not deployed yet, so **new uploads
-would fail**. Existing images keep loading, because their URLs point at
-Supabase's CDN — which also means deleting the Supabase project breaks every
-image already uploaded.
+### 2. Storage — DONE for new uploads, existing files still on Supabase
+A purpose-built replacement is running. The app uses exactly two operations
+against one public bucket (`.upload()` and `.getPublicUrl()`), and getPublicUrl
+never hits the network — so this is 150 lines rather than the full `storage-api`
+container, which brings S3 abstraction, image transformation and multi-tenancy
+to serve "write a file, serve it back". Reads come straight off disk via nginx.
+
+Verified: anonymous upload rejected (401), authenticated upload accepted, public
+read returns the bytes, path traversal refused, `.html` refused. That last one
+matters — the bucket is served from our own origin, so an uploadable HTML or
+crafted SVG would be stored XSS on app.catalogshare.online.
+
+**Still to do:** the images already uploaded live on Supabase's CDN. They keep
+loading until that project is deleted, at which point every existing product
+photo breaks. Copying them across needs the same credential as the accounts.
 
 ### 3. Edge functions
 Five are called from the client and must be re-hosted as small Node services:
@@ -127,6 +138,18 @@ sudo -u postgres psql -d catalogshare        # direct SQL, no dashboard needed
 sudo -u postgres pg_dump catalogshare | gzip > backup.sql.gz
 ```
 
-**Back it up.** Supabase was doing that silently; nothing is doing it now. A
-nightly `pg_dump` to a second location is the minimum this needs before it holds
-real merchant data.
+## Backups
+
+Running nightly at 02:30 via `catalogshare-backup.timer`: 14 daily database
+dumps, 8 weekly snapshots of uploads, and the config/secrets (a restore without
+those is a database nothing can connect to). It fails loudly if the dump comes
+out suspiciously small — a backup that silently produces a 20-byte file is worse
+than no backup, because it looks like one.
+
+```bash
+sudo /usr/local/bin/catalogshare-backup     # run one now
+ls -lah /var/backups/catalogshare/
+```
+
+These live on the same disk as the database, which protects against a bad
+migration but not a dead server. Copying them off-box is the next improvement.
