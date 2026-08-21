@@ -10,6 +10,13 @@ import { cn } from "@/lib/utils";
  * "wrong password" on these forms, and the user has no way to tell a typo from
  * a genuinely wrong password. The toggle is a real button rather than an icon
  * so it is reachable by keyboard and big enough to hit with a thumb.
+ *
+ * The reveal is also why autoCapitalize/autoCorrect below are not decoration.
+ * A type="password" field is exempt from a mobile keyboard's autocapitalise and
+ * autocorrect; the moment this flips to type="text" it is NOT, so revealing the
+ * password and typing it silently produces a capital first letter. That sends a
+ * different password than the one on screen and reports back as "wrong
+ * password" - which sends people to reset a password that was never wrong.
  */
 const PasswordInput = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
   ({ className, ...props }, ref) => {
@@ -18,6 +25,9 @@ const PasswordInput = React.forwardRef<HTMLInputElement, React.ComponentProps<"i
     return (
       <div className="relative">
         <Input
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           {...props}
           ref={ref}
           type={visible ? "text" : "password"}

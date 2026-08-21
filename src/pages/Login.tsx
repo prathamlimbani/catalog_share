@@ -36,7 +36,7 @@ const Login = () => {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: password.trim() });
       if (error) throw error;
 
       // Check if user has a company

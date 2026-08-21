@@ -29,7 +29,7 @@ const MasterLogin = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: password.trim() });
       if (error) throw error;
 
       const { data: { user } } = await supabase.auth.getUser();
