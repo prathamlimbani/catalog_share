@@ -102,6 +102,17 @@ export async function initAds(): Promise<boolean> {
       }
 
       await AdMob.addListener(BannerAdPluginEvents.SizeChanged, (size: AdMobBannerSize) => {
+        // Only a banner that is actually on screen may reserve space.
+        //
+        // hideBanner()/removeBanner() make the SDK re-lay-out the ad view, and
+        // that emits SizeChanged — sometimes with the OLD height, and always
+        // after teardownAds() has already set 0. Taking it at face value put
+        // the reservation back with no ad behind it, which lifted the tab bar
+        // off the bottom of the screen and left a gap the page showed through.
+        if (!adsAllowed || !bannerVisible) {
+          setBannerHeight(0);
+          return;
+        }
         setBannerHeight(size?.height ?? 0);
       });
       await AdMob.addListener(BannerAdPluginEvents.FailedToLoad, () => {
@@ -179,6 +190,12 @@ export async function showBanner(): Promise<void> {
   const ok = await initAds();
   if (!ok) return;
 
+  // Set BEFORE the call, not after: SizeChanged fires while the ad view lays
+  // out, which is before showBanner() resolves. With the flag set afterwards
+  // the SizeChanged guard saw `bannerVisible === false` for the real banner and
+  // threw away its height, so the ad covered the content it should sit below.
+  bannerVisible = true;
+
   try {
     await AdMob.showBanner({
       adId: getAdIds().bannerId,
@@ -189,9 +206,9 @@ export async function showBanner(): Promise<void> {
       margin: 0,
       isTesting: isTestAdMode,
     });
-    bannerVisible = true;
   } catch (err) {
     console.warn("[ads] showBanner failed:", err);
+    bannerVisible = false;
     setBannerHeight(0);
   }
 }

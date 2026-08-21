@@ -72,6 +72,15 @@ function useKeyboardOpen(): boolean {
  * Sits above the gesture bar (pb-safe) and above the AdMob banner, whose live
  * height is published as --banner-height so the two never overlap.
  *
+ * The banner is cleared with padding, NOT by lifting the bar off the bottom of
+ * the screen. Offsetting `bottom` left a --banner-height gap underneath the bar
+ * that showed whatever the page had scrolled to whenever that value was wrong —
+ * a stale SizeChanged, an ad that reserved space and never painted — which read
+ * as a rendering glitch, most visibly on the long estimate form. Anchored at 0
+ * the bar always reaches the bottom of the viewport, so the worst a bad value
+ * can now do is make the bar slightly too tall. The reserved strip is where the
+ * native banner draws.
+ *
  * Hidden while the soft keyboard is up: Android resizes the WebView, so the bar
  * would otherwise park itself directly on top of the keyboard and cover the
  * sticky Save bars that the forms lift with `.keyboard-aware`.
@@ -89,7 +98,7 @@ export function BottomNav() {
         "fixed inset-x-0 z-40 lg:hidden print:hidden",
         "border-t border-border bg-card/98 backdrop-blur-md",
       )}
-      style={{ bottom: "var(--banner-height, 0px)" }}
+      style={{ bottom: 0, paddingBottom: "var(--banner-height, 0px)" }}
       aria-label="Primary"
     >
       <ul className="flex items-stretch justify-around pb-safe">
