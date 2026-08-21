@@ -1,0 +1,69 @@
+# Self-hosted CatalogShare backend.
+#
+# Replaces the two Supabase services the app actually talks to: GoTrue for auth
+# and PostgREST for data. The database is the SYSTEM Postgres 16 already on this
+# box, not another container - one less moving part, one less thing to back up
+# separately, and psql works without docker exec.
+#
+# network_mode: host on purpose. Both services need 127.0.0.1:5432, and putting
+# them on the host network means Postgres keeps listening only on loopback
+# instead of being opened to the docker bridge. Each service binds its own port
+# to 127.0.0.1, so nothing here is reachable from the internet except through
+# nginx.
+
+services:
+  auth:
+    image: supabase/gotrue:v2.177.0
+    container_name: catalogshare-auth
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      GOTRUE_API_HOST: 127.0.0.1
+      PORT: "9999"
+      API_EXTERNAL_URL: https://app.catalogshare.online/backend/auth
+
+      GOTRUE_DB_DRIVER: postgres
+      DATABASE_URL: postgres://supabase_auth_admin:${AUTH_ADMIN_PASSWORD}@127.0.0.1:5432/${DB_NAME}?search_path=auth&sslmode=disable
+
+      GOTRUE_SITE_URL: https://app.catalogshare.online
+      GOTRUE_URI_ALLOW_LIST: https://app.catalogshare.online,https://app.catalogshare.online/*,https://localhost,https://localhost/*,capacitor://localhost,capacitor://localhost/*
+      GOTRUE_DISABLE_SIGNUP: "false"
+
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_EXP: "3600"
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_ISSUER: https://app.catalogshare.online/backend/auth
+
+      # No SMTP is wired up yet, so a signup that waited for a confirmation
+      # email would strand every new merchant. Autoconfirm keeps registration
+      # working; turn this off in the same change that adds SMTP, not before.
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_SMS_AUTOCONFIRM: "true"
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
+
+      GOTRUE_PASSWORD_MIN_LENGTH: "6"
+      GOTRUE_SECURITY_REFRESH_TOKEN_ROTATION_ENABLED: "true"
+      GOTRUE_SECURITY_REFRESH_TOKEN_REUSE_INTERVAL: "10"
+      GOTRUE_LOG_LEVEL: info
+
+  rest:
+    image: postgrest/postgrest:v12.2.3
+    container_name: catalogshare-rest
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${AUTHENTICATOR_PASSWORD}@127.0.0.1:5432/${DB_NAME}
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_JWT_AUD: authenticated
+      PGRST_SERVER_HOST: 127.0.0.1
+      PGRST_SERVER_PORT: "3001"
+      # The app reads a row back after writing it in several places; without
+      # this PostgREST returns 204 and those reads come back empty.
+      PGRST_DB_MAX_ROWS: "10000"
+      PGRST_DB_EXTRA_SEARCH_PATH: public, extensions
+      PGRST_LOG_LEVEL: error
