@@ -1,12 +1,32 @@
 /**
  * verify-razorpay-payment
  * =======================
+ * Ported from supabase/functions/verify-razorpay-payment/index.ts. The logic,
+ * the order of the checks, the status codes and the error strings are the
+ * originals. What changed, and only because a Deno-ism forced it:
+ *   - `serve(async (req) => {...})`  ->  `export default async function handler(req)`
+ *   - `Deno.env.get(...)`            ->  `env(...)` from ./runtime.mjs
+ *   - the esm.sh supabase-js import and the two hand-rolled createClient calls
+ *     ->  callerClient(authHeader) / adminClient() from ./runtime.mjs, which
+ *     build the same two clients (anon key + the caller's Authorization header,
+ *     and the service role key)
+ *   - the local corsHeaders / json() copies  ->  imported from ./runtime.mjs
+ *   - TypeScript annotations and `as` casts stripped; they were compile-time only
+ *   - the second `const expected` renamed to `expectedSignature` (see below)
+ * crypto.subtle, btoa and fetch are all global in Node 20 and are kept as-is.
+ *
+ * BUG CARRIED OVER, NOT FIXED: the .ts source declares `const expected` twice in
+ * the same block scope (the HMAC at line 268 and the amount at line 341), which
+ * is a SyntaxError - that file cannot have run as written. Renaming one of the
+ * two is the only way this parses, so the HMAC one (referenced once) is now
+ * `expectedSignature`. Nothing else about it changed.
+ *
  * The only place a paid plan is allowed to be granted.
  *
  * It re-computes Razorpay's HMAC-SHA256 signature over "order_id|payment_id"
  * with RAZORPAY_KEY_SECRET and refuses to write anything unless it matches.
  * The plan and the amount are then read back from the ORDER stored at Razorpay
- * (created by create-razorpay-order), not from the request body — so a caller
+ * (created by create-razorpay-order), not from the request body - so a caller
  * cannot pay 199 and claim the 499 plan, and cannot fabricate a payment at all
  * without the secret.
  *
@@ -17,26 +37,15 @@
  *   SUPABASE_ANON_KEY           - injected by the platform
  *   SUPABASE_SERVICE_ROLE_KEY   - injected by the platform; used to write the grant
  *
- *   supabase secrets set RAZORPAY_KEY_ID=... RAZORPAY_KEY_SECRET=...
- *
- * Deploy:
- *   supabase functions deploy verify-razorpay-payment
- *
  * Request  (POST, Authorization: Bearer <user jwt>):
- *   { "razorpay_order_id": "order_…", "razorpay_payment_id": "pay_…", "razorpay_signature": "…" }
+ *   { "razorpay_order_id": "order_...", "razorpay_payment_id": "pay_...", "razorpay_signature": "..." }
  * Responses:
- *   200 { "ok": true,  "paymentId": "pay_…", "plan": "estimate_generate", "expiresAt": "2026-09-18T…Z" }
- *   202 { "ok": false, "pending": true, "status": "authorized", … }   money not captured yet
- *   4xx/5xx { "error": "…" }
+ *   200 { "ok": true,  "paymentId": "pay_...", "plan": "estimate_generate", "expiresAt": "2026-09-18T...Z" }
+ *   202 { "ok": false, "pending": true, "status": "authorized", ... }   money not captured yet
+ *   4xx/5xx { "error": "..." }
  */
 
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { env, corsHeaders, json, adminClient, callerClient } from "./runtime.mjs";
 
 /**
  * Fallback prices, in whole rupees.
@@ -45,14 +54,14 @@ const corsHeaders = {
  * that table does not exist yet. Without the fallback, deploying this before
  * the migration would reject every payment.
  */
-const FALLBACK_PLAN_PRICES: Record<string, number> = {
+const FALLBACK_PLAN_PRICES = {
   growth: 199,
   pro: 349,
   estimate_generate: 399,
   support: 499,
 };
 
-/** Razorpay will not create an order below ₹1. */
+/** Razorpay will not create an order below 1 rupee. */
 const MIN_ORDER_PAISE = 100;
 
 /**
@@ -62,15 +71,15 @@ const MIN_ORDER_PAISE = 100;
  * redeploy: the check below compares Razorpay's amount against THIS, so the two
  * cannot drift the way a hardcoded copy did.
  */
-async function planPriceRupees(admin: Admin, planId: string): Promise<number | null> {
+async function planPriceRupees(admin, planId) {
   try {
     const { data, error } = await admin
       .from("plans")
       .select("price")
       .eq("id", planId)
       .maybeSingle();
-    if (!error && data && typeof (data as { price?: number }).price === "number") {
-      return (data as { price: number }).price;
+    if (!error && data && typeof data.price === "number") {
+      return data.price;
     }
   } catch (err) {
     console.warn("[verify] plans table unavailable, using fallback prices:", err);
@@ -83,14 +92,9 @@ async function planPriceRupees(admin: Admin, planId: string): Promise<number | n
  *
  * The discount is recomputed here from the coupon row rather than trusted from
  * the order notes. A client that could name its own `percent_off` could buy any
- * plan for ₹1, and the order notes are written by that client.
+ * plan for 1 rupee, and the order notes are written by that client.
  */
-async function expectedAmountPaise(
-  admin: Admin,
-  planId: string,
-  priceRupees: number,
-  couponCode: string,
-): Promise<{ paise: number; percentOff: number; couponId: string | null }> {
+async function expectedAmountPaise(admin, planId, priceRupees, couponCode) {
   const full = priceRupees * 100;
   if (!couponCode) return { paise: full, percentOff: 0, couponId: null };
 
@@ -103,16 +107,7 @@ async function expectedAmountPaise(
 
     if (error || !data) return { paise: full, percentOff: 0, couponId: null };
 
-    const c = data as {
-      id: string;
-      percent_off: number;
-      applies_to_plans: string[] | null;
-      active: boolean;
-      starts_at: string | null;
-      expires_at: string | null;
-      max_redemptions: number | null;
-      redeemed_count: number;
-    };
+    const c = data;
 
     const now = Date.now();
     const usable =
@@ -138,7 +133,7 @@ async function expectedAmountPaise(
 
 /**
  * Plan ids an unmigrated database still accepts. Identical shim to the one in
- * src/hooks/useRazorpaySubscription.ts — remove both once the CHECK constraints
+ * src/hooks/useRazorpaySubscription.ts - remove both once the CHECK constraints
  * on subscriptions.plan and companies.subscription_plan have been widened.
  *
  * Both map to `pro`, never `growth`: growth has unlocksEstimates false, so
@@ -146,7 +141,7 @@ async function expectedAmountPaise(
  * back on the Estimates lock screen they just paid to get past. `pro` is the
  * cheapest legacy id that unlocks both estimates and the premium skins.
  */
-const LEGACY_PLAN_FALLBACK: Record<string, string> = {
+const LEGACY_PLAN_FALLBACK = {
   estimate_generate: "pro",
   support: "pro",
 };
@@ -154,16 +149,7 @@ const LEGACY_PLAN_FALLBACK: Record<string, string> = {
 const CHECK_VIOLATION = "23514";
 const SUBSCRIPTION_DAYS = 30;
 
-type Admin = ReturnType<typeof createClient>;
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
-
-async function hmacSha256Hex(secret: string, message: string): Promise<string> {
+async function hmacSha256Hex(secret, message) {
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),
@@ -177,8 +163,8 @@ async function hmacSha256Hex(secret: string, message: string): Promise<string> {
     .join("");
 }
 
-/** Constant-time comparison — a plain `===` on a signature leaks it byte by byte. */
-function timingSafeEqual(a: string, b: string): boolean {
+/** Constant-time comparison - a plain `===` on a signature leaks it byte by byte. */
+function timingSafeEqual(a, b) {
   if (a.length !== b.length) return false;
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
@@ -192,19 +178,14 @@ function timingSafeEqual(a: string, b: string): boolean {
  * Safe to call twice for the same payment: it sets an absolute expiry rather
  * than adding days, so a retry cannot stack a second month onto one charge.
  */
-async function grantCompanyPlan(
-  admin: Admin,
-  companyId: string,
-  planId: string,
-  expiresAtIso: string,
-): Promise<{ storedPlan: string; error: unknown }> {
+async function grantCompanyPlan(admin, companyId, planId, expiresAtIso) {
   let storedPlan = planId;
   let { error } = await admin
     .from("companies")
     .update({ subscription_plan: storedPlan, subscription_expires_at: expiresAtIso })
     .eq("id", companyId);
 
-  if ((error as { code?: string } | null)?.code === CHECK_VIOLATION && LEGACY_PLAN_FALLBACK[storedPlan]) {
+  if (error?.code === CHECK_VIOLATION && LEGACY_PLAN_FALLBACK[storedPlan]) {
     const legacy = LEGACY_PLAN_FALLBACK[storedPlan];
     console.warn(
       `[verify] companies.subscription_plan rejected "${storedPlan}" (CHECK constraint); stored "${legacy}" instead. ` +
@@ -220,7 +201,7 @@ async function grantCompanyPlan(
   return { storedPlan, error };
 }
 
-serve(async (req) => {
+export default async function handler(req) {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -229,32 +210,21 @@ serve(async (req) => {
   }
 
   try {
-    const keyId = Deno.env.get("RAZORPAY_KEY_ID");
-    const keySecret = Deno.env.get("RAZORPAY_KEY_SECRET");
+    const keyId = env("RAZORPAY_KEY_ID");
+    const keySecret = env("RAZORPAY_KEY_SECRET");
     if (!keyId || !keySecret) {
       console.error("[verify] RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET are not set");
       return json({ error: "Payment gateway is not configured" }, 500);
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return json({ error: "Unauthorized" }, 401);
 
-    const supabaseCaller = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const supabaseCaller = callerClient(authHeader);
     const { data: { user }, error: userError } = await supabaseCaller.auth.getUser();
     if (userError || !user) return json({ error: "Unauthorized" }, 401);
 
-    const body = await req.json().catch(() => null) as {
-      razorpay_order_id?: string;
-      razorpay_payment_id?: string;
-      razorpay_signature?: string;
-    } | null;
+    const body = await req.json().catch(() => null);
 
     const orderId = body?.razorpay_order_id ?? "";
     const paymentId = body?.razorpay_payment_id ?? "";
@@ -265,9 +235,6 @@ serve(async (req) => {
     }
 
     // ---- 1. Signature. Nothing below runs unless this passes. ----------------
-    // Named for what it is: the later coupon work introduced a second
-    // `const expected` in this same block, which is a SyntaxError - the file
-    // could not have parsed, let alone deployed.
     const expectedSignature = await hmacSha256Hex(keySecret, `${orderId}|${paymentId}`);
     if (!timingSafeEqual(expectedSignature, signature)) {
       console.warn("[verify] signature mismatch for", paymentId, "user", user.id);
@@ -300,7 +267,7 @@ serve(async (req) => {
     }
 
     // 'authorized' means the bank has only put a hold on the funds. If the
-    // capture never happens the hold lapses and NOTHING is ever settled to us —
+    // capture never happens the hold lapses and NOTHING is ever settled to us -
     // so an authorized payment must not buy a month. 202 rather than an error:
     // the customer has done nothing wrong and the payment may still capture, so
     // the client shows "still processing" and the receipt screen keeps polling.
@@ -331,9 +298,7 @@ serve(async (req) => {
     }
 
     // ---- 3. Grant, with the service role. -----------------------------------
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const supabaseAdmin = adminClient();
 
     const priceRupees = await planPriceRupees(supabaseAdmin, planId);
     if (!priceRupees) {
@@ -388,7 +353,7 @@ serve(async (req) => {
     //
     // NOTE: no `onConflict` target on purpose. That index is partial, and Postgres
     // can only infer a partial unique index when the statement repeats its
-    // predicate — which PostgREST cannot express. Omitting the target emits a bare
+    // predicate - which PostgREST cannot express. Omitting the target emits a bare
     // `ON CONFLICT DO NOTHING`, which works; adding one fails with 42P10.
     let storedPlan = planId;
     let { data: inserted, error: insertError } = await supabaseAdmin
@@ -396,7 +361,7 @@ serve(async (req) => {
       .upsert({ ...row, plan: storedPlan }, { ignoreDuplicates: true })
       .select("id");
 
-    if ((insertError as { code?: string } | null)?.code === CHECK_VIOLATION && LEGACY_PLAN_FALLBACK[storedPlan]) {
+    if (insertError?.code === CHECK_VIOLATION && LEGACY_PLAN_FALLBACK[storedPlan]) {
       storedPlan = LEGACY_PLAN_FALLBACK[storedPlan];
       console.warn(
         `[verify] the database rejected plan "${planId}" (CHECK constraint); stored "${storedPlan}" instead. ` +
@@ -438,7 +403,7 @@ serve(async (req) => {
           .from("subscriptions")
           .update({ plan: storedPlan })
           .eq("id", existing.id);
-        if ((fixError as { code?: string } | null)?.code === CHECK_VIOLATION && LEGACY_PLAN_FALLBACK[storedPlan]) {
+        if (fixError?.code === CHECK_VIOLATION && LEGACY_PLAN_FALLBACK[storedPlan]) {
           storedPlan = LEGACY_PLAN_FALLBACK[storedPlan];
           await supabaseAdmin.from("subscriptions").update({ plan: storedPlan }).eq("id", existing.id);
         } else if (fixError) {
@@ -484,4 +449,4 @@ serve(async (req) => {
     console.error("[verify] unexpected failure:", err);
     return json({ error: "Unexpected error" }, 500);
   }
-});
+}
