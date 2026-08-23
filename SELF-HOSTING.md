@@ -24,7 +24,7 @@ from `.env.supabase-backup` and rebuild.
 | Database | System PostgreSQL 16, database `catalogshare` | `127.0.0.1:5432` |
 | Auth | GoTrue `v2.177.0` (the same service Supabase runs) | `127.0.0.1:9999` |
 | Data API | PostgREST `v12.2.3` (ditto) | `127.0.0.1:3002` |
-| Storage | Purpose-built 150-line service + nginx | `127.0.0.1:5013` |
+| Storage | Purpose-built Node service + nginx (uploads, list, remove; reads off disk) | `127.0.0.1:5013` |
 | Backups | `pg_dump` + uploads, nightly at 02:30 | `/var/backups/catalogshare` |
 | Public entry | nginx on the existing certificate | `https://app.catalogshare.online/backend` |
 
@@ -83,27 +83,67 @@ the bcrypt password hashes, which transfer as-is) can be exported.
 Without that, the options are: everyone re-registers, or accounts are recreated
 and everyone resets their password — and password reset needs SMTP, see below.
 
-### 2. Storage — DONE for new uploads, existing files still on Supabase
-A purpose-built replacement is running. The app uses exactly two operations
-against one public bucket (`.upload()` and `.getPublicUrl()`), and getPublicUrl
-never hits the network — so this is 150 lines rather than the full `storage-api`
-container, which brings S3 abstraction, image transformation and multi-tenancy
-to serve "write a file, serve it back". Reads come straight off disk via nginx.
+### 2. Storage — DONE
+A purpose-built replacement is running (`supabase/selfhost-storage-server.mjs`,
+deployed to `/opt/catalogshare-storage/server.mjs`). The app uses one public
+bucket and four operations — `.upload()`, `.getPublicUrl()`, and from the
+account-deletion function `.list()` and `.remove()`. getPublicUrl never hits
+the network, and reads come straight off disk via nginx — so this is a few
+hundred lines rather than the full `storage-api` container, which brings S3
+abstraction, image transformation and multi-tenancy to serve "write a file,
+serve it back".
 
-Verified: anonymous upload rejected (401), authenticated upload accepted, public
-read returns the bytes, path traversal refused, `.html` refused. That last one
-matters — the bucket is served from our own origin, so an uploadable HTML or
-crafted SVG would be stored XSS on app.catalogshare.online.
+**Two things broke photo uploads after the move, both fixed 23 Aug 2026:**
 
-**Still to do:** the images already uploaded live on Supabase's CDN. They keep
-loading until that project is deleted, at which point every existing product
-photo breaks. Copying them across needs the same credential as the accounts.
+1. supabase-js sends a `File`/`Blob` as **multipart/form-data** (a
+   `cacheControl` field plus the file in an unnamed part), not as the raw body.
+   The first version of the service wrote the request body to disk verbatim, so
+   every photo chosen in the app would have been stored inside its multipart
+   envelope and served back broken. The service now parses the envelope (and
+   still accepts a raw body for ArrayBuffer uploads and curl).
+2. storage-js adds an `x-upsert` header to every upload. The Android app runs
+   from `https://localhost`, so the WebView preflights the upload, and nginx's
+   `Access-Control-Allow-Headers` did not name `x-upsert` — the WebView dropped
+   the POST before sending it and the app reported "check your connection".
+   The access log is the tell: an `OPTIONS` for the object with no `POST` after
+   it. The allowed-header list now lives in one `$cors_allow_headers` variable
+   in the nginx config and covers everything supabase-js sends.
+
+Verified against the live URL through the real supabase-js client
+(`src/test/storageServer.test.ts` does the same against a local instance):
+anonymous upload rejected (401), multipart upload stored byte-identical, public
+read returns the bytes, duplicate refused unless `upsert`, path traversal
+refused, `.html` refused, list/remove work. That `.html` rule matters — the
+bucket is served from our own origin, so an uploadable HTML or crafted SVG would
+be stored XSS on app.catalogshare.online.
+
+The 77 files that were on Supabase's CDN were copied across by
+`scripts/migrate-storage.mjs`; nothing is served from Supabase any more.
 
 ### 3. Edge functions
 Five are called from the client and must be re-hosted as small Node services:
 `create-razorpay-order`, `verify-razorpay-payment`, `send-emails`,
 `delete-company`, `delete-own-account`. Plus `check-expired-subscriptions` on a
 timer. The AdMob SSV endpoint is already self-hosted and is the pattern to copy.
+
+### 3a. AdMob rewarded ads — the SSV service must point at THIS backend
+The rewarded-ad reward is credited only by the server-side-verification callback
+(`catalogshare-ssv`, `/opt/catalogshare-ssv/server.mjs`, env `/etc/catalogshare/ssv.env`),
+which Google calls after it confirms the ad was watched. That service was left
+pointing at the dead Supabase project (`SUPABASE_URL=…supabase.co`) with an empty
+service-role key, so **every reward logged "NOT CREDITED — not configured" and no
+Coins were ever awarded**. Fixed 23 Aug 2026: `ssv.env` now reads
+```
+PORT=5010
+SUPABASE_URL=http://127.0.0.1:8088          # the internal gateway, NOT the public URL
+SUPABASE_SERVICE_ROLE_KEY=<same key as /opt/catalogshare-functions/functions.env>
+```
+The box cannot reach its own public IP, so the internal gateway is mandatory here
+just as it is for the functions host. After editing, `sudo systemctl restart
+catalogshare-ssv` — the log should say `supabase configured: true`. Verify a real
+credit with `curl -s -X POST http://127.0.0.1:8088/rest/v1/rpc/credit_ad_reward
+-H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json'
+-d '{"p_transaction_id":"test-1","p_user_id":"<uuid>","p_reward_amount":10}'` → `{"ok":true,…}`.
 
 ### 4. SMTP
 GoTrue runs with `GOTRUE_MAILER_AUTOCONFIRM=true`, so signup works without
@@ -160,3 +200,80 @@ ls -lah /var/backups/catalogshare/
 
 These live on the same disk as the database, which protects against a bad
 migration but not a dead server. Copying them off-box is the next improvement.
+
+---
+
+## Google sign-in
+
+Merchants can sign in (and sign up) with a Google account, on the website and
+in the Android app, and an existing email-and-password account can attach a
+Google account from **Account → Sign-in methods**. Nothing in the app shows a
+Google button until the server is configured, so this can be set up at any
+time without a release.
+
+### How the pieces fit
+
+| Surface | Mechanism |
+|---|---|
+| Website sign-in / sign-up | GoTrue's own OAuth redirect: browser → Google → `https://app.catalogshare.online/backend/auth/v1/callback` → back to the app |
+| Android sign-in / sign-up | Google Credential Manager hands the app an **id token**; the app posts it to GoTrue's `grant_type=id_token` |
+| Website "connect Google" | GoTrue's link-identity redirect (`GOTRUE_SECURITY_MANUAL_LINKING_ENABLED=true`) |
+| Android "connect Google" | The `link-google` function verifies the id token with Google, then calls `admin_link_identity()` as the service role. Google refuses to show its consent page inside a WebView, so the redirect flow is not an option in the app |
+
+An existing email/password account that signs in with a Google account of the
+**same, verified** address is linked automatically by GoTrue — no settings
+visit needed. The "connect" flow exists for accounts whose Google address is
+different.
+
+### Operator steps
+
+1. **Google Cloud Console → APIs & Services → Credentials**, in one project:
+   - **OAuth consent screen**: External. While it is in *Testing*, only listed
+     test users can sign in; *email* and *profile* scopes do not need
+     verification to go to Production.
+   - **Create credentials → OAuth client ID → Web application**
+     - Authorized JavaScript origin: `https://app.catalogshare.online`
+     - Authorized redirect URI: `https://app.catalogshare.online/backend/auth/v1/callback`
+     - Keep the **client ID** and **client secret**.
+   - **OAuth client ID → Android**, one per signing certificate, package
+     `in.catalogshare.app`:
+     - Upload key: `2D:03:1F:13:9F:D9:9C:90:1F:1F:74:AB:C6:3A:0C:AD:32:B1:E7:9A`
+     - Debug key (local builds): `86:7B:8C:DA:26:83:48:BE:47:A3:02:4E:E9:C3:47:59:E0:10:D2:14`
+     - **Play App Signing key** — Play Console → *Test and release → Setup →
+       App signing* → SHA-1. Required for the Play Store build even though the
+       upload key is registered; without it Credential Manager fails with
+       `[28444] Developer console is not set up correctly`.
+     The Android clients are only registered with Google; nothing from them is
+     pasted anywhere. The app uses the **Web** client id on every platform.
+2. **Admin console → Integrations → Google sign-in**: paste the Web client ID
+   and client secret. The console also lists every value above with a copy
+   button, plus a live "enabled on the server" probe.
+3. Wait a minute. `catalogshare-smtp.timer` runs the reconcile script, which
+   copies the two values into `/opt/catalogshare-backend/.env`, mirrors the
+   client id into `app_settings.auth.google_web_client_id` (what the app reads
+   to decide whether to show the button), and restarts GoTrue with the
+   provider on. The script only flips the provider on when **both** values are
+   present — GoTrue will not start a provider with a blank secret, and a
+   half-configured one would take every sign-in down at the next restart.
+4. Verify:
+
+   ```bash
+   curl -s https://app.catalogshare.online/backend/auth/v1/settings | grep -o '"google":[a-z]*'
+   # "google":true
+   ```
+
+Changes in Google Cloud can take a few hours to propagate to Credential
+Manager on devices; a token that is "for a different app" means the app's
+`webClientId` and the server's `GOOGLE_CLIENT_ID` do not match.
+
+### Apply the migration
+
+`supabase/migrations/20260823000000_google_sign_in.sql` seeds the two
+`integration_secrets` rows, the public `app_settings.auth` row and the
+`admin_link_identity()` function. It is idempotent:
+
+```bash
+sudo -u postgres psql -d catalogshare -f 20260823000000_google_sign_in.sql
+```
+
+The last SELECT prints a row per object; every status must read `OK`.

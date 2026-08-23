@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import ColorThemePicker from "@/components/ColorThemePicker";
 import { authErrorMessage } from "@/lib/errorMessages";
 import { phoneDigits, safeExternalUrl } from "@/lib/storefront";
+import { oauthErrorFromLocation, signInWithGoogle } from "@/lib/googleAuth";
+import { useGoogleSignInConfig } from "@/lib/authProviders";
+import { GoogleButton } from "@/components/GoogleButton";
 
 /** Deliberately loose: the server is the authority, this only catches typos. */
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -35,11 +39,19 @@ type CompanyErrors = { companyName?: string; phone?: string; googleMapsUrl?: str
 
 const Register = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [step, setStep] = useState<"signup" | "company">("signup");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const { webClientId: googleWebClientId } = useGoogleSignInConfig();
   const [resuming, setResuming] = useState(true);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  // Seeded from the URL: a Google sign-up that fails in the browser comes back
+  // here with the reason in the query string rather than a session.
+  const [formError, setFormError] = useState<string | null>(() => {
+    const fromRedirect = oauthErrorFromLocation();
+    return fromRedirect ? authErrorMessage(fromRedirect, "Google sign-up didn't finish. Please try again.") : null;
+  });
   const [signupErrors, setSignupErrors] = useState<SignupErrors>({});
   const [companyErrors, setCompanyErrors] = useState<CompanyErrors>({});
 
@@ -166,6 +178,56 @@ const Register = () => {
       toast.error(message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  /**
+   * Step 1 with Google instead of a password.
+   *
+   * The terms still have to be accepted first - the checkbox is the legal
+   * record of consent, and a Google sign-up must not be a way around it. On
+   * the device the account exists the moment Google answers, so this moves
+   * straight to step 2; in the browser the page leaves for Google and the
+   * resume effect above picks the registration up on return.
+   */
+  const handleGoogleSignup = async () => {
+    if (googleLoading || loading) return;
+    if (!agreedToTerms) {
+      setSignupErrors((prev) => ({ ...prev, terms: "You must agree to the terms to continue." }));
+      return;
+    }
+    setSignupErrors({});
+    setFormError(null);
+    setGoogleLoading(true);
+    try {
+      const { session, cancelled } = await signInWithGoogle({
+        webClientId: googleWebClientId,
+        redirectPath: "/register",
+      });
+      if (cancelled || !session) return;
+
+      // An existing merchant who tapped "sign up" by mistake is simply signed
+      // in; their company is already there.
+      const { data: companies } = await supabase
+        .from("companies")
+        .select("id")
+        .eq("owner_id", session.user.id)
+        .limit(1);
+      if (companies && companies.length > 0) {
+        toast.success("Welcome back!");
+        navigate("/dashboard", { replace: true });
+        return;
+      }
+
+      setEmail(session.user.email ?? "");
+      toast.success("Signed in with Google. Now set up your company.");
+      setStep("company");
+    } catch (error) {
+      const message = authErrorMessage(error, "Google sign-up failed. Please try again.");
+      setFormError(message);
+      toast.error(message);
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -329,7 +391,17 @@ const Register = () => {
       } else {
         toast.success("Company created. Welcome to your dashboard.");
       }
-      navigate("/dashboard");
+      // The dashboard reads the company through react-query. If anything cached
+      // this account as "no company yet" while it was still empty (a stray read
+      // during signup, or the query settling a beat before the row existed),
+      // that stale entry would strand the user on the "Complete setup" screen
+      // even though the company was created — the exact "stuck on company setup
+      // after filling everything" report. Drop the cached company and the
+      // session-user key so the dashboard refetches the row we just wrote, and
+      // replace history so Back doesn't return to the setup form.
+      queryClient.removeQueries({ queryKey: ["current-company"] });
+      queryClient.removeQueries({ queryKey: ["auth-user-id"] });
+      navigate("/dashboard", { replace: true });
     } catch (error) {
       const message = authErrorMessage(error, "Setup failed. Please try again.");
       setFormError(message);
@@ -477,10 +549,16 @@ const Register = () => {
                   )}
                 </div>
               </div>
-              <Button type="submit" className="h-12 w-full text-base" disabled={loading}>
+              <Button type="submit" className="h-12 w-full text-base" disabled={loading || googleLoading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {loading ? "Creating account..." : "Create account"}
               </Button>
+              <GoogleButton
+                label="Sign up with Google"
+                onClick={() => void handleGoogleSignup()}
+                loading={googleLoading}
+                disabled={loading}
+              />
               <p className="text-center text-sm text-muted-foreground">
                 Already have an account?{" "}
                 <Link to="/login" className="text-primary hover:underline">

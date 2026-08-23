@@ -61,6 +61,19 @@ const config: CapacitorConfig = {
     CapacitorHttp: {
       enabled: false,
     },
+    // Google sign-in via the OS account sheet (@capgo/capacitor-social-login,
+    // wired up in src/native/googleSignIn.ts). Only Google is bundled: each
+    // provider left on here ships its SDK in the APK whether it is used or
+    // not, and Facebook's in particular trips privacy scanners. Read at
+    // `cap sync`, so a change here needs a sync to take effect.
+    SocialLogin: {
+      providers: {
+        google: true,
+        facebook: false,
+        apple: false,
+        twitter: false,
+      },
+    },
   },
 };
 

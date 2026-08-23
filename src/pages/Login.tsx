@@ -11,16 +11,30 @@ import { AlertTriangle, Loader2, Store } from "lucide-react";
 import { useAuthRedirect } from "@/hooks/useAuthRedirect";
 import { checkConnection, type ConnectionReport } from "@/lib/connectionCheck";
 import { authErrorMessage } from "@/lib/errorMessages";
+import { routeAfterSignIn } from "@/lib/postLogin";
+import { oauthErrorFromLocation, signInWithGoogle } from "@/lib/googleAuth";
+import { useGoogleSignInConfig } from "@/lib/authProviders";
+import { GoogleButton } from "@/components/GoogleButton";
 
 /** Deliberately loose: the server is the authority, this only catches typos. */
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const Login = () => {
-  const { checking } = useAuthRedirect();
+  // A Google sign-in on the web returns here with a live session; route a user
+  // who has no company yet on to registration instead of leaving them on the
+  // form. The password flow never reaches this state (it routes itself).
+  const { checking } = useAuthRedirect({ incompleteTo: "/register" });
+  const { webClientId } = useGoogleSignInConfig();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
-  const [formError, setFormError] = useState<string | null>(null);
+  // Seeded from the URL: when Google sign-in fails on the web, GoTrue sends the
+  // browser back here with the reason in the query string instead of a session.
+  const [formError, setFormError] = useState<string | null>(() => {
+    const fromRedirect = oauthErrorFromLocation();
+    return fromRedirect ? authErrorMessage(fromRedirect, "Google sign-in didn't finish. Please try again.") : null;
+  });
+  const [googleLoading, setGoogleLoading] = useState(false);
   /**
    * Filled in only when a login fails for a reason that looks like the network.
    * "Failed to fetch" covers DNS, TLS, a refused connection and a blocked CORS
@@ -49,43 +63,12 @@ const Login = () => {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: password.trim() });
       if (error) throw error;
 
-      // Check if user has a company
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
-      // Where to land is a nicety; being signed in is the thing that matters.
-      // A dropped connection during these two lookups used to throw the user
-      // back to the login form even though the session was already live.
-      try {
-        // Check if master admin
-        // An admin signing in through the merchant login still belongs in the
-        // console. The error is captured so a failed lookup does not silently
-        // route the owner into the company-setup flow.
-        const { data: roles, error: roleError } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", user.id)
-          .eq("role", "admin");
-
-        if (roleError) throw roleError;
-
-        if (roles && roles.length > 0) {
-          navigate("/master-admin");
-          return;
-        }
-
-        // Check if has company
-        const { data: companies } = await supabase
-          .from("companies")
-          .select("slug")
-          .eq("owner_id", user.id)
-          .limit(1);
-
-        // No company yet, redirect to register step 2
-        navigate(companies && companies.length > 0 ? "/dashboard" : "/register");
-      } catch {
-        navigate("/dashboard");
-      }
+      // Role → console, company → dashboard, neither → company setup. Shared
+      // with the Google path so the two can never disagree.
+      await routeAfterSignIn(navigate, user);
 
       toast.success("Welcome back!");
     } catch (error) {
@@ -112,6 +95,38 @@ const Login = () => {
       toast.error(message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  /**
+   * Google. On the device this resolves with a session and routes like the
+   * password path; in the browser it navigates away to Google and this
+   * component is gone before the promise settles.
+   */
+  const handleGoogle = async () => {
+    if (googleLoading || loading) return;
+    setFormError(null);
+    setDiagnosis(null);
+    setGoogleLoading(true);
+    try {
+      const { session, cancelled } = await signInWithGoogle({ webClientId, redirectPath: "/login" });
+      if (cancelled) {
+        setGoogleLoading(false);
+        return;
+      }
+      // Web: the browser is navigating to Google. Leave the button in its
+      // loading state — resetting it would flash the label back for the moment
+      // before the page unloads.
+      if (!session) return;
+      // Native: routes new accounts to /register and returning ones to
+      // /dashboard, so a neutral line covers both (not "Welcome back").
+      await routeAfterSignIn(navigate, session.user);
+      toast.success("Signed in with Google.");
+    } catch (error) {
+      const message = authErrorMessage(error, "Google sign-in failed. Please try again.");
+      setFormError(message);
+      toast.error(message);
+      setGoogleLoading(false);
     }
   };
 
@@ -210,10 +225,11 @@ const Login = () => {
                 Forgot password?
               </Link>
             </div>
-            <Button type="submit" className="h-12 w-full text-base" disabled={loading}>
+            <Button type="submit" className="h-12 w-full text-base" disabled={loading || googleLoading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {loading ? "Signing in..." : "Sign in"}
             </Button>
+            <GoogleButton onClick={() => void handleGoogle()} loading={googleLoading} disabled={loading} />
             <p className="text-center text-sm text-muted-foreground">
               Don't have an account?{" "}
               <Link to="/register" className="text-primary hover:underline">

@@ -16,6 +16,33 @@
 import { createClient } from "@supabase/supabase-js";
 
 /**
+ * A WebSocket for supabase-js to hold, on a Node that has none.
+ *
+ * None of these functions use realtime. supabase-js builds a RealtimeClient
+ * eagerly inside `createClient()` anyway, and from v2.49 it THROWS on Node 20
+ * when no global WebSocket exists rather than degrading. Because every handler
+ * begins with `adminClient()`, that single throw took down all six functions at
+ * once - payment verification, email, account deletion - each surfacing as a
+ * generic "Internal server error" that named nothing.
+ *
+ * Node 22 has a global WebSocket and needs none of this, so the import is
+ * skipped there and this whole block disappears the day the host is upgraded.
+ */
+let wsTransport;
+if (typeof globalThis.WebSocket === "undefined") {
+  try {
+    wsTransport = (await import("ws")).default;
+  } catch {
+    // Left undefined deliberately: createClient will throw with Google's own
+    // explanatory message, which is more useful than one invented here.
+    console.warn('[fn] no global WebSocket and the "ws" package is missing - run: npm i ws');
+  }
+}
+
+/** Merged into every client so the transport decision is made in one place. */
+const REALTIME_OPTIONS = wsTransport ? { realtime: { transport: wsTransport } } : {};
+
+/**
  * Credentials loaded from `integration_secrets`, refreshed in the background.
  *
  * Held in a plain map and read synchronously so that `env()` keeps its existing
@@ -113,6 +140,7 @@ export const SERVICE_ROLE_KEY = env("SUPABASE_SERVICE_ROLE_KEY", "");
 export function adminClient() {
   return createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
+    ...REALTIME_OPTIONS,
   });
 }
 
@@ -127,6 +155,7 @@ export function callerClient(authHeader) {
   return createClient(SUPABASE_URL, ANON_KEY, {
     global: { headers: { Authorization: authHeader ?? "" } },
     auth: { autoRefreshToken: false, persistSession: false },
+    ...REALTIME_OPTIONS,
   });
 }
 

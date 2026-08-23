@@ -20,12 +20,13 @@
  *     server-side too, so it holds even if this form is bypassed.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Check,
   Copy,
   CreditCard,
+  KeyRound,
   Loader2,
   Mail,
   MonitorPlay,
@@ -79,12 +80,50 @@ const GROUPS: Array<{ title: string; icon: typeof Mail; blurb: string; keys: str
     keys: ["ADMOB_APP_ID", "ADMOB_BANNER_ID", "ADMOB_INTERSTITIAL_ID", "ADMOB_REWARDED_ID"],
   },
   {
+    title: "Google sign-in",
+    icon: KeyRound,
+    blurb:
+      "From Google Cloud Console → Credentials. Paste the WEB application client - the same id serves the website and the Android app; the Android clients only need registering with Google. Google sign-in also needs Email (above) configured first: until it is, the app auto-confirms signups, and turning Google on then would allow account takeover, so the button stays hidden until both are set.",
+    keys: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
+  },
+  {
     title: "General",
     icon: Settings2,
     blurb: "Everything else.",
     keys: ["SUPPORT_EMAIL"],
   },
 ];
+
+/** Exactly what Google Cloud Console asks for, so nothing has to be looked up. */
+const GOOGLE_SETUP_VALUES: Array<{ label: string; value: string; where: string }> = [
+  {
+    label: "Authorized JavaScript origin",
+    value: "https://app.catalogshare.online",
+    where: "Web application client",
+  },
+  {
+    label: "Authorized redirect URI",
+    value: "https://app.catalogshare.online/backend/auth/v1/callback",
+    where: "Web application client",
+  },
+  {
+    label: "Package name",
+    value: "in.catalogshare.app",
+    where: "Every Android client",
+  },
+  {
+    label: "SHA-1 — upload key",
+    value: "2D:03:1F:13:9F:D9:9C:90:1F:1F:74:AB:C6:3A:0C:AD:32:B1:E7:9A",
+    where: "Android client (builds signed on this machine)",
+  },
+  {
+    label: "SHA-1 — debug key",
+    value: "86:7B:8C:DA:26:83:48:BE:47:A3:02:4E:E9:C3:47:59:E0:10:D2:14",
+    where: "Android client (local debug builds)",
+  },
+];
+
+const AUTH_SETTINGS_URL = `${import.meta.env.VITE_SUPABASE_URL ?? ""}/auth/v1/settings`;
 
 /** The callback URL AdMob asks for when enabling server-side verification. */
 const SSV_CALLBACK_URL = "https://app.catalogshare.online/api/admob-ssv";
@@ -192,6 +231,147 @@ function AdmobSsvCard() {
   );
 }
 
+/** One copyable value in the Google setup card. */
+function CopyRow({ label, value, where }: { label: string; value: string; where: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Could not copy", { description: value });
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-baseline gap-x-2">
+        <Label className="text-sm font-medium">{label}</Label>
+        <span className="text-xs text-muted-foreground">{where}</span>
+      </div>
+      <div className="mt-1.5 flex gap-2">
+        <code className="flex min-w-0 flex-1 items-center overflow-x-auto whitespace-nowrap rounded-md border border-border bg-muted px-3 py-2 font-mono text-xs">
+          {value}
+        </code>
+        <Button variant="outline" onClick={() => void copy()} aria-label={`Copy ${label}`}>
+          {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Google Cloud Console's side of the setup, answered.
+ *
+ * The redirect URI, origin, package name and certificate fingerprints are facts
+ * about this deployment, not things to work out each time - and a fingerprint
+ * typed by hand is how "Developer console is not set up correctly" happens.
+ *
+ * The probe reads GoTrue's public settings endpoint, which is the one honest
+ * answer to "did it take?": the reconcile script copies the pasted values into
+ * GoTrue's environment and restarts it within a minute, and `external.google`
+ * flips to true only once that restart has happened with both values present.
+ */
+function GoogleSetupCard() {
+  const [probe, setProbe] = useState<"idle" | "checking" | "on" | "off" | "bad">("idle");
+
+  const check = useCallback(async () => {
+    setProbe("checking");
+    try {
+      const res = await fetch(AUTH_SETTINGS_URL, { cache: "no-store" });
+      if (!res.ok) {
+        setProbe("bad");
+        return;
+      }
+      const settings = (await res.json()) as { external?: { google?: boolean } };
+      setProbe(settings?.external?.google === true ? "on" : "off");
+    } catch {
+      setProbe("bad");
+    }
+  }, []);
+
+  useEffect(() => {
+    void check();
+  }, [check]);
+
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          <ShieldCheck className="h-5 w-5 text-primary" />
+          <h3 className="font-semibold">Google sign-in: what to give Google</h3>
+          {probe === "on" && (
+            <Badge variant="secondary" className="gap-1">
+              <Check className="h-3 w-3" /> Enabled on the server
+            </Badge>
+          )}
+          {probe === "off" && (
+            <Badge variant="outline" className="gap-1">
+              <AlertTriangle className="h-3 w-3" /> Not enabled yet — needs the client id, secret, and Email configured; applies within a minute
+            </Badge>
+          )}
+          {probe === "bad" && (
+            <Badge variant="outline" className="gap-1 border-destructive text-destructive">
+              <AlertTriangle className="h-3 w-3" /> Could not read the server&apos;s auth settings
+            </Badge>
+          )}
+        </div>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Create these in <span className="font-medium text-foreground">one</span> Google
+          Cloud project under APIs &amp; Services → Credentials: a{" "}
+          <span className="font-medium text-foreground">Web application</span> client
+          (its id and secret go in the fields above) and one{" "}
+          <span className="font-medium text-foreground">Android</span> client per signing
+          certificate. The Android clients are only registered with Google; the app
+          uses the Web client id on every platform.
+        </p>
+
+        <div className="space-y-4">
+          {GOOGLE_SETUP_VALUES.map((row) => (
+            <CopyRow key={row.label} {...row} />
+          ))}
+        </div>
+
+        <div className="mt-4 rounded-lg border border-border p-4">
+          <p className="mb-2 text-sm font-medium">Also register the Play App Signing key</p>
+          <p className="text-sm text-muted-foreground">
+            Play re-signs the store build with its own key, so the upload-key SHA-1
+            above is not what installed phones present. Copy the SHA-1 from Play
+            Console → <span className="font-medium text-foreground">Test and release → Setup → App signing</span>{" "}
+            and add it as a third Android client with the same package name.
+            Without it, Google sign-in works in local builds and fails from the
+            Play Store with &ldquo;Developer console is not set up correctly&rdquo;.
+          </p>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={() => void check()} disabled={probe === "checking"}>
+            {probe === "checking" ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Checking
+              </>
+            ) : (
+              "Re-check the server"
+            )}
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            Reads {AUTH_SETTINGS_URL.replace(/^https?:\/\//, "")}
+          </span>
+        </div>
+
+        <p className="mt-4 text-xs text-muted-foreground">
+          While the OAuth consent screen is in Testing, only the Google accounts
+          listed as test users can sign in. Changes in Google Cloud can take a few
+          hours to reach phones.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function IntegrationsAdmin() {
   const db = supabase as unknown as Loose;
 
@@ -247,7 +427,9 @@ export function IntegrationsAdmin() {
       toast.success(`${row.label ?? key} saved`, {
         description: key.startsWith("SMTP") || key === "RESEND_API_KEY"
           ? "Email settings apply within a minute."
-          : "Applies within a minute.",
+          : key.startsWith("GOOGLE_")
+            ? "Google sign-in switches on within a minute once both the client id and the secret are saved."
+            : "Applies within a minute.",
       });
       if (row.is_secret) setDraft((d) => ({ ...d, [key]: "" }));
       await refresh();
@@ -350,7 +532,8 @@ export function IntegrationsAdmin() {
         if (!groupRows.length) return null;
 
         return (
-          <Card key={title}>
+          <Fragment key={title}>
+          <Card>
             <CardContent className="p-5">
               <div className="mb-1 flex items-center gap-2">
                 <Icon className="h-5 w-5 text-primary" />
@@ -450,6 +633,8 @@ export function IntegrationsAdmin() {
               )}
             </CardContent>
           </Card>
+          {title === "Google sign-in" && <GoogleSetupCard />}
+          </Fragment>
         );
       })}
 

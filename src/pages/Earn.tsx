@@ -130,6 +130,28 @@ const Earn = () => {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  // A short gap between rewarded ads. Two things need it: AdMob serves the next
+  // ad far more reliably when the last one has had a moment to be replaced (a
+  // tap the instant the previous ad closes is what produced "No ad was
+  // available just now"), and `prepareRewarded()` — kicked off as each ad ends
+  // — needs a few seconds to have the next one ready. The countdown is shown on
+  // the button so the wait is obvious rather than feeling like a dead tap.
+  const REWARD_COOLDOWN_MS = 15_000;
+  const [cooldownUntil, setCooldownUntil] = useState(0);
+  const [nowTs, setNowTs] = useState(() => Date.now());
+  useEffect(() => {
+    if (cooldownUntil <= Date.now()) return;
+    const id = setInterval(() => {
+      const t = Date.now();
+      setNowTs(t);
+      // Stop ticking the moment the gap is over, rather than leaving a 250ms
+      // timer running for the rest of the session.
+      if (t >= cooldownUntil) clearInterval(id);
+    }, 250);
+    return () => clearInterval(id);
+  }, [cooldownUntil]);
+  const cooldownSecs = Math.max(0, Math.ceil((cooldownUntil - nowTs) / 1000));
+
   // `phase` cannot guard the button on its own: a tap reads the state from the
   // render it happened on, and `disabled` only takes effect at the next paint,
   // so two touches inside one frame both saw "idle" and opened two rewarded ads
@@ -292,7 +314,11 @@ const Earn = () => {
       }
     } finally {
       watching.current = false;
-      if (alive.current) setPhase("idle");
+      if (alive.current) {
+        setPhase("idle");
+        // Start the gap before the next ad — see REWARD_COOLDOWN_MS.
+        setCooldownUntil(Date.now() + REWARD_COOLDOWN_MS);
+      }
     }
   };
 
@@ -304,9 +330,11 @@ const Earn = () => {
       ? "Loading ad…"
       : phase === "confirming"
         ? "Confirming your reward…"
-        : notReady
-          ? "Watch an ad"
-          : `Watch an ad · +${config.pointsPerAd} ${label}`;
+        : cooldownSecs > 0
+          ? `Next ad in ${cooldownSecs}s`
+          : notReady
+            ? "Watch an ad"
+            : `Watch an ad · +${config.pointsPerAd} ${label}`;
 
   return (
     <AdminLayout
@@ -410,7 +438,7 @@ const Earn = () => {
 
           <Button
             className="h-14 w-full text-base"
-            disabled={busy || notReady || blocker !== null}
+            disabled={busy || notReady || blocker !== null || cooldownSecs > 0}
             onClick={() => void handleWatch()}
           >
             {busy ? (

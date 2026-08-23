@@ -28,6 +28,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { isOnline, onNetworkChange } from "@/native/net";
 import { prefGet, prefSet } from "@/native/prefs";
+import { loadTrialConfig } from "@/lib/trialConfig";
 
 /**
  * Trial-start subscribers.
@@ -168,6 +169,17 @@ export async function ensureTrialStarted(
   const existing = await readTrialStart(companyId);
   const confirmed = (await prefGet(confirmedKey(companyId))) === "1";
   if (existing > 0 && confirmed) return existing;
+
+  // Do NOT create a new trial when the admin has switched trials off, or turned
+  // auto-start off (which makes trials invite-only — only an explicit grant,
+  // written as a server `trial_started_at`, may start one, and that path is the
+  // `serverStartedAt` short-circuit above). Without this, opening the Estimates
+  // screen handed every new user a fresh trial regardless of the console
+  // setting, which is exactly what "the trial is disabled but new users still
+  // get it" was. The config is awaited rather than read so a cold start (before
+  // the app-wide load completes) uses the real value, not the built-in default.
+  const trial = await loadTrialConfig();
+  if (!trial.enabled || !trial.autoStart) return existing;
 
   if (isOnline()) {
     try {

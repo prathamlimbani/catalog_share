@@ -60,6 +60,39 @@ export function authErrorMessage(error: unknown, fallback = "Something went wron
   if (text.includes("already registered") || text.includes("already exists")) {
     return "An account with this email already exists. Log in instead, or use a different email.";
   }
+
+  // Google sign-in and account linking. These come before the generic
+  // "token"/"expired" matches below, which would otherwise describe a rejected
+  // id token as a mistyped email code.
+  if (text.includes("provider is not enabled") || text.includes("unsupported provider") || text.includes("provider could not be found")) {
+    return "Google sign-in isn't switched on yet. Use your email and password.";
+  }
+  if (text.includes("already linked") || text.includes("already connected")) {
+    return "That Google account is already connected to another CatalogShare account.";
+  }
+  if (text.includes("manual linking is disabled") || text.includes("linking is disabled")) {
+    return "Connecting accounts isn't available right now. Please try again later.";
+  }
+  if (text.includes("at least one identity") || text.includes("cannot unlink")) {
+    return "That is the only way into this account, so it can't be disconnected.";
+  }
+  if (text.includes("multiple accounts with the same email")) {
+    return "More than one account uses this email address. Please contact support.";
+  }
+  if (text.includes("id token") || text.includes("id_token") || text.includes("audience")) {
+    return "Google didn't accept that sign-in. Please try again.";
+  }
+  if (text.includes("access_denied") || text.includes("access denied")) {
+    return "Google sign-in was cancelled before it finished.";
+  }
+  // Anything else that already names Google is a sentence the link-google
+  // function wrote for the user (e.g. "That Google sign-in has expired. Try
+  // again."). Pass it through verbatim so the generic "expired"/"token"
+  // branches below don't rewrite it into the email-code copy.
+  if (text.includes("google")) {
+    return raw;
+  }
+
   if (text.includes("expired")) {
     return "That code has expired. Send yourself a new one and try again.";
   }

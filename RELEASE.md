@@ -296,6 +296,27 @@ The manifest declares `android:autoVerify="true"` for `https://catalogshare.onli
 
 ---
 
+## 5b. Google sign-in (register every signing key with Google)
+
+Sign in with Google on Android goes through Google Credential Manager, which only
+answers for an APK whose **package name + signing SHA-1** are registered as an
+*Android* OAuth client in the same Google Cloud project as the *Web* client the
+app is configured with. One Android client per certificate:
+
+| Build | SHA-1 | Where it comes from |
+|---|---|---|
+| Debug (`assembleDebug`) | `86:7B:8C:DA:26:83:48:BE:47:A3:02:4E:E9:C3:47:59:E0:10:D2:14` | `~/.android/debug.keystore` |
+| Upload key (`bundleRelease`, sideloaded APK) | `2D:03:1F:13:9F:D9:9C:90:1F:1F:74:AB:C6:3A:0C:AD:32:B1:E7:9A` | `C:/catalogshare-keys/catalogshare-upload.jks` |
+| **Play App Signing** (what users install) | copy from Play Console → **Test and release → Setup → App signing** | Google holds this key |
+
+The Web client id and secret are pasted into the admin console (**Integrations →
+Google sign-in**); the console also shows these values with copy buttons. Nothing
+in this repo changes per key - the APK only ever carries the Web client id, which
+it reads from the server at runtime. Missing the Play App Signing entry is the
+classic failure: sign-in works on a sideloaded build and fails from the Store
+with `[28444] Developer console is not set up correctly`. See
+`SELF-HOSTING.md` → "Google sign-in" for the server side.
+
 ## 6. Play Console checklist
 
 ### 6.1 Create the app

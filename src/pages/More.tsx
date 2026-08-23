@@ -7,6 +7,8 @@ import {
   Crown,
   FileText,
   Fingerprint,
+  KeyRound,
+  Link2,
   LogOut,
   Mail,
   Pencil,
@@ -49,6 +51,16 @@ import {
   APP_VERSION,
 } from "@/lib/appInfo";
 import { toast } from "sonner";
+import type { UserIdentity } from "@supabase/supabase-js";
+import { useGoogleSignInConfig } from "@/lib/authProviders";
+import {
+  googleIdentityOf,
+  identityEmail,
+  linkGoogleAccount,
+  oauthErrorFromLocation,
+  unlinkGoogleAccount,
+} from "@/lib/googleAuth";
+import { authErrorMessage } from "@/lib/errorMessages";
 
 interface RowProps {
   icon: React.ReactNode;
@@ -161,6 +173,35 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+interface MethodRowProps {
+  icon: React.ReactNode;
+  label: string;
+  hint?: string;
+  /** Shown at the trailing edge; the row itself is not clickable. */
+  action?: React.ReactNode;
+}
+
+/**
+ * A sign-in method that is already in place: a label, its address, and an
+ * optional control. Deliberately a div, not a Row: Row is a button, and the
+ * Disconnect control inside it would be a button inside a button, which is
+ * invalid markup that swallows the inner tap on some Android WebViews.
+ */
+function MethodRow({ icon, label, hint, action }: MethodRowProps) {
+  return (
+    <div className="flex w-full min-h-[56px] items-center gap-3 px-4 py-2">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1 text-left">
+        <span className="block truncate text-sm font-medium text-foreground">{label}</span>
+        {hint && <span className="block truncate text-xs text-muted-foreground">{hint}</span>}
+      </span>
+      {action ?? <span />}
+    </div>
+  );
+}
+
 /**
  * The "Account" tab — profile, plan, data, support and the legal surfaces
  * Google Play requires to be reachable in-app.
@@ -177,6 +218,87 @@ const More = () => {
   const [lockStatus, setLockStatus] = useState<BiometricStatus | null>(null);
   const [lockOn, setLockOn] = useState(false);
   const [lockBusy, setLockBusy] = useState(false);
+
+  // ---- sign-in methods ------------------------------------------------
+  // The account's own email and its linked identities. Both come from GoTrue,
+  // not the company row: a merchant can change the email shown to customers
+  // without changing the one they sign in with.
+  const { webClientId: googleWebClientId, enabled: googleConfigured } = useGoogleSignInConfig();
+  const [accountEmail, setAccountEmail] = useState<string>("");
+  const [identities, setIdentities] = useState<UserIdentity[] | null>(null);
+  const [googleBusy, setGoogleBusy] = useState(false);
+
+  const loadSignInMethods = async () => {
+    try {
+      const [{ data: userData }, { data: identityData }] = await Promise.all([
+        supabase.auth.getUser(),
+        supabase.auth.getUserIdentities(),
+      ]);
+      setAccountEmail(userData.user?.email ?? "");
+      setIdentities(identityData?.identities ?? []);
+    } catch {
+      // Offline or the lookup failed: leave identities as they were (null =
+      // "unknown"), so the email/password row stays shown optimistically
+      // rather than the section collapsing. Nothing is set to [] here — an
+      // empty array would read as "this account has no sign-in methods".
+    }
+  };
+
+  // Queried fresh on every mount on purpose: on the web the link flow leaves
+  // for Google and comes back to this page, and the new identity has to show
+  // up without a manual refresh.
+  useEffect(() => {
+    void loadSignInMethods();
+    // A web "Connect Google" that failed comes back to /account with the reason
+    // in the URL. Surface it here — GoTrue does not otherwise tell the user.
+    const redirectError = oauthErrorFromLocation();
+    if (redirectError) {
+      toast.error(authErrorMessage(redirectError, "Couldn't connect Google. Please try again."));
+    }
+  }, []);
+
+  const googleIdentity = googleIdentityOf(identities);
+  const googleEmail = identityEmail(googleIdentity);
+  // While identities are unknown (loading or an offline read) assume the common
+  // case — an email/password account — so the row does not flicker away. Only a
+  // successfully loaded Google-only account (no email identity) hides it.
+  const hasEmailIdentity = identities === null ? true : identities.some((i) => i.provider === "email");
+  // GoTrue refuses to unlink the last identity, so only offer Disconnect when
+  // there is another way in.
+  const canDisconnectGoogle = (identities?.length ?? 0) > 1;
+
+  const handleConnectGoogle = async () => {
+    if (googleBusy) return;
+    setGoogleBusy(true);
+    try {
+      const result = await linkGoogleAccount({ webClientId: googleWebClientId });
+      if (result.cancelled || result.redirected) return;
+      toast.success(result.email ? `Google connected · ${result.email}` : "Google connected.");
+      await loadSignInMethods();
+    } catch (error) {
+      toast.error(authErrorMessage(error, "Could not connect Google. Please try again."));
+    } finally {
+      setGoogleBusy(false);
+    }
+  };
+
+  const handleDisconnectGoogle = async () => {
+    if (googleBusy) return;
+    const confirmed = window.confirm(
+      "Disconnect Google from this account?\n\nYou will still be able to sign in with your email and password.",
+    );
+    if (!confirmed) return;
+    setGoogleBusy(true);
+    try {
+      await unlinkGoogleAccount();
+      toast.success("Google disconnected.");
+      await loadSignInMethods();
+    } catch (error) {
+      toast.error(authErrorMessage(error, "Could not disconnect Google. Please try again."));
+    } finally {
+      setGoogleBusy(false);
+    }
+  };
 
   // What this phone can do, and whether the lock is already armed. Both are
   // native-only reads that answer instantly on web.
@@ -340,6 +462,54 @@ const More = () => {
             </Button>
           </div>
         </Card>
+
+        {/* The Google row appears once the server is set up for it, and stays
+            visible for an account that already has Google attached even if the
+            setting is later switched off - they need the Disconnect control. */}
+        <Section title="Sign-in methods">
+          {hasEmailIdentity && (
+            <MethodRow
+              icon={<KeyRound className="h-4 w-4" />}
+              label="Email & password"
+              hint={accountEmail || "Signed in"}
+            />
+          )}
+          {googleIdentity ? (
+            <MethodRow
+              icon={<Link2 className="h-4 w-4" />}
+              label="Google"
+              hint={
+                canDisconnectGoogle
+                  ? googleEmail
+                    ? `Connected · ${googleEmail}`
+                    : "Connected"
+                  : googleEmail
+                    ? `${googleEmail} · your only way to sign in`
+                    : "Your only way to sign in"
+              }
+              action={
+                canDisconnectGoogle ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="shrink-0 text-destructive hover:text-destructive"
+                    disabled={googleBusy}
+                    onClick={() => void handleDisconnectGoogle()}
+                  >
+                    {googleBusy ? <RefreshCw className="h-4 w-4 animate-spin" /> : "Disconnect"}
+                  </Button>
+                ) : undefined
+              }
+            />
+          ) : googleConfigured && identities !== null ? (
+            <Row
+              icon={<Link2 className="h-4 w-4" />}
+              label="Connect Google account"
+              hint={googleBusy ? "Waiting for Google…" : "Sign in faster with one tap"}
+              onClick={() => void handleConnectGoogle()}
+            />
+          ) : null}
+        </Section>
 
         {rewardsConfig.enabled && (
           <Section title="Rewards">

@@ -44,10 +44,63 @@ services:
       GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
       GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
 
+      # ---- Sign in with Google ------------------------------------------
+      # All four come from /opt/catalogshare-backend/.env, which the reconcile
+      # script rewrites from integration_secrets - the operator pastes the
+      # client id and secret into the admin console, never into this file.
+      # ENABLED is derived by that script and is only "true" once BOTH values
+      # are present: GoTrue refuses to start a provider with a blank secret,
+      # and a half-configured provider would take every other sign-in down
+      # with it at the next restart.
+      #
+      # The redirect URI is what Google calls back after consent. nginx maps
+      # /backend/auth/v1/ onto GoTrue's root, so /callback lands on GoTrue's
+      # own handler. It must match the Web client's "Authorized redirect URI"
+      # in Google Cloud Console character for character.
+      GOTRUE_EXTERNAL_GOOGLE_ENABLED: ${GOOGLE_SIGN_IN_ENABLED:-false}
+      GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOTRUE_EXTERNAL_GOOGLE_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI: https://app.catalogshare.online/backend/auth/v1/callback
+      # Lets a signed-in merchant attach (and detach) a Google identity to the
+      # account they already have, instead of ending up with two accounts. The
+      # website uses GoTrue's own link endpoint; the app goes through the
+      # link-google function because Google blocks its consent page in WebViews.
+      GOTRUE_SECURITY_MANUAL_LINKING_ENABLED: "true"
+
       GOTRUE_PASSWORD_MIN_LENGTH: "6"
       GOTRUE_SECURITY_REFRESH_TOKEN_ROTATION_ENABLED: "true"
       GOTRUE_SECURITY_REFRESH_TOKEN_REUSE_INTERVAL: "10"
       GOTRUE_LOG_LEVEL: info
+
+      # ---- Email -------------------------------------------------------
+      # All of these come from /opt/catalogshare-backend/.env, which the
+      # reconcile script rewrites from integration_secrets - the operator fills
+      # them in from the admin console, never in this file. They interpolate
+      # here so a console edit actually reaches GoTrue.
+      #
+      # THE PASSWORD IS THE LOAD-BEARING ONE. It used to be a blank literal here
+      # while the reconcile script wrote RESEND_API_KEY to .env - so the key was
+      # set but GoTrue never read it, SMTP stayed dead, and turning autoconfirm
+      # off would have stalled every signup on an email that never sends. It now
+      # reads ${RESEND_API_KEY}. Defaults keep a Resend setup working with only
+      # the API key pasted in.
+      #
+      # AUTOCONFIRM STAYS TRUE until the password is actually set (the reconcile
+      # script flips it off in the same run that first sees a password), because
+      # turning it off first would stall every registration on a confirmation
+      # email that cannot be sent.
+      GOTRUE_SMTP_HOST: ${SMTP_HOST:-smtp.resend.com}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:-465}
+      GOTRUE_SMTP_USER: ${SMTP_USER:-resend}
+      GOTRUE_SMTP_PASS: ${RESEND_API_KEY:-}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_FROM:-catalogshare123@gmail.com}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_FROM_NAME:-CatalogShare}
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /reset-password
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /login
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: /account
+      GOTRUE_MAILER_SUBJECTS_RECOVERY: Reset your CatalogShare password
+      GOTRUE_MAILER_SUBJECTS_CONFIRMATION: Confirm your CatalogShare account
+
 
   rest:
     image: postgrest/postgrest:v12.2.3
@@ -61,7 +114,8 @@ services:
       PGRST_JWT_SECRET: ${JWT_SECRET}
       PGRST_JWT_AUD: authenticated
       PGRST_SERVER_HOST: 127.0.0.1
-      PGRST_SERVER_PORT: "3001"
+      PGRST_SERVER_PORT: "3002"
+      # 3002 because 3001 is already taken by another app on this box.
       # The app reads a row back after writing it in several places; without
       # this PostgREST returns 204 and those reads come back empty.
       PGRST_DB_MAX_ROWS: "10000"

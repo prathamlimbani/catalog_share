@@ -20,6 +20,8 @@ import sendEmails from "./send-emails.mjs";
 import deleteCompany from "./delete-company.mjs";
 import deleteOwnAccount from "./delete-own-account.mjs";
 import checkExpiredSubscriptions from "./check-expired-subscriptions.mjs";
+import publishLegal from "./publish-legal.mjs";
+import linkGoogle from "./link-google.mjs";
 
 const PORT = Number(process.env.PORT ?? 5014);
 
@@ -30,6 +32,8 @@ const ROUTES = {
   "delete-company": deleteCompany,
   "delete-own-account": deleteOwnAccount,
   "check-expired-subscriptions": checkExpiredSubscriptions,
+  "publish-legal": publishLegal,
+  "link-google": linkGoogle,
 };
 
 function log(...a) {
