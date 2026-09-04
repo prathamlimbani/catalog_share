@@ -58,6 +58,7 @@ import {
   type RewardOffer,
 } from "@/lib/rewards";
 import { syncCreditGrants } from "@/lib/estimateCredits";
+import { logActivityInBackground } from "@/lib/activity";
 import { isNative } from "@/native/platform";
 import { PLANS, getPlanName } from "@/lib/plans";
 import { activateEntitlementNow } from "@/hooks/useRazorpaySubscription";
@@ -208,6 +209,16 @@ export function RedeemOffers({ companyId, balance, pointsLabel, onRedeemed }: Re
       // actually granted is what the merchant should be told about.
       const kind = result.kind ?? offer.kind;
       const amount = wholeNumber(result.amount ?? offer.amount);
+
+      // The points leaving the wallet are logged by the trigger on
+      // points_ledger; this records WHAT they bought, which only the client
+      // knows in these terms ("5 estimates", not "-100").
+      logActivityInBackground("reward.redeemed", {
+        entityType: "reward_offer",
+        entityId: offer.id,
+        summary: `${(offer.label ?? "").trim() || describeOffer(offer)} for ${wholeNumber(offer.points_cost)} ${label}`,
+        metadata: { kind, amount, points_cost: wholeNumber(offer.points_cost) },
+      });
 
       if (kind === "estimate_credits") {
         // Collect it immediately rather than waiting for the Estimates screen

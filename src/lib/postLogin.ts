@@ -10,6 +10,7 @@
 import type { User } from "@supabase/supabase-js";
 import type { NavigateFunction } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { logActivityInBackground } from "@/lib/activity";
 
 export type PostLoginDestination = "/master-admin" | "/dashboard" | "/register";
 
@@ -55,5 +56,19 @@ export async function destinationAfterSignIn(user: Pick<User, "id">): Promise<Po
 }
 
 export async function routeAfterSignIn(navigate: NavigateFunction, user: Pick<User, "id">): Promise<void> {
-  navigate(await destinationAfterSignIn(user));
+  const destination = await destinationAfterSignIn(user);
+
+  // Logged here rather than in each of the three sign-in screens, for the same
+  // reason the routing rule lives here: password, Google-on-device and the
+  // OAuth redirect all come through this one function, and a per-screen call
+  // would be forgotten by the fourth way in.
+  //
+  // NOT awaited. Where someone lands must never wait on an audit row, and a
+  // sign-in that appears to hang is a sign-in people retry.
+  logActivityInBackground("auth.signed_in", {
+    summary: destination === "/register" ? "Signed in (no shop yet)" : "Signed in",
+    metadata: { destination },
+  });
+
+  navigate(destination);
 }

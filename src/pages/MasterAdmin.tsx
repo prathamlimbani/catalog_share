@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { LogOut, Store, Phone, Mail, MapPin, FileText, ExternalLink, Trash2, MessageSquare, Star, ClipboardList, BarChart3, Download, Crown, ChevronDown, Zap, Sparkles, Send, BookOpen, CheckCircle2, Tag, Coins, Plug, ShieldCheck } from "lucide-react";
+import { LogOut, Store, Phone, Mail, MapPin, FileText, ExternalLink, Trash2, MessageSquare, Star, ClipboardList, BarChart3, Download, Crown, ChevronDown, Zap, Sparkles, Send, BookOpen, CheckCircle2, Tag, Coins, Plug, ShieldCheck, Activity } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { exportAnalyticsDailyCsv, exportMasterDataForTableau } from "@/lib/tableauExport";
@@ -23,13 +23,14 @@ import RewardsAdmin from "@/components/admin/RewardsAdmin";
 import IntegrationsAdmin from "@/components/admin/IntegrationsAdmin";
 import VerificationAdmin from "@/components/admin/VerificationAdmin";
 import EmailProvidersAdmin from "@/components/admin/EmailProvidersAdmin";
+import ActivityAdmin from "@/components/admin/ActivityAdmin";
 
 const MasterAdmin = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [confirmText, setConfirmText] = useState("");
-  const [activeTab, setActiveTab] = useState<"companies" | "suggestions" | "surveys" | "analytics" | "subscriptions" | "plans" | "rewards" | "integrations" | "verification">("companies");
+  const [activeTab, setActiveTab] = useState<"companies" | "suggestions" | "surveys" | "activity" | "analytics" | "subscriptions" | "plans" | "rewards" | "integrations" | "verification">("companies");
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | "all">("all");
   const [planChangeTarget, setPlanChangeTarget] = useState<{ id: string; name: string; newPlan: string } | null>(null);
   const [bulkEmailSending, setBulkEmailSending] = useState(false);
@@ -300,6 +301,10 @@ const MasterAdmin = () => {
     { key: "companies" as const, label: "Companies", icon: Store, count: companies?.length || 0 },
     { key: "suggestions" as const, label: "Suggestions", icon: MessageSquare, count: suggestions?.length || 0 },
     { key: "surveys" as const, label: "Surveys", icon: ClipboardList, count: surveys?.length || 0 },
+    // Next to Analytics on purpose: the two answer the questions people
+    // confuse for each other. Analytics is what anonymous VISITORS did on a
+    // storefront; Activity is what the MERCHANT did in the app, and who.
+    { key: "activity" as const, label: "Activity", icon: Activity, count: 0 },
     { key: "analytics" as const, label: "Analytics", icon: BarChart3, count: 0 },
     { key: "subscriptions" as const, label: "Subscriptions", icon: Crown, count: companies?.length || 0 },
     { key: "plans" as const, label: "Plans", icon: Tag, count: 0 },
@@ -335,7 +340,7 @@ const MasterAdmin = () => {
               >
                 <span className="font-medium">Everything (Excel workbook)</span>
                 <span className="text-xs text-muted-foreground">
-                  13 tables, ready to open in Tableau
+                  15 tables, ready to open in Tableau
                 </span>
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -625,6 +630,8 @@ const MasterAdmin = () => {
           )}
         </>
       )}
+
+      {activeTab === "activity" && <ActivityAdmin companies={companies} />}
 
       {/* Analytics Tab */}
       {activeTab === "analytics" && (

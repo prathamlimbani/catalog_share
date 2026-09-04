@@ -35,6 +35,7 @@ import {
   type GrantSyncResult,
 } from "@/lib/estimateCredits";
 import { showRewarded, type RewardedOutcome } from "@/native/ads";
+import { logActivityInBackground } from "@/lib/activity";
 
 /** How often the "next ad in …" countdown is refreshed while it is on screen. */
 const COUNTDOWN_TICK_MS = 30_000;
@@ -152,13 +153,31 @@ export function useEstimateCredits(companyId: string | null | undefined): UseEst
     // Only a finished ad pays, and only a finished ad consumes a slot of the
     // rolling limit. An ad someone closed after four seconds cost them nothing
     // and must cost them nothing.
-    if (outcome.earned) await noteAdWatched(companyId);
+    if (outcome.earned) {
+      await noteAdWatched(companyId);
+      // Only a WATCHED ad is logged. A dismissed one is not an event anybody
+      // wants a row for, and logging attempts would drown the real ones.
+      logActivityInBackground("ad.watched", {
+        summary: "Watched an ad for an estimate credit",
+        metadata: { reward: "estimate_credit" },
+      });
+    }
     return outcome;
   }, [companyId]);
 
   const watchForPoints = useCallback(async (): Promise<RewardedOutcome> => {
     const outcome = await showRewarded();
-    if (outcome.earned) await noteAdWatchedForPoints(companyId);
+    if (outcome.earned) {
+      await noteAdWatchedForPoints(companyId);
+      // The POINTS themselves are logged by the trigger on points_ledger when
+      // Google's callback credits them. This records that the ad was watched,
+      // which is the half that never reaches the server on its own — and the
+      // gap between the two is how you spot SSV callbacks going missing.
+      logActivityInBackground("ad.watched", {
+        summary: "Watched an ad for points",
+        metadata: { reward: "points" },
+      });
+    }
     return outcome;
   }, [companyId]);
 

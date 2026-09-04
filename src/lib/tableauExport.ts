@@ -242,6 +242,8 @@ export interface RawData {
   points: AnyRow[];
   redemptions: AnyRow[];
   plans: AnyRow[];
+  activity: AnyRow[];
+  activityTruncated: boolean;
   issues: FetchIssue[];
 }
 
@@ -262,6 +264,10 @@ async function fetchEverything(): Promise<RawData> {
   const points = await fetchAll("points_ledger", "created_at", issues);
   const redemptions = await fetchAll("reward_redemptions", "created_at", issues);
   const plans = await fetchAll("plans", "sort_order", issues);
+  // A database without 20260904000000 has no activity_events, and fetchAll
+  // records that in `issues` rather than throwing — an export missing one
+  // sheet is worth having; an export that dies is not.
+  const activity = await fetchAll("activity_events", "created_at", issues);
 
   return {
     companies: companies.rows,
@@ -275,6 +281,8 @@ async function fetchEverything(): Promise<RawData> {
     points: points.rows,
     redemptions: redemptions.rows,
     plans: plans.rows,
+    activity: activity.rows,
+    activityTruncated: activity.truncated,
     issues,
   };
 }
@@ -502,6 +510,16 @@ export function buildTables(raw: RawData, nowMs: number): Table[] {
     // `amount` is paise, by the column's own comment.
     agg.rupees += num0(s.amount) / 100;
     revenueByDay.set(day, agg);
+  }
+
+  // The activity log gets its own pass here, BEFORE the spine is cut, rather
+  // than in the loop that builds its sheet further down. A day that exists only
+  // in the log — a run of sign-ins on a day nobody bought anything — would
+  // otherwise fall outside the spine and lose its row in every day-grain table.
+  // The per-group counting stays next to the sheet it feeds.
+  for (const a of raw.activity) {
+    const ms = parseMs(a.created_at);
+    if (ms !== null) realDays.add(istDay(ms));
   }
 
   const spine = daySpine(realDays, todayDay);
@@ -839,6 +857,7 @@ export function buildTables(raw: RawData, nowMs: number): Table[] {
       advance_paid_inr: money(inv.advance_payment),
       balance_due_inr: Math.round((final - num0(inv.advance_payment)) * 100) / 100,
       is_deleted: Boolean(inv.deleted_at),
+      created_by: text(inv.created_by),
       created_date_ist: day === null ? null : istDayToDate(day),
       created_month_ist: day === null ? null : istDayToMonth(day),
       created_at_utc: createdMs === null ? null : utcStamp(createdMs),
@@ -889,11 +908,146 @@ export function buildTables(raw: RawData, nowMs: number): Table[] {
       "advance_paid_inr",
       "balance_due_inr",
       "is_deleted",
+      "created_by",
       "created_date_ist",
       "created_month_ist",
       "created_at_utc",
     ],
     rows: estimateRows,
+  };
+
+  // ---- sheet: activity_events --------------------------------------------
+  //
+  // One row per recorded action, flat. `actor_id` is carried rather than an
+  // email: this file is a data source, and a join key that is stable beats a
+  // label that changes when somebody updates their address. The company name is
+  // denormalised beside the id for the same reason every other sheet does it --
+  // a Tableau user should not have to join to read a bar chart.
+  const activityRows: Row[] = [];
+  const activityByDay = new Map<number, Map<string, number>>();
+  const activityGroups = new Set<string>();
+
+  for (const row of raw.activity) {
+    const createdMs = parseMs(row.created_at);
+    const day = createdMs === null ? null : istDay(createdMs);
+    const action = text(row.action) ?? "";
+    // The prefix, not the whole verb: it is the grain anybody actually charts,
+    // and it survives a new action being added without the workbook changing.
+    const group = action.includes(".") ? action.slice(0, action.indexOf(".")) : "other";
+    const companyId = text(row.company_id);
+    const company = companyId === null ? undefined : companyById.get(companyId);
+
+    activityGroups.add(group);
+
+    activityRows.push({
+      activity_id: text(row.id),
+      company_id: companyId,
+      company_name: company?.name ?? null,
+      plan_id: company?.plan ?? null,
+      actor_id: text(row.actor_id),
+      // A row with no actor is a system action (a backfill, an edge function),
+      // and saying so beats an empty cell that reads like missing data.
+      actor_kind: row.actor_id ? "user" : "system",
+      action,
+      action_group: group,
+      entity_type: text(row.entity_type),
+      entity_id: text(row.entity_id),
+      summary: text(row.summary),
+      created_date_ist: day === null ? null : istDayToDate(day),
+      created_month_ist: day === null ? null : istDayToMonth(day),
+      created_weekday_ist: day === null ? null : istDayToWeekday(day),
+      created_hour_ist: createdMs === null ? null : istHour(createdMs),
+      created_at_utc: createdMs === null ? null : utcStamp(createdMs),
+    });
+
+    if (day === null) continue;
+    let byGroup = activityByDay.get(day);
+    if (!byGroup) {
+      byGroup = new Map<string, number>();
+      activityByDay.set(day, byGroup);
+    }
+    byGroup.set(group, (byGroup.get(group) ?? 0) + 1);
+  }
+
+  const activityTable: Table = {
+    name: "activity_events",
+    columns: [
+      "activity_id",
+      "company_id",
+      "company_name",
+      "plan_id",
+      "actor_id",
+      "actor_kind",
+      "action",
+      "action_group",
+      "entity_type",
+      "entity_id",
+      "summary",
+      "created_date_ist",
+      "created_month_ist",
+      "created_weekday_ist",
+      "created_hour_ist",
+      "created_at_utc",
+    ],
+    rows: activityRows,
+  };
+
+  // ---- sheet: activity_daily ---------------------------------------------
+  //
+  // Zero-filled across the same spine as the other day tables. A day-grain
+  // table that omits quiet days overstates every average drawn from it, and
+  // "estimates per active day" is exactly the sort of number somebody will
+  // draw from this one.
+  //
+  // The group columns are FIXED rather than derived from the data, so a quiet
+  // month does not produce a workbook with fewer columns than a busy one --
+  // that is the schema-changes-when-empty problem the old export had.
+  const ACTIVITY_GROUP_COLUMNS = [
+    "estimate",
+    "product",
+    "auth",
+    "payment",
+    "points",
+    "ad",
+    "reward",
+    "store",
+    "export",
+  ] as const;
+
+  const activityDailyTable: Table = {
+    name: "activity_daily",
+    columns: [
+      "date_ist",
+      "month_ist",
+      "weekday_ist",
+      ...ACTIVITY_GROUP_COLUMNS.map((g) => `${g}_events`),
+      "other_events",
+      "total_events",
+    ],
+    rows: spine.map((day): Row => {
+      const byGroup = activityByDay.get(day);
+      const row: Row = {
+        date_ist: istDayToDate(day),
+        month_ist: istDayToMonth(day),
+        weekday_ist: istDayToWeekday(day),
+      };
+
+      let known = 0;
+      for (const group of ACTIVITY_GROUP_COLUMNS) {
+        const n = byGroup?.get(group) ?? 0;
+        row[`${group}_events`] = n;
+        known += n;
+      }
+
+      // Anything whose prefix this build has never heard of still counts, so
+      // the total is a total rather than "the total of what we recognised".
+      let all = 0;
+      if (byGroup) for (const n of byGroup.values()) all += n;
+
+      row.other_events = all - known;
+      row.total_events = all;
+      return row;
+    }),
   };
 
   const estimateItemsTable: Table = {
@@ -1152,6 +1306,8 @@ export function buildTables(raw: RawData, nowMs: number): Table[] {
     dailyTable,
     platformTable,
     eventsTable,
+    activityTable,
+    activityDailyTable,
     estimatesTable,
     estimateItemsTable,
     feedbackTable,

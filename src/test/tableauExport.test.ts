@@ -46,6 +46,8 @@ function raw(overrides: Partial<RawData> = {}): RawData {
     points: [],
     redemptions: [],
     plans: [],
+    activity: [],
+    activityTruncated: false,
     issues: [],
     ...overrides,
   };
