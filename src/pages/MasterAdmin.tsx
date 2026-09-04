@@ -11,26 +11,29 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { LogOut, Store, Phone, Mail, MapPin, FileText, ExternalLink, Trash2, MessageSquare, Star, ClipboardList, BarChart3, Download, Crown, ChevronDown, Zap, Sparkles, Send, BookOpen, CheckCircle2, Tag, Coins, Plug } from "lucide-react";
+import { LogOut, Store, Phone, Mail, MapPin, FileText, ExternalLink, Trash2, MessageSquare, Star, ClipboardList, BarChart3, Download, Crown, ChevronDown, Zap, Sparkles, Send, BookOpen, CheckCircle2, Tag, Coins, Plug, ShieldCheck } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { exportMasterDataToExcel } from "@/lib/exportUtils";
+import { exportAnalyticsDailyCsv, exportMasterDataForTableau } from "@/lib/tableauExport";
 import { downloadInvoice } from "@/lib/receipt";
 import { getPlanName } from "@/components/SubscriptionDialog";
 
 import PlansAdmin from "@/components/admin/PlansAdmin";
 import RewardsAdmin from "@/components/admin/RewardsAdmin";
 import IntegrationsAdmin from "@/components/admin/IntegrationsAdmin";
+import VerificationAdmin from "@/components/admin/VerificationAdmin";
+import EmailProvidersAdmin from "@/components/admin/EmailProvidersAdmin";
 
 const MasterAdmin = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [confirmText, setConfirmText] = useState("");
-  const [activeTab, setActiveTab] = useState<"companies" | "suggestions" | "surveys" | "analytics" | "subscriptions" | "plans" | "rewards" | "integrations">("companies");
+  const [activeTab, setActiveTab] = useState<"companies" | "suggestions" | "surveys" | "analytics" | "subscriptions" | "plans" | "rewards" | "integrations" | "verification">("companies");
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | "all">("all");
   const [planChangeTarget, setPlanChangeTarget] = useState<{ id: string; name: string; newPlan: string } | null>(null);
   const [bulkEmailSending, setBulkEmailSending] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     /**
@@ -251,6 +254,48 @@ const MasterAdmin = () => {
     navigate("/");
   };
 
+  /**
+   * Run one of the two exports and report what actually came out.
+   *
+   * The old button said "Master Excel file downloaded successfully!" whether it
+   * had read a hundred thousand events or none at all — which is how an export
+   * with no analytics in it went unnoticed. The toast now carries the row count,
+   * and a table that could not be read is named rather than swallowed.
+   */
+  const runExport = async (which: "workbook" | "daily-csv") => {
+    if (exporting) return;
+    setExporting(true);
+    toast.loading("Gathering platform data — this can take a minute…", { id: "master-export" });
+    try {
+      const result =
+        which === "workbook" ? await exportMasterDataForTableau() : await exportAnalyticsDailyCsv();
+
+      const rows = result.rows.toLocaleString("en-IN");
+      if (result.issues.length > 0) {
+        toast.warning(`${result.fileName} — ${rows} rows`, {
+          id: "master-export",
+          description: `Some tables could not be read: ${result.issues
+            .map((i) => i.table)
+            .join(", ")}. See the export_info sheet.`,
+          duration: 10000,
+        });
+      } else {
+        toast.success(`${result.fileName} downloaded`, {
+          id: "master-export",
+          description: `${rows} rows across ${result.sheets} table${result.sheets === 1 ? "" : "s"}.`,
+        });
+      }
+    } catch (err) {
+      console.error("[master-admin] export failed:", err);
+      toast.error("Could not build the export", {
+        id: "master-export",
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const tabs = [
     { key: "companies" as const, label: "Companies", icon: Store, count: companies?.length || 0 },
     { key: "suggestions" as const, label: "Suggestions", icon: MessageSquare, count: suggestions?.length || 0 },
@@ -260,6 +305,7 @@ const MasterAdmin = () => {
     { key: "plans" as const, label: "Plans", icon: Tag, count: 0 },
     { key: "rewards" as const, label: "Rewards & Ads", icon: Coins, count: 0 },
     { key: "integrations" as const, label: "Integrations", icon: Plug, count: 0 },
+    { key: "verification" as const, label: "Verification", icon: ShieldCheck, count: 0 },
   ];
 
   return (
@@ -270,21 +316,39 @@ const MasterAdmin = () => {
           <p className="text-muted-foreground">Manage companies, suggestions & surveys</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200"
-            onClick={async () => {
-              try {
-                toast.loading("Gathering platform data...", { id: "master-export-toast" });
-                await exportMasterDataToExcel();
-                toast.success("Master Excel file downloaded successfully!", { id: "master-export-toast" });
-              } catch (err) {
-                toast.error("Failed to export master data.", { id: "master-export-toast" });
-              }
-            }}
-          >
-            <Download className="h-4 w-4 mr-2" /> Export All Data
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200"
+                disabled={exporting}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {exporting ? "Exporting…" : "Export Data"}
+                <ChevronDown className="h-4 w-4 ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72">
+              <DropdownMenuItem
+                className="flex-col items-start gap-0.5"
+                onClick={() => void runExport("workbook")}
+              >
+                <span className="font-medium">Everything (Excel workbook)</span>
+                <span className="text-xs text-muted-foreground">
+                  13 tables, ready to open in Tableau
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="flex-col items-start gap-0.5"
+                onClick={() => void runExport("daily-csv")}
+              >
+                <span className="font-medium">Daily analytics only (CSV)</span>
+                <span className="text-xs text-muted-foreground">
+                  One row per shop per day, zero-filled
+                </span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <ThemeToggle />
           <Button variant="outline" onClick={handleLogout}>
             <LogOut className="h-4 w-4 mr-2" /> Logout
@@ -717,6 +781,16 @@ const MasterAdmin = () => {
       {activeTab === "rewards" && <RewardsAdmin />}
 
       {activeTab === "integrations" && <IntegrationsAdmin />}
+
+      {/* Who has to verify what, the WhatsApp templates, and the SMTP accounts.
+          Together because an operator wiring this up is making one decision:
+          which channels this deployment trusts. */}
+      {activeTab === "verification" && (
+        <div className="space-y-4">
+          <VerificationAdmin />
+          <EmailProvidersAdmin />
+        </div>
+      )}
 
       {activeTab === "subscriptions" && (
         <>

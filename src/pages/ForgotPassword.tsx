@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -7,8 +7,12 @@ import { PasswordInput } from "@/components/PasswordInput";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { KeyRound, ArrowLeft, CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
+import { KeyRound, ArrowLeft, CheckCircle, AlertTriangle, Loader2, MessageCircle } from "lucide-react";
 import { authErrorMessage } from "@/lib/errorMessages";
+import { authConfig, loadAuthConfig } from "@/lib/authConfig";
+import { INDIA, localNumberError, toE164 } from "@/lib/phone";
+import PhoneField from "@/components/auth/PhoneField";
+import OtpChallenge from "@/components/auth/OtpChallenge";
 
 /** Deliberately loose: the server is the authority, this only catches typos. */
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -16,7 +20,18 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 6;
 
 const ForgotPassword = () => {
-    const [step, setStep] = useState<"email" | "otp" | "done">("email");
+    /**
+     * WhatsApp first, email second.
+     *
+     * The channel is chosen up front rather than derived, because "I have lost
+     * my password" and "I have also lost access to that inbox" are the same
+     * sentence for a lot of merchants — the whole reason WhatsApp is now the
+     * permanent channel.
+     */
+    const [step, setStep] = useState<"email" | "otp" | "wa" | "wa-code" | "done">("email");
+    const [channel, setChannel] = useState<"whatsapp" | "email">("email");
+    const [phone, setPhone] = useState("");
+    const [phoneCountry, setPhoneCountry] = useState(INDIA.code);
     const [email, setEmail] = useState("");
     const [otp, setOtp] = useState("");
     const [newPassword, setNewPassword] = useState("");
@@ -26,6 +41,7 @@ const ForgotPassword = () => {
     const [formError, setFormError] = useState<string | null>(null);
     const [fieldErrors, setFieldErrors] = useState<{
         email?: string;
+        phone?: string;
         otp?: string;
         newPassword?: string;
         confirmPassword?: string;
@@ -33,6 +49,41 @@ const ForgotPassword = () => {
 
     const clearFieldError = (field: keyof typeof fieldErrors) =>
         setFieldErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev));
+
+    // Default to WhatsApp once the settings say it is available. Done in an
+    // effect rather than in useState so the choice follows the admin toggle
+    // instead of whatever was true when the module first loaded.
+    useEffect(() => {
+        void loadAuthConfig().then((config) => {
+            if (config.whatsappResetEnabled) setChannel("whatsapp");
+        });
+    }, []);
+
+    /**
+     * Start the WhatsApp reset.
+     *
+     * The new password is collected HERE, before the code, because verifying
+     * the code and setting the password are one server call — see verifyOtp.
+     * Splitting them would leave a window where a correct code authorises a
+     * separate unauthenticated "change this password" request, which is the
+     * whole account.
+     */
+    const handleWhatsAppStart = (e: React.FormEvent) => {
+        e.preventDefault();
+
+        const errors: typeof fieldErrors = {};
+        const phoneError = localNumberError(phone, INDIA);
+        if (phoneError) errors.phone = phoneError;
+        if (newPassword.length < MIN_PASSWORD_LENGTH) {
+            errors.newPassword = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+        }
+        if (newPassword !== confirmPassword) errors.confirmPassword = "Both passwords must match.";
+        setFieldErrors(errors);
+        setFormError(null);
+        if (Object.keys(errors).length > 0) return;
+
+        setStep("wa-code");
+    };
 
     /**
      * No redirectTo on purpose: the user types the emailed code into the next
@@ -154,6 +205,149 @@ const ForgotPassword = () => {
                         <Button className="h-12 w-full text-base" asChild>
                             <Link to="/login">Go to login</Link>
                         </Button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    // The WhatsApp code screen. The new password was collected on the previous
+    // step and travels with the code, because verifying and setting the password
+    // are one server call.
+    if (step === "wa-code") {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 to-background px-4 py-8">
+                <Card className="w-full max-w-md">
+                    <CardHeader className="text-center">
+                        <CardTitle className="text-2xl">Check WhatsApp</CardTitle>
+                        <CardDescription>
+                            Enter the code to finish setting your new password.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {errorBanner}
+                        <OtpChallenge
+                            purpose="reset"
+                            phone={toE164(phone, INDIA)}
+                            newPassword={newPassword}
+                            onVerified={() => {
+                                toast.success("Password reset successfully.");
+                                setStep("done");
+                            }}
+                            onCancel={() => {
+                                setFormError(null);
+                                setStep("wa");
+                            }}
+                            cancelLabel="Use a different number"
+                        />
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    if (step === "wa") {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 to-background px-4 py-8">
+                <Card className="w-full max-w-md">
+                    <CardHeader className="text-center">
+                        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                            <KeyRound className="h-6 w-6 text-primary" />
+                        </div>
+                        <CardTitle className="text-2xl">Reset by WhatsApp</CardTitle>
+                        <CardDescription>
+                            Your new password first, then we send a code to confirm it is you.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleWhatsAppStart} noValidate className="space-y-4">
+                            {errorBanner}
+                            <PhoneField
+                                id="reset-phone"
+                                label="Your registered WhatsApp number"
+                                required
+                                lockCountry
+                                countryCode={phoneCountry}
+                                onCountryChange={setPhoneCountry}
+                                value={phone}
+                                onValueChange={(local) => {
+                                    setPhone(local);
+                                    clearFieldError("phone");
+                                }}
+                                error={fieldErrors.phone}
+                                hint="The number your CatalogShare account was verified with."
+                            />
+                            <div className="space-y-2">
+                                <Label htmlFor="wa-newPassword">New password</Label>
+                                <PasswordInput
+                                    id="wa-newPassword"
+                                    autoComplete="new-password"
+                                    value={newPassword}
+                                    onChange={(e) => {
+                                        setNewPassword(e.target.value);
+                                        clearFieldError("newPassword");
+                                    }}
+                                    placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+                                    aria-invalid={!!fieldErrors.newPassword}
+                                    aria-describedby={fieldErrors.newPassword ? "wa-newPassword-error" : undefined}
+                                    className="h-11"
+                                />
+                                {fieldErrors.newPassword && (
+                                    <p id="wa-newPassword-error" className="text-sm font-medium text-destructive">
+                                        {fieldErrors.newPassword}
+                                    </p>
+                                )}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="wa-confirmPassword">Confirm password</Label>
+                                <PasswordInput
+                                    id="wa-confirmPassword"
+                                    autoComplete="new-password"
+                                    value={confirmPassword}
+                                    onChange={(e) => {
+                                        setConfirmPassword(e.target.value);
+                                        clearFieldError("confirmPassword");
+                                    }}
+                                    placeholder="Type it again"
+                                    aria-invalid={!!fieldErrors.confirmPassword}
+                                    aria-describedby={fieldErrors.confirmPassword ? "wa-confirmPassword-error" : undefined}
+                                    className="h-11"
+                                />
+                                {fieldErrors.confirmPassword && (
+                                    <p id="wa-confirmPassword-error" className="text-sm font-medium text-destructive">
+                                        {fieldErrors.confirmPassword}
+                                    </p>
+                                )}
+                            </div>
+                            {/* Same expectation-setting as the email path: we never
+                                confirm whether a number has an account, because that
+                                would make this screen a way to look one up. */}
+                            <p className="text-xs text-muted-foreground">
+                                If this number has an account, a code arrives on WhatsApp within a minute.
+                            </p>
+                            <Button type="submit" className="h-12 w-full text-base">
+                                Send code on WhatsApp
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                className="h-11 w-full text-sm text-muted-foreground"
+                                onClick={() => {
+                                    setChannel("email");
+                                    setFormError(null);
+                                    setFieldErrors({});
+                                    setStep("email");
+                                }}
+                            >
+                                Use email instead
+                            </Button>
+                            <p className="text-center text-sm text-muted-foreground">
+                                Remember your password?{" "}
+                                <Link to="/login" className="text-primary hover:underline">
+                                    Login
+                                </Link>
+                            </p>
+                        </form>
                     </CardContent>
                 </Card>
             </div>
@@ -325,6 +519,24 @@ const ForgotPassword = () => {
                             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {loading ? "Sending..." : "Send reset code"}
                         </Button>
+                        {/* Offered only when the admin has WhatsApp reset on, so
+                            this is never a route to a screen that refuses. */}
+                        {authConfig().whatsappResetEnabled && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="h-11 w-full text-sm"
+                                onClick={() => {
+                                    setChannel("whatsapp");
+                                    setFormError(null);
+                                    setFieldErrors({});
+                                    setStep("wa");
+                                }}
+                            >
+                                <MessageCircle className="mr-2 h-4 w-4" />
+                                Reset by WhatsApp instead
+                            </Button>
+                        )}
                         <p className="text-center text-sm text-muted-foreground">
                             Remember your password?{" "}
                             <Link to="/login" className="text-primary hover:underline">

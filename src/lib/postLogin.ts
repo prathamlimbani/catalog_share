@@ -34,11 +34,18 @@ export async function destinationAfterSignIn(user: Pick<User, "id">): Promise<Po
     if (roleError) throw roleError;
     if (roles && roles.length > 0) return "/master-admin";
 
-    const { data: companies } = await supabase
+    const { data: companies, error: companyError } = await supabase
       .from("companies")
       .select("slug")
       .eq("owner_id", user.id)
       .limit(1);
+
+    // A dropped error here reads as "no company" and sends a merchant who has
+    // been trading for a year back to the registration form — the same mistake
+    // the role lookup above had until 4ba03ee. Throw into the catch, which
+    // defaults to the dashboard: for someone who just signed in successfully,
+    // guessing "already registered" is the safe way to be wrong.
+    if (companyError) throw companyError;
 
     // No company yet → registration step 2.
     return companies && companies.length > 0 ? "/dashboard" : "/register";

@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Crown, CreditCard, Download, CalendarClock, RefreshCw, Receipt, CheckCircle2, XCircle, Clock, FileText, Loader2, Mail, Phone, Heart, WifiOff, RotateCcw, AlertTriangle, Timer } from "lucide-react";
+import { Crown, CreditCard, Download, CalendarClock, RefreshCw, Receipt, CheckCircle2, XCircle, Clock, FileText, Loader2, Mail, Phone, Heart, WifiOff, RotateCcw, AlertTriangle, Ticket } from "lucide-react";
 import { SubscriptionDialog } from "@/components/SubscriptionDialog";
 import { restorePurchase, type RestoreOutcome } from "@/hooks/useRazorpaySubscription";
 import { getPlanLimit, getPlanName } from "@/lib/plans";
@@ -58,19 +58,6 @@ const paymentKey = (payment: Record<string, unknown>): string =>
     str(payment.id) || str(payment.razorpay_payment_id);
 
 const statusLabel = (status: unknown): string => normalizeStatus(status).toUpperCase() || "UNKNOWN";
-
-/**
- * Trial remaining, in the coarsest unit that is still true. The entitlement
- * clock advances on a boundary timer and a ten-minute safety net rather than
- * every second, so anything finer than this would be confidently wrong.
- */
-const formatTrialRemaining = (ms: number): string => {
-    const days = Math.floor(ms / 86_400_000);
-    if (days >= 1) return `${days} day${days === 1 ? "" : "s"} left`;
-    const hours = Math.floor(ms / 3_600_000);
-    if (hours >= 1) return `${hours} hour${hours === 1 ? "" : "s"} left`;
-    return "less than an hour left";
-};
 
 /** What the restore control is currently reporting. */
 type RestoreState = RestoreOutcome;
@@ -315,13 +302,14 @@ const Billing = () => {
                                                 {productCount ?? "—"}/{planLimit === 9999 ? '∞' : planLimit} products used
                                             </span>
                                         </div>
-                                        {/* The one place a free-tier merchant can
-                                            see the trial clock without being sold
-                                            to first. Never shown to a paid plan. */}
-                                        {!entitlement.isPaid && entitlement.trialActive && (
+                                        {/* What a free-tier merchant most needs to
+                                            know on this screen: estimates still
+                                            work, they are just paid for with ads
+                                            until a plan is bought. */}
+                                        {!entitlement.estimatesFree && (
                                             <p className="mt-1 flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400">
-                                                <Timer className="h-3 w-3 shrink-0" />
-                                                Free Estimates trial — {formatTrialRemaining(entitlement.trialMsRemaining)}
+                                                <Ticket className="h-3 w-3 shrink-0" />
+                                                Estimates are ad-funded on this plan
                                             </p>
                                         )}
                                         {expiresAt && currentPlan !== 'free' && (

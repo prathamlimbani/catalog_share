@@ -21,7 +21,7 @@ import type { Entitlement } from "@/lib/entitlement";
  *     next to a price or a "Pay" button invites a misclick that costs the user
  *     real money.
  *   - SUPPRESSORS, registered by a screen for a reason the route cannot express
- *     — the estimate PDF preview, the trial-lock screen. See `suppressAds`.
+ *     — the estimate PDF preview. See `suppressAds`.
  */
 const AD_FREE_ROUTES = [
   "/account", // the settings screen — ad-free by request
@@ -119,6 +119,25 @@ export function useAdBanner(entitlement: Entitlement): { showingAds: boolean; po
     if (showingAds) void showBanner();
     else void hideBanner();
   }, [showingAds]);
+
+  // Say WHY, once per change.
+  //
+  // "No ads are loading" has four completely different causes that look
+  // identical on screen — a paid plan, the admin kill switch, an ad-free route,
+  // and a transient suppressor — and a fifth, AdMob returning no fill, which
+  // this gate never sees. The FailedToLoad handler collapses the banner to zero
+  // height, so a no-fill and a closed gate both render as nothing at all.
+  // Without this line the only way to tell them apart is to read the database.
+  useEffect(() => {
+    console.info("[ads] banner gate", {
+      showingAds,
+      adsEnabled: entitlement.adsEnabled,
+      policyBanner: policy.banner,
+      routeBlocked,
+      suppressed,
+      path: location.pathname,
+    });
+  }, [showingAds, entitlement.adsEnabled, policy.banner, routeBlocked, suppressed, location.pathname]);
 
   // Leaving the shell entirely (sign-out, a store front, the admin console)
   // must not leave a banner painted over whatever comes next.

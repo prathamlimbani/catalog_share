@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,13 @@ import { routeAfterSignIn } from "@/lib/postLogin";
 import { oauthErrorFromLocation, signInWithGoogle } from "@/lib/googleAuth";
 import { useGoogleSignInConfig } from "@/lib/authProviders";
 import { GoogleButton } from "@/components/GoogleButton";
+import { authConfig, loadAuthConfig } from "@/lib/authConfig";
+import { fetchSecurityState } from "@/lib/otp";
+import OtpChallenge from "@/components/auth/OtpChallenge";
+import PhoneField from "@/components/auth/PhoneField";
+import { INDIA, localNumberError, toE164 } from "@/lib/phone";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Mail, Smartphone } from "lucide-react";
 
 /** Deliberately loose: the server is the authority, this only catches typos. */
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -44,7 +51,101 @@ const Login = () => {
   const [diagnosis, setDiagnosis] = useState<ConnectionReport | null>(null);
   const [diagnosing, setDiagnosing] = useState(false);
   const [loading, setLoading] = useState(false);
+  /**
+   * Set when the password was right but a WhatsApp code is still owed.
+   *
+   * WHAT THIS DOES AND DOES NOT PROTECT, stated plainly because it matters:
+   * the Supabase session already exists by this point — GoTrue issued it when
+   * the password was accepted — so this is a gate on the APP, not on the API.
+   * It stops someone who has only the password from using CatalogShare; it does
+   * not stop someone who has the password AND is willing to call the REST API
+   * directly. Real transport-level MFA needs GoTrue's own factor enrolment,
+   * which is a separate piece of work.
+   *
+   * What keeps it honest is that the PASSED state is server-side:
+   * `user_security.last_2fa_at` is written only by the verify-otp function
+   * under the service role and is read-only to the account, so the client
+   * cannot simply set a flag and walk through.
+   */
+  const [pendingTwoFactor, setPendingTwoFactor] = useState<{ phone: string } | null>(null);
+
+  /**
+   * Which credential the merchant is signing in with.
+   *
+   * Email keeps the existing password flow untouched. Mobile is passwordless:
+   * the WhatsApp code IS the credential, and the session is minted server-side
+   * only after that code is checked.
+   */
+  const [mode, setMode] = useState<"email" | "phone">("email");
+  const [phone, setPhone] = useState("");
+  const [phoneCountry, setPhoneCountry] = useState(INDIA.code);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  /** Set once the number is submitted, which is what shows the code screen. */
+  const [phoneChallenge, setPhoneChallenge] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  // The gates have to be known before the form is submitted, not after.
+  useEffect(() => {
+    void loadAuthConfig();
+  }, []);
+
+  /**
+   * Step one of a mobile sign-in: just validate and show the code screen.
+   *
+   * No request is made here — OtpChallenge sends the code on mount. Doing it
+   * here as well would send two, and the first would be silently invalidated.
+   */
+  const handlePhoneSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const error = localNumberError(phone, INDIA);
+    if (error) {
+      setPhoneError(error);
+      return;
+    }
+    setPhoneError(null);
+    setFormError(null);
+    setPhoneChallenge(toE164(phone, INDIA));
+  };
+
+  /**
+   * Step two: redeem the single-use token for a real session.
+   *
+   * The token comes back from verify-otp and is only valid for a few seconds.
+   * GoTrue issues the session, so refresh and expiry behave exactly as they do
+   * for a password login — nothing here invents a session.
+   */
+  const completePhoneLogin = async (tokenHash?: string) => {
+    if (!tokenHash) {
+      setPhoneChallenge(null);
+      setFormError(
+        "Your number was confirmed but the sign-in did not finish. Try your email and password.",
+      );
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: "magiclink",
+      });
+      if (error || !data.session) throw error ?? new Error("No session returned");
+
+      setPhoneChallenge(null);
+      await routeAfterSignIn(navigate, data.session.user);
+      toast.success("Welcome back!");
+    } catch (error) {
+      const message = authErrorMessage(
+        error,
+        "That code was right, but signing in did not finish. Please try again.",
+      );
+      setPhoneChallenge(null);
+      setFormError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,6 +166,22 @@ const Login = () => {
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
+
+      // Second factor, when the admin has switched it on.
+      const config = await loadAuthConfig();
+      if (config.twoFactorEnabled) {
+        const security = await fetchSecurityState(user.id);
+        // An account with no VERIFIED number cannot be challenged — there is
+        // nowhere to send the code — so it is let through rather than locked
+        // out of an app it has no way back into. Turning 2FA on for a merchant
+        // base that has not verified yet must not be a mass lockout; the
+        // registration gate is what fills that gap over time.
+        if (security?.phoneVerified && security.phone && !security.twoFactorExempt) {
+          setPendingTwoFactor({ phone: security.phone });
+          setLoading(false);
+          return;
+        }
+      }
 
       // Role → console, company → dashboard, neither → company setup. Shared
       // with the Google path so the two can never disagree.
@@ -138,6 +255,76 @@ const Login = () => {
     );
   }
 
+  // The second factor. Rendered instead of the form, never beside it, so there
+  // is no half-signed-in screen to be confused by.
+  if (pendingTwoFactor) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 to-background px-4 py-8">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">One more step</CardTitle>
+            <CardDescription>
+              Your password was accepted. Confirm it is you with the code on WhatsApp.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <OtpChallenge
+              purpose="login"
+              phone={pendingTwoFactor.phone}
+              title="Enter the code"
+              onVerified={() => {
+                setPendingTwoFactor(null);
+                void (async () => {
+                  const { data: { user } } = await supabase.auth.getUser();
+                  if (user) await routeAfterSignIn(navigate, user);
+                  toast.success("Welcome back!");
+                })();
+              }}
+              // Signing out is the honest "cancel" here: the session already
+              // exists, so simply going back to the form would leave someone
+              // signed in having failed the challenge they were just given.
+              onCancel={() => {
+                setPendingTwoFactor(null);
+                setPassword("");
+                void supabase.auth.signOut();
+              }}
+              cancelLabel="Cancel and sign out"
+            />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // The mobile code screen, shown instead of the form.
+  if (phoneChallenge) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 to-background px-4 py-8">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">Check WhatsApp</CardTitle>
+            <CardDescription>
+              Enter the code to sign in. No password needed.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <OtpChallenge
+              purpose="phone_login"
+              phone={phoneChallenge}
+              title="Enter the code"
+              onVerified={(result) => void completePhoneLogin(result.tokenHash)}
+              onCancel={() => {
+                setPhoneChallenge(null);
+                setFormError(null);
+              }}
+              cancelLabel="Use a different number"
+            />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 to-background px-4 py-8">
       <Card className="w-full max-w-md">
@@ -149,6 +336,76 @@ const Login = () => {
           <CardDescription>Access your catalog dashboard</CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Only offered when the admin has phone login on AND the app can
+              actually reach the settings — DEFAULT_AUTH_CONFIG has it false, so
+              a config outage shows the familiar email form rather than a tab
+              that leads nowhere. */}
+          {authConfig().phoneLoginEnabled && (
+            <Tabs
+              value={mode}
+              onValueChange={(v) => {
+                setMode(v as "email" | "phone");
+                setFormError(null);
+                setDiagnosis(null);
+              }}
+              className="mb-4"
+            >
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="email" className="gap-1.5">
+                  <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+                  Email
+                </TabsTrigger>
+                <TabsTrigger value="phone" className="gap-1.5">
+                  <Smartphone className="h-3.5 w-3.5" aria-hidden="true" />
+                  Mobile
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          )}
+
+          {authConfig().phoneLoginEnabled && mode === "phone" ? (
+            <form onSubmit={handlePhoneSubmit} noValidate className="space-y-4">
+              {formError && (
+                <div
+                  role="alert"
+                  className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+                >
+                  <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                  <span className="break-anywhere">{formError}</span>
+                </div>
+              )}
+              <PhoneField
+                id="login-phone"
+                label="WhatsApp number"
+                required
+                lockCountry
+                autoFocus
+                countryCode={phoneCountry}
+                onCountryChange={setPhoneCountry}
+                value={phone}
+                onValueChange={(local) => {
+                  setPhone(local);
+                  setPhoneError(null);
+                }}
+                error={phoneError}
+                hint="We send a code to this number on WhatsApp. No password needed."
+              />
+              <Button type="submit" className="h-12 w-full text-base" disabled={loading}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Send code on WhatsApp
+              </Button>
+              <p className="text-center text-xs leading-relaxed text-muted-foreground">
+                Use the number on your CatalogShare account. If it has never been confirmed, this
+                confirms it at the same time.
+              </p>
+              <p className="text-center text-sm text-muted-foreground">
+                New here?{" "}
+                <Link to="/register" className="text-primary hover:underline">
+                  Create an account
+                </Link>
+              </p>
+            </form>
+          ) : (
           <form onSubmit={handleLogin} noValidate className="space-y-4">
             {formError && (
               <div
@@ -237,6 +494,7 @@ const Login = () => {
               </Link>
             </p>
           </form>
+          )}
         </CardContent>
       </Card>
     </div>

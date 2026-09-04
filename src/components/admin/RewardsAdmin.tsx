@@ -60,9 +60,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { invalidateGateConfig, type GateMode } from "@/lib/rewardedGate";
-import { applyTrialConfig } from "@/lib/trialConfig";
+import { applyCreditConfig, DEFAULT_CREDIT_CONFIG } from "@/lib/estimateCredits";
 import { invalidateAdPolicy } from "@/lib/adPolicy";
+import { offerKindOf, type OfferKind } from "@/lib/rewards";
 
 /** The generated types predate these tables; describe what we use and cast. */
 type Loose = {
@@ -89,8 +89,6 @@ interface RewardsForm {
 interface AdsForm {
   enabled: boolean;
   rewardedPrompt: boolean;
-  freeDailyEstimates: string;
-  saveGateMode: GateMode;
 }
 
 /** A policy row as the table returns it. */
@@ -123,8 +121,12 @@ interface CouponRow {
 interface OfferRow {
   id: string;
   label: string;
-  plan_id: string;
-  days: number;
+  /** Missing on a database without 20260829000000; read as plan days. */
+  kind: string | null;
+  /** Estimates or product slots granted. Ignored for plan days. */
+  amount: number | null;
+  plan_id: string | null;
+  days: number | null;
   points_cost: number;
   active: boolean;
   sort_order: number;
@@ -149,11 +151,49 @@ interface CouponDraft {
 interface OfferDraft {
   id: string;
   label: string;
+  kind: OfferKind;
+  /** Estimates, or product slots. Only read for the two non-plan kinds. */
+  amount: string;
   plan_id: string;
   days: string;
   points_cost: string;
   active: boolean;
   sort_order: string;
+}
+
+/** What each kind is called on this screen, and what its amount counts. */
+const OFFER_KIND_COPY: Record<OfferKind, { title: string; unit: string; hint: string }> = {
+  estimate_credits: {
+    title: "Estimates",
+    unit: "Estimates granted",
+    hint: "Banked in the merchant's estimate wallet, on their phone. They never expire.",
+  },
+  product_slots: {
+    title: "Product slots",
+    unit: "Extra products",
+    hint: "Added to whatever the plan allows, permanently. It survives a downgrade.",
+  },
+  plan_days: {
+    title: "Plan days",
+    unit: "Days granted",
+    hint: "Retired. It grants a subscription that expires, and the merchant is left where they started.",
+  },
+};
+
+/** What one saved offer hands over, in a line. */
+function describeOfferRow(row: OfferRow, planNames: Record<string, string>): string {
+  const amount = Number(row.amount) || 0;
+  switch (offerKindOf(row.kind)) {
+    case "estimate_credits":
+      return `${amount} estimate${amount === 1 ? "" : "s"}`;
+    case "product_slots":
+      return `+${amount} product${amount === 1 ? "" : "s"}, permanently`;
+    default: {
+      const days = Number(row.days) || 0;
+      const plan = row.plan_id ? (planNames[row.plan_id] ?? row.plan_id) : "an unnamed plan";
+      return `${days} day${days === 1 ? "" : "s"} of ${plan}`;
+    }
+  }
 }
 
 interface PendingDelete {
@@ -171,25 +211,25 @@ const DEFAULT_REWARDS = {
 };
 
 /**
- * The trial's terms, editable here rather than compiled into the app.
+ * The estimate-credit terms, editable here rather than compiled into the app.
  *
- * These mirror `app_settings.trial` and the defaults in src/lib/trialConfig.ts;
- * both sides fall back to the same five days if the row is missing.
+ * These mirror `app_settings.estimate_credits` and the defaults in
+ * src/lib/estimateCredits.ts; both sides fall back to the same numbers when the
+ * row is missing, so a console that cannot reach the database still shows the
+ * terms the app is actually running.
  */
-const DEFAULT_TRIAL_FORM = {
-  enabled: true,
-  durationDays: "5",
-  unlocksEstimates: true,
-  unlocksPremiumThemes: false,
-  productLimit: "40",
-  autoStart: true,
+const DEFAULT_CREDIT_FORM = {
+  enabled: DEFAULT_CREDIT_CONFIG.enabled,
+  adsPerEstimate: String(DEFAULT_CREDIT_CONFIG.adsPerEstimate),
+  adsPerEdit: String(DEFAULT_CREDIT_CONFIG.adsPerEdit),
+  welcomeCredits: String(DEFAULT_CREDIT_CONFIG.welcomeCredits),
+  watchLimit: String(DEFAULT_CREDIT_CONFIG.watchLimit),
+  watchWindowHours: String(DEFAULT_CREDIT_CONFIG.watchWindowHours),
 };
 
 const DEFAULT_ADS = {
   enabled: true,
   rewardedPrompt: true,
-  freeDailyEstimates: 3,
-  saveGateMode: "required" as GateMode,
 };
 
 /** What the form shows before anything has been read back. */
@@ -203,8 +243,6 @@ const BLANK_REWARDS: RewardsForm = {
 const BLANK_ADS: AdsForm = {
   enabled: DEFAULT_ADS.enabled,
   rewardedPrompt: DEFAULT_ADS.rewardedPrompt,
-  freeDailyEstimates: String(DEFAULT_ADS.freeDailyEstimates),
-  saveGateMode: DEFAULT_ADS.saveGateMode,
 };
 
 const BLANK_COUPON: CouponDraft = {
@@ -223,18 +261,17 @@ const BLANK_COUPON: CouponDraft = {
 const BLANK_OFFER: OfferDraft = {
   id: "",
   label: "",
+  // Estimates, not plan days: a new offer should default to the shape that
+  // actually works. Plan days are still selectable, and still carry the guard
+  // exemption, but nothing new should be built on them.
+  kind: "estimate_credits",
+  amount: "5",
   plan_id: "",
   days: "3",
   points_cost: "100",
   active: true,
   sort_order: "0",
 };
-
-const GATE_MODES: Array<{ value: GateMode; label: string }> = [
-  { value: "required", label: "Required — the estimate saves only after an ad" },
-  { value: "offered", label: "Offered — the ad is optional, declining still saves" },
-  { value: "off", label: "Off — no gate on saving" },
-];
 
 /**
  * Read an integer setting.
@@ -288,10 +325,6 @@ function describeError(err: unknown): string {
     : "The write did not go through.";
 }
 
-function isGateMode(value: unknown): value is GateMode {
-  return value === "required" || value === "offered" || value === "off";
-}
-
 /**
  * A date field is a day, not an instant.
  *
@@ -335,8 +368,8 @@ export function RewardsAdmin() {
 
   const [ads, setAds] = useState<AdsForm>(BLANK_ADS);
   const [savingAds, setSavingAds] = useState(false);
-  const [trial, setTrial] = useState({ ...DEFAULT_TRIAL_FORM });
-  const [savingTrial, setSavingTrial] = useState(false);
+  const [creditForm, setCreditForm] = useState({ ...DEFAULT_CREDIT_FORM });
+  const [savingCredits, setSavingCredits] = useState(false);
 
   const [policies, setPolicies] = useState<PolicyDraft[]>([]);
   const [planNames, setPlanNames] = useState<Record<string, string>>({});
@@ -399,7 +432,7 @@ export function RewardsAdmin() {
       if (!silent) setLoading(true);
       try {
         const [settingsRes, policyRes, couponRes, offerRes, planRes] = await Promise.all([
-          db.from("app_settings").select("key, value").in("key", ["rewards", "ads", "trial"]),
+          db.from("app_settings").select("key, value").in("key", ["rewards", "ads", "estimate_credits"]),
           db.from("plan_ad_policy").select("*").order("plan_id", { ascending: true }),
           db.from("coupons").select("*").order("created_at", { ascending: false }),
           db.from("reward_offers").select("*").order("sort_order", { ascending: true }),
@@ -433,15 +466,21 @@ export function RewardsAdmin() {
 
         const rewardsValue = raw.rewards ?? {};
         const adsValue = raw.ads ?? {};
-        const trialValue = raw.trial ?? {};
+        const creditValue = raw.estimate_credits ?? {};
 
-        setTrial({
-          enabled: trialValue.enabled !== false,
-          durationDays: String(intOr(trialValue.duration_days, 5)),
-          unlocksEstimates: trialValue.unlocks_estimates !== false,
-          unlocksPremiumThemes: trialValue.unlocks_premium_themes === true,
-          productLimit: String(intOr(trialValue.product_limit, 40)),
-          autoStart: trialValue.auto_start !== false,
+        setCreditForm({
+          enabled: creditValue.enabled !== false,
+          adsPerEstimate: String(
+            intOr(creditValue.ads_per_estimate, DEFAULT_CREDIT_CONFIG.adsPerEstimate),
+          ),
+          adsPerEdit: String(intOr(creditValue.ads_per_edit, DEFAULT_CREDIT_CONFIG.adsPerEdit)),
+          welcomeCredits: String(
+            intOr(creditValue.welcome_credits, DEFAULT_CREDIT_CONFIG.welcomeCredits),
+          ),
+          watchLimit: String(intOr(creditValue.watch_limit, DEFAULT_CREDIT_CONFIG.watchLimit)),
+          watchWindowHours: String(
+            intOr(creditValue.watch_window_hours, DEFAULT_CREDIT_CONFIG.watchWindowHours),
+          ),
         });
 
         setRewards({
@@ -454,12 +493,6 @@ export function RewardsAdmin() {
         setAds({
           enabled: adsValue.enabled !== false,
           rewardedPrompt: adsValue.rewarded_prompt !== false,
-          freeDailyEstimates: String(
-            intOr(adsValue.free_daily_estimates, DEFAULT_ADS.freeDailyEstimates),
-          ),
-          saveGateMode: isGateMode(adsValue.save_gate_mode)
-            ? adsValue.save_gate_mode
-            : DEFAULT_ADS.saveGateMode,
         });
 
         const fresh = ((policyRes.data ?? []) as PolicyRow[]).map(toPolicyDraft);
@@ -570,59 +603,64 @@ export function RewardsAdmin() {
     }
   };
 
-  const saveTrial = async () => {
-    const days = parseIntField(trial.durationDays);
-    if (days === null || days < 1 || days > 365) {
-      toast.error("Trial length must be a whole number of days, from 1 to 365.");
+  const saveCredits = async () => {
+    const perEstimate = parseIntField(creditForm.adsPerEstimate);
+    if (perEstimate === null || perEstimate < 1 || perEstimate > 20) {
+      toast.error("Ads per estimate must be a whole number from 1 to 20.");
       return;
     }
-    const limit = parseIntField(trial.productLimit);
+    const perEdit = parseIntField(creditForm.adsPerEdit);
+    if (perEdit === null || perEdit < 1 || perEdit > 20) {
+      toast.error("Ads per edit must be a whole number from 1 to 20.");
+      return;
+    }
+    const welcome = parseIntField(creditForm.welcomeCredits);
+    if (welcome === null || welcome < 0) {
+      toast.error("The welcome grant must be a whole number. 0 means none.");
+      return;
+    }
+    const limit = parseIntField(creditForm.watchLimit);
     if (limit === null || limit < 1) {
-      toast.error("The product limit during the trial must be at least 1.");
+      toast.error("The watch limit must be at least 1 ad.");
+      return;
+    }
+    const hours = parseIntField(creditForm.watchWindowHours);
+    if (hours === null || hours < 1 || hours > 24) {
+      toast.error("The watch window must be a whole number of hours, from 1 to 24.");
       return;
     }
 
     if (inFlight.current) return;
     inFlight.current = true;
-    setSavingTrial(true);
+    setSavingCredits(true);
+    const payload = {
+      enabled: creditForm.enabled,
+      ads_per_estimate: perEstimate,
+      ads_per_edit: perEdit,
+      welcome_credits: welcome,
+      watch_limit: limit,
+      watch_window_hours: hours,
+    };
     try {
-      await writeSetting("trial", {
-        enabled: trial.enabled,
-        duration_days: days,
-        unlocks_estimates: trial.unlocksEstimates,
-        unlocks_premium_themes: trial.unlocksPremiumThemes,
-        product_limit: limit,
-        auto_start: trial.autoStart,
-      });
+      await writeSetting("estimate_credits", payload);
       // Push it into this session as well, so the console reflects the terms it
       // just wrote rather than the ones it loaded with.
-      applyTrialConfig({
-        enabled: trial.enabled,
-        duration_days: days,
-        unlocks_estimates: trial.unlocksEstimates,
-        unlocks_premium_themes: trial.unlocksPremiumThemes,
-        product_limit: limit,
-        auto_start: trial.autoStart,
-      });
-      toast.success("Trial plan saved", {
-        description: `New and running trials now last ${days} day${days === 1 ? "" : "s"}.`,
+      applyCreditConfig(payload);
+      toast.success("Estimate credits saved", {
+        description: creditForm.enabled
+          ? `An estimate now costs ${perEstimate} ad${perEstimate === 1 ? "" : "s"}, an edit ${perEdit}.`
+          : "Estimates are free for every plan until this is switched back on.",
       });
       await refresh(true);
     } catch (err: any) {
-      toast.error("Could not save the trial plan", { description: describeError(err) });
+      toast.error("Could not save the estimate credits", { description: describeError(err) });
     } finally {
       inFlight.current = false;
-      setSavingTrial(false);
+      setSavingCredits(false);
     }
   };
 
   const saveAds = async () => {
-    const free = parseIntField(ads.freeDailyEstimates);
-    if (free === null || free < 0) {
-      toast.error("Free estimates per day must be a whole number. 0 means none.");
-      return;
-    }
-
     if (inFlight.current) return;
     inFlight.current = true;
     setSavingAds(true);
@@ -630,13 +668,10 @@ export function RewardsAdmin() {
       await writeSetting("ads", {
         enabled: ads.enabled,
         rewarded_prompt: ads.rewardedPrompt,
-        free_daily_estimates: free,
-        save_gate_mode: ads.saveGateMode,
       });
       toast.success("Ad settings saved");
-      // The gate config is cached for five minutes per plan; drop it so this
-      // session sees the change now instead of on the next cold start.
-      invalidateGateConfig();
+      // The policy is cached per plan; drop it so this session sees the change
+      // now instead of on the next cold start.
       invalidateAdPolicy();
       await refresh(true);
     } catch (err: any) {
@@ -673,7 +708,6 @@ export function RewardsAdmin() {
       // screen instead of the refetch reverting it under an error toast.
       dirtyPolicies.current.delete(row.plan_id);
       toast.success(`Saved the ad policy for ${planNames[row.plan_id] ?? row.plan_id}`);
-      invalidateGateConfig();
       invalidateAdPolicy();
       await refresh(true);
     } catch (err: any) {
@@ -804,8 +838,10 @@ export function RewardsAdmin() {
     setOfferDraft({
       id: row.id,
       label: row.label,
-      plan_id: row.plan_id,
-      days: String(row.days),
+      kind: offerKindOf(row.kind),
+      amount: String(row.amount ?? 5),
+      plan_id: row.plan_id ?? "",
+      days: String(row.days ?? 3),
       points_cost: String(row.points_cost),
       active: row.active,
       sort_order: String(row.sort_order),
@@ -815,17 +851,31 @@ export function RewardsAdmin() {
     if (!offerDraft) return;
 
     const label = offerDraft.label.trim();
-    const planId = offerDraft.plan_id.trim();
-    if (!label || !planId) {
-      toast.error("An offer needs a label and a plan id.");
+    if (!label) {
+      toast.error("An offer needs a label — it is what the merchant reads.");
       return;
     }
 
-    // Both are CHECK-constrained above zero; catching it here says which field
-    // is wrong instead of surfacing the constraint name.
+    const kind = offerDraft.kind;
+    const planDays = kind === "plan_days";
+    const planId = offerDraft.plan_id.trim();
+
+    // `reward_offers_shape_check` enforces all of this. Catching it here names
+    // the field that is wrong instead of surfacing a constraint name.
+    if (planDays && !planId) {
+      toast.error("A plan-days offer needs a plan id.");
+      return;
+    }
+
     const days = parseIntField(offerDraft.days);
-    if (days === null || days < 1) {
-      toast.error("An offer must grant at least one day.");
+    if (planDays && (days === null || days < 1)) {
+      toast.error("A plan-days offer must grant at least one day.");
+      return;
+    }
+
+    const amount = parseIntField(offerDraft.amount);
+    if (!planDays && (amount === null || amount < 1)) {
+      toast.error(`Set ${OFFER_KIND_COPY[kind].unit.toLowerCase()} to at least 1.`);
       return;
     }
 
@@ -841,10 +891,16 @@ export function RewardsAdmin() {
     inFlight.current = true;
     setSavingOffer(true);
     try {
+      // The columns the chosen kind does not use are written as NULL / 0 rather
+      // than left at whatever the form last held. An estimate offer carrying a
+      // stale plan_id would satisfy the CHECK and then print "Growth" on the
+      // card for something that grants no plan at all.
       const payload = {
         label,
-        plan_id: planId,
-        days,
+        kind,
+        amount: planDays ? 0 : amount,
+        plan_id: planDays ? planId : null,
+        days: planDays ? days : null,
         points_cost: cost,
         active: offerDraft.active,
         sort_order: parseIntField(offerDraft.sort_order) ?? 0,
@@ -871,7 +927,7 @@ export function RewardsAdmin() {
       title: `Delete "${row.label}"?`,
       // reward_redemptions.offer_id is ON DELETE SET NULL, so what merchants
       // already bought is untouched.
-      body: "Merchants keep any plan days they already redeemed with it. It simply stops being offered.",
+      body: "Merchants keep everything they already redeemed with it. It simply stops being offered.",
       run: async () => {
         try {
           const { error } = await db.from("reward_offers").delete().eq("id", row.id);
@@ -914,6 +970,13 @@ export function RewardsAdmin() {
   const adsForOffer = offerDraft
     ? Math.ceil(Math.max(1, parseIntField(offerDraft.points_cost) ?? 1) / perAdForHint)
     : 0;
+
+  // What an estimates offer will cost the merchant's wallet. Read from the
+  // unsaved credit form above, for the same reason `adsForOffer` reads the
+  // unsaved economy: the operator is pricing both at once.
+  const creditsForOffer =
+    Math.max(0, parseIntField(offerDraft?.amount ?? "") ?? 0) *
+    Math.max(1, parseIntField(creditForm.adsPerEstimate) ?? DEFAULT_CREDIT_CONFIG.adsPerEstimate);
 
   if (loading) {
     return (
@@ -1010,8 +1073,7 @@ export function RewardsAdmin() {
               Once migrated, the defaults become {DEFAULT_REWARDS.pointsPerAd}{" "}
               {DEFAULT_REWARDS.pointsLabel} per ad, a cap of{" "}
               {DEFAULT_REWARDS.dailyAdCap} ads per day, and{" "}
-              {DEFAULT_ADS.freeDailyEstimates} free estimates before the gate
-              applies.
+              {DEFAULT_CREDIT_FORM.adsPerEstimate} ads per estimate.
             </p>
           </CardContent>
         </Card>
@@ -1142,53 +1204,9 @@ export function RewardsAdmin() {
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Turning ads off also turns the save gate off, whatever mode is selected
-            below.
+            This governs ads shown AT a merchant &mdash; banners and interstitials.
+            What an estimate costs in rewarded ads is set separately, below.
           </p>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="ad-free-estimates">Free estimates per day</Label>
-              <Input
-                id="ad-free-estimates"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                value={ads.freeDailyEstimates}
-                onChange={(e) => setAds({ ...ads, freeDailyEstimates: e.target.value })}
-              />
-              <p className="mt-1 text-xs text-muted-foreground">
-                The intended quota for a free merchant. The gate itself reads the
-                per-plan number in the table below, so change that one to alter what
-                happens today.
-              </p>
-            </div>
-
-            <div>
-              <Label>When the quota runs out</Label>
-              <Select
-                value={ads.saveGateMode}
-                onValueChange={(v) => setAds({ ...ads, saveGateMode: v as GateMode })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {GATE_MODES.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>
-                      {m.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Required earns the most, and is also the pattern Google Play's Ads
-                policy treats as interfering with app functionality. Switching to
-                Offered takes effect on every installed copy immediately, with no
-                release and no review.
-              </p>
-            </div>
-          </div>
 
           <Button onClick={saveAds} disabled={savingAds}>
             {savingAds ? (
@@ -1201,105 +1219,127 @@ export function RewardsAdmin() {
         </CardContent>
       </Card>
 
-      {/* ---------------- Trial plan ---------------- */}
+      {/* ---------------- Estimate credits ---------------- */}
       <Card>
         <CardContent className="space-y-4 p-5">
           <div className="flex items-center gap-2">
             <Clapperboard className="h-5 w-5 text-primary" />
-            <h3 className="font-semibold">Trial plan</h3>
+            <h3 className="font-semibold">Estimate credits</h3>
           </div>
           <p className="text-sm text-muted-foreground">
-            What a merchant gets before they pay. These terms used to be fixed in the
-            app, so changing them meant a Play release. Edits here reach every
-            installed copy the next time it comes to the foreground.
+            What an estimate costs on a plan that does not include them outright.
+            One finished rewarded ad buys one credit; credits never expire. Which
+            plans pay is NOT set here &mdash; it follows &ldquo;Unlocks estimates&rdquo;
+            on the Plans tab, so Pro and Estimate Generator create freely while
+            Free and Growth pay in ads.
           </p>
 
+          <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+            <Label htmlFor="credits-enabled" className="cursor-pointer text-sm">
+              Estimates cost credits
+            </Label>
+            <Switch
+              id="credits-enabled"
+              checked={creditForm.enabled}
+              onCheckedChange={(v) => setCreditForm({ ...creditForm, enabled: v })}
+            />
+          </div>
+
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
-              <Label htmlFor="trial-enabled" className="cursor-pointer text-sm">
-                Trial is offered
+            <div className="space-y-1.5">
+              <Label htmlFor="credits-per-estimate" className="text-sm">
+                Ads to create an estimate
               </Label>
-              <Switch
-                id="trial-enabled"
-                checked={trial.enabled}
-                onCheckedChange={(v) => setTrial({ ...trial, enabled: v })}
-              />
-            </div>
-
-            <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
-              <Label htmlFor="trial-auto" className="cursor-pointer text-sm">
-                Starts on first use
-              </Label>
-              <Switch
-                id="trial-auto"
-                checked={trial.autoStart}
-                onCheckedChange={(v) => setTrial({ ...trial, autoStart: v })}
+              <Input
+                id="credits-per-estimate"
+                inputMode="numeric"
+                value={creditForm.adsPerEstimate}
+                onChange={(e) => setCreditForm({ ...creditForm, adsPerEstimate: e.target.value })}
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="trial-days" className="text-sm">
-                Length in days
+              <Label htmlFor="credits-per-edit" className="text-sm">
+                Ads to edit one
               </Label>
               <Input
-                id="trial-days"
+                id="credits-per-edit"
                 inputMode="numeric"
-                value={trial.durationDays}
-                onChange={(e) => setTrial({ ...trial, durationDays: e.target.value })}
+                value={creditForm.adsPerEdit}
+                onChange={(e) => setCreditForm({ ...creditForm, adsPerEdit: e.target.value })}
               />
+              <p className="text-xs text-muted-foreground">
+                Never leave this at 0. A free edit turns one credited estimate into an
+                unlimited one &mdash; save a blank, then re-edit it into every job.
+              </p>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="trial-limit" className="text-sm">
-                Product limit during the trial
+              <Label htmlFor="credits-welcome" className="text-sm">
+                Welcome credits, once per account
               </Label>
               <Input
-                id="trial-limit"
+                id="credits-welcome"
                 inputMode="numeric"
-                value={trial.productLimit}
-                onChange={(e) => setTrial({ ...trial, productLimit: e.target.value })}
+                value={creditForm.welcomeCredits}
+                onChange={(e) => setCreditForm({ ...creditForm, welcomeCredits: e.target.value })}
               />
+              <p className="text-xs text-muted-foreground">
+                Granted the first time a merchant opens Estimates, so nobody meets a
+                wall on their first visit. Raising it later does NOT top up accounts
+                that already took the grant.
+              </p>
             </div>
 
-            <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
-              <Label htmlFor="trial-estimates" className="cursor-pointer text-sm">
-                Unlocks estimates
-              </Label>
-              <Switch
-                id="trial-estimates"
-                checked={trial.unlocksEstimates}
-                onCheckedChange={(v) => setTrial({ ...trial, unlocksEstimates: v })}
-              />
-            </div>
-
-            <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
-              <Label htmlFor="trial-themes" className="cursor-pointer text-sm">
-                Unlocks premium themes
-              </Label>
-              <Switch
-                id="trial-themes"
-                checked={trial.unlocksPremiumThemes}
-                onCheckedChange={(v) => setTrial({ ...trial, unlocksPremiumThemes: v })}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="credits-limit" className="text-sm">
+                  Ad limit
+                </Label>
+                <Input
+                  id="credits-limit"
+                  inputMode="numeric"
+                  value={creditForm.watchLimit}
+                  onChange={(e) => setCreditForm({ ...creditForm, watchLimit: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="credits-window" className="text-sm">
+                  per (hours)
+                </Label>
+                <Input
+                  id="credits-window"
+                  inputMode="numeric"
+                  value={creditForm.watchWindowHours}
+                  onChange={(e) =>
+                    setCreditForm({ ...creditForm, watchWindowHours: e.target.value })
+                  }
+                />
+              </div>
+              <p className="col-span-2 text-xs text-muted-foreground">
+                A rolling window, not a fixed bucket: a slot frees up{" "}
+                {creditForm.watchWindowHours} hours after the ad that filled it, not at
+                a clock boundary.
+              </p>
             </div>
           </div>
 
           <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-            Changing the length moves the end date of trials that are ALREADY
-            running, because the app stores a start date and adds the current
-            length to it. Shortening it can therefore end someone's trial today.
-            Turning the trial off ends every running trial at once &mdash; which is
-            the point of the switch, but it is not reversible for the merchants
-            it cuts short.
+            Making an estimate cost ads is the pattern Google Play&rsquo;s Ads policy
+            treats as interfering with app functionality. If a review is ever rejected
+            on it, turn &ldquo;Estimates cost credits&rdquo; off here: it takes effect on
+            every installed copy immediately, with no release and no review. Balances
+            already banked are untouched and spend again the moment it is switched
+            back on.
           </p>
 
-          <Button onClick={saveTrial} disabled={savingTrial}>
-            {savingTrial ? (
+          <Button onClick={saveCredits} disabled={savingCredits}>
+            {savingCredits ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <Check className="mr-2 h-4 w-4" />
             )}
-            Save trial plan
+            Save estimate credits
           </Button>
         </CardContent>
       </Card>
@@ -1655,9 +1695,8 @@ export function RewardsAdmin() {
                   {!row.active && <Badge variant="outline">Hidden</Badge>}
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {row.points_cost} {pointsLabel} · {row.days} day
-                  {row.days === 1 ? "" : "s"} of{" "}
-                  {planNames[row.plan_id] ?? row.plan_id} · order {row.sort_order}
+                  {row.points_cost} {pointsLabel} · {describeOfferRow(row, planNames)} · order{" "}
+                  {row.sort_order}
                 </p>
               </div>
               <div className="flex gap-2">
@@ -1706,7 +1745,7 @@ export function RewardsAdmin() {
                   id="of-label"
                   value={offerDraft.label}
                   onChange={(e) => setOfferDraft({ ...offerDraft, label: e.target.value })}
-                  placeholder="Growth for 3 days"
+                  placeholder="5 estimates"
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
                   The merchant reads this on the Earn screen and on their ledger.
@@ -1714,33 +1753,79 @@ export function RewardsAdmin() {
               </div>
 
               <div>
-                <Label htmlFor="of-plan">Plan id</Label>
-                <Input
-                  id="of-plan"
-                  value={offerDraft.plan_id}
-                  onChange={(e) => setOfferDraft({ ...offerDraft, plan_id: e.target.value })}
-                  placeholder="growth"
-                />
+                <Label htmlFor="of-kind">What it gives</Label>
+                <Select
+                  value={offerDraft.kind}
+                  onValueChange={(v) =>
+                    setOfferDraft({ ...offerDraft, kind: offerKindOf(v) })
+                  }
+                >
+                  <SelectTrigger id="of-kind">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="estimate_credits">
+                      {OFFER_KIND_COPY.estimate_credits.title}
+                    </SelectItem>
+                    <SelectItem value="product_slots">
+                      {OFFER_KIND_COPY.product_slots.title}
+                    </SelectItem>
+                    <SelectItem value="plan_days">{OFFER_KIND_COPY.plan_days.title}</SelectItem>
+                  </SelectContent>
+                </Select>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {knownPlanIds.length > 0
-                    ? `Known ids: ${knownPlanIds.join(", ")}.`
-                    : "Must match a plan id exactly."}
+                  {OFFER_KIND_COPY[offerDraft.kind].hint}
                 </p>
               </div>
 
-              <div>
-                <Label htmlFor="of-days">Days granted</Label>
-                <Input
-                  id="of-days"
-                  type="number"
-                  min={1}
-                  value={offerDraft.days}
-                  onChange={(e) => setOfferDraft({ ...offerDraft, days: e.target.value })}
-                />
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Added to whatever time the merchant already has, never replacing it.
-                </p>
-              </div>
+              {offerDraft.kind === "plan_days" ? (
+                <>
+                  <div>
+                    <Label htmlFor="of-plan">Plan id</Label>
+                    <Input
+                      id="of-plan"
+                      value={offerDraft.plan_id}
+                      onChange={(e) => setOfferDraft({ ...offerDraft, plan_id: e.target.value })}
+                      placeholder="growth"
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {knownPlanIds.length > 0
+                        ? `Known ids: ${knownPlanIds.join(", ")}.`
+                        : "Must match a plan id exactly."}
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="of-days">Days granted</Label>
+                    <Input
+                      id="of-days"
+                      type="number"
+                      min={1}
+                      value={offerDraft.days}
+                      onChange={(e) => setOfferDraft({ ...offerDraft, days: e.target.value })}
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Added to whatever time the merchant already has, never replacing it.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <Label htmlFor="of-amount">{OFFER_KIND_COPY[offerDraft.kind].unit}</Label>
+                  <Input
+                    id="of-amount"
+                    type="number"
+                    min={1}
+                    value={offerDraft.amount}
+                    onChange={(e) => setOfferDraft({ ...offerDraft, amount: e.target.value })}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {offerDraft.kind === "estimate_credits"
+                      ? `Costs ${creditsForOffer} credit${creditsForOffer === 1 ? "" : "s"} in the wallet at today's ${creditForm.adsPerEstimate} ads per estimate — frozen into the grant when it is bought.`
+                      : "Added on top of the plan's limit, and kept if the plan lapses."}
+                  </p>
+                </div>
+              )}
 
               <div>
                 <Label htmlFor="of-cost">Cost in {pointsLabel.toLowerCase()}</Label>

@@ -22,6 +22,8 @@ import deleteOwnAccount from "./delete-own-account.mjs";
 import checkExpiredSubscriptions from "./check-expired-subscriptions.mjs";
 import publishLegal from "./publish-legal.mjs";
 import linkGoogle from "./link-google.mjs";
+import sendOtp from "./send-otp.mjs";
+import verifyOtp from "./verify-otp.mjs";
 
 const PORT = Number(process.env.PORT ?? 5014);
 
@@ -34,6 +36,8 @@ const ROUTES = {
   "check-expired-subscriptions": checkExpiredSubscriptions,
   "publish-legal": publishLegal,
   "link-google": linkGoogle,
+  "send-otp": sendOtp,
+  "verify-otp": verifyOtp,
 };
 
 function log(...a) {
@@ -110,6 +114,7 @@ server.listen(PORT, "127.0.0.1", () => {
   for (const [k, v] of Object.entries({
     SUPABASE_URL: process.env.SUPABASE_URL,
     RESEND_API_KEY: process.env.RESEND_API_KEY ? "set" : "MISSING",
+    FAST2SMS_API_KEY: process.env.FAST2SMS_API_KEY ? "set" : "from database",
     RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID ? "set" : "MISSING",
     RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET ? "set" : "MISSING",
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? "set" : "MISSING",

@@ -1,6 +1,10 @@
 #!/bin/bash
 # Push SMTP and Google sign-in settings from the database into GoTrue.
 #
+# SMTP now comes from the ACTIVE row in email_providers (Resend, Microsoft
+# 365, Gmail, anything), falling back to the older integration_secrets SMTP_*
+# fields when that table is not there yet.
+#
 # The functions host reads its credentials from integration_secrets live, so
 # Razorpay and Resend changes take effect within a minute with no restart.
 # GoTrue is different: it reads SMTP and its OAuth providers from its
@@ -23,8 +27,49 @@ get() {
     "SELECT value FROM public.integration_secrets WHERE key = '$1'" 2>/dev/null | tr -d '\r'
 }
 
-HOST=$(get SMTP_HOST); PORT=$(get SMTP_PORT); USER=$(get SMTP_USER)
-PASS=$(get SMTP_PASS); FROM=$(get SMTP_FROM); FROM_NAME=$(get SMTP_FROM_NAME)
+# One column off the ACTIVE row in email_providers, or empty when the table does
+# not exist yet. 2>/dev/null swallows the "relation does not exist" so a
+# deployment that has not run the migration falls through to the legacy fields
+# below instead of failing the whole reconcile.
+provider() {
+  sudo -u postgres psql -d catalogshare -tAc \
+    "SELECT $1 FROM public.email_providers WHERE active LIMIT 1" 2>/dev/null | tr -d '\r'
+}
+
+# -----------------------------------------------------------------------------
+# Where SMTP comes from, in order of authority
+#
+# 1. email_providers, the row marked active. This is what the admin console
+#    edits and what the functions host sends through, so GoTrue MUST agree with
+#    it — otherwise the app sends receipts from Microsoft 365 while password
+#    reset links still come from Resend, and only one of the two domains is
+#    aligned for SPF.
+# 2. integration_secrets SMTP_*, the pre-provider fields. Kept as the fallback
+#    so applying the code before the SQL does not stop email.
+# -----------------------------------------------------------------------------
+ACTIVE_ID=$(provider id)
+if [ -n "$ACTIVE_ID" ]; then
+  HOST=$(provider host); PORT=$(provider port); USER=$(provider username)
+  PASS=$(provider password); FROM=$(provider from_email); FROM_NAME=$(provider from_name)
+  TRANSPORT=$(provider transport)
+  echo "active email provider: $ACTIVE_ID ($TRANSPORT)"
+
+  # GoTrue can only speak SMTP. A provider set to the Resend HTTPS API is
+  # correct for the functions host but leaves GoTrue with nothing, so its SMTP
+  # equivalent is filled in from the same credential: for Resend the API key IS
+  # the SMTP password.
+  if [ "$TRANSPORT" = "resend_api" ]; then
+    HOST="smtp.resend.com"
+    PORT="465"
+    USER="resend"
+    echo "provider uses the HTTPS API; pointing GoTrue at Resend SMTP with the same key"
+  fi
+else
+  HOST=$(get SMTP_HOST); PORT=$(get SMTP_PORT); USER=$(get SMTP_USER)
+  PASS=$(get SMTP_PASS); FROM=$(get SMTP_FROM); FROM_NAME=$(get SMTP_FROM_NAME)
+  echo "no active email provider row; using the legacy integration_secrets fields"
+fi
+
 RESEND=$(get RESEND_API_KEY)
 GOOGLE_ID=$(get GOOGLE_CLIENT_ID); GOOGLE_SECRET=$(get GOOGLE_CLIENT_SECRET)
 
@@ -80,7 +125,11 @@ if [ "$GOOGLE_ENABLED" = true ]; then
   PUBLISH_GOOGLE_ID="$GOOGLE_ID"
 fi
 
-FINGERPRINT=$(printf '%s|%s|%s|%s|%s|%s|%s|%s' "$HOST" "$PORT" "$USER" "$PASS" "$FROM" "$FROM_NAME" "$GOOGLE_ID" "$GOOGLE_SECRET" | sha256sum | cut -d' ' -f1)
+# ACTIVE_ID is in the fingerprint deliberately: two providers can share a host
+# and username (two Microsoft 365 mailboxes, a primary and a backup), and
+# without the id a switch between them would not look like a change and GoTrue
+# would never be restarted onto the new one.
+FINGERPRINT=$(printf '%s|%s|%s|%s|%s|%s|%s|%s|%s' "$ACTIVE_ID" "$HOST" "$PORT" "$USER" "$PASS" "$FROM" "$FROM_NAME" "$GOOGLE_ID" "$GOOGLE_SECRET" | sha256sum | cut -d' ' -f1)
 PREVIOUS=$(cat "$STATE" 2>/dev/null || echo "")
 
 if [ "$FINGERPRINT" = "$PREVIOUS" ]; then
@@ -104,12 +153,21 @@ PY
   fi
 }
 
+# RESEND_API_KEY is still written because the functions host reads it as its
+# last-resort fallback (see mailer.mjs legacyProvider). It holds whatever the
+# ACTIVE provider's password is, whichever provider that now happens to be.
 set_env RESEND_API_KEY "${PASS}"
 set_env SMTP_HOST      "${HOST:-smtp.resend.com}"
 set_env SMTP_PORT      "${PORT:-465}"
 set_env SMTP_USER      "${USER:-resend}"
 set_env SMTP_FROM      "${FROM:-catalogshare123@gmail.com}"
 set_env SMTP_FROM_NAME "${FROM_NAME:-CatalogShare}"
+
+# Fast2SMS. The functions host reads these from integration_secrets live and
+# needs no restart, so they are mirrored here only so a `docker compose` shell
+# and the env file agree about what is configured.
+set_env FAST2SMS_API_KEY         "$(get FAST2SMS_API_KEY)"
+set_env FAST2SMS_PHONE_NUMBER_ID "$(get FAST2SMS_PHONE_NUMBER_ID)"
 
 # Google. ENABLED is derived here, not stored: docker-compose.yml reads it as
 # GOTRUE_EXTERNAL_GOOGLE_ENABLED and GoTrue refuses to boot a provider whose
@@ -135,12 +193,24 @@ SQL
 # Autoconfirm must stay ON while there is no working password, or every new
 # registration stalls on a confirmation email that cannot be sent. Turning it
 # off is the LAST step of wiring SMTP, not the first.
-if [ -n "$PASS" ]; then
+#
+# It is now gated on GOOGLE_ENABLED rather than on $PASS alone. Confirm-on-signup
+# exists for exactly one reason (see the takeover note above): while GoTrue
+# auto-confirms, enabling Google would let someone pre-register a Google address
+# and inherit the account. With Google off that buys nothing — and it cost every
+# registration on this deployment. Pasting the Resend key on 2026-08-24 flipped
+# this to "false", and from that moment signup ended at "Confirm your email
+# first" and no new company could be created.
+#
+# GOOGLE_ENABLED already requires $PASS (see its assignment above), so this only
+# ever narrows when the flip happens; it never turns confirmation off on a
+# deployment that has Google running.
+if [ "$GOOGLE_ENABLED" = true ]; then
   sed -i 's/GOTRUE_MAILER_AUTOCONFIRM: "true"/GOTRUE_MAILER_AUTOCONFIRM: "false"/' /opt/catalogshare-backend/docker-compose.yml || true
-  echo "smtp configured; email confirmation ENABLED"
+  echo "google sign-in enabled; email confirmation ENABLED (takeover gate)"
 else
   sed -i 's/GOTRUE_MAILER_AUTOCONFIRM: "false"/GOTRUE_MAILER_AUTOCONFIRM: "true"/' /opt/catalogshare-backend/docker-compose.yml || true
-  echo "no smtp password; autoconfirm left ON so signups keep working"
+  echo "google sign-in off; autoconfirm left ON so signups keep working"
 fi
 
 if [ "$GOOGLE_ENABLED" = true ]; then

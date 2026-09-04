@@ -32,6 +32,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { beginUserSignOut } from "@/native/bootstrap";
 import { useCurrentCompany } from "@/hooks/useCompany";
 import { useRewardsConfig, useWallet } from "@/hooks/useRewards";
+import { useEstimateCredits } from "@/hooks/useEstimateCredits";
+import { formatUntil } from "@/lib/estimateCredits";
 import { fetchWallet, type LedgerEntry } from "@/lib/rewards";
 import { AdminLayout } from "@/components/AdminLayout";
 import RedeemOffers from "@/components/rewards/RedeemOffers";
@@ -39,7 +41,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { prepareRewarded, showRewarded } from "@/native/ads";
+import { prepareRewarded } from "@/native/ads";
 import { isNative } from "@/native/platform";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -47,7 +49,11 @@ import { toast } from "sonner";
 /** What the ledger reasons mean, for rows that carry no note of their own. */
 const REASON_LABELS: Record<string, string> = {
   ad_reward: "Watched an ad",
-  redemption: "Redeemed for plan days",
+  // Only reached by a row with no note. Every redemption written since the
+  // rewards table existed carries the offer's own label ("5 estimates"), so
+  // this is the fallback for the oldest lines and must not name a specific
+  // reward that may not be what was bought.
+  redemption: "Redeemed a reward",
   admin_grant: "Added by CatalogShare",
   signup_bonus: "Welcome bonus",
 };
@@ -125,6 +131,10 @@ const Earn = () => {
 
   const { config, loading: configLoading } = useRewardsConfig();
   const { wallet, loading: walletLoading, refresh, awaitCredit } = useWallet(companyId);
+  // The rolling ad limit is shared with the estimate-credit flow: it caps how
+  // many ads a person watches, not how many of each kind. Watching twenty here
+  // is twenty, whichever pocket they were for.
+  const { credits, watchForPoints } = useEstimateCredits(companyId);
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -235,7 +245,13 @@ const Earn = () => {
                 title: "That is all for today",
                 body: `You have watched all ${cap} ads for today. The counter resets at midnight UTC — 5:30 AM in India — and what you have earned can be spent any time.`,
               }
-            : null;
+            : !credits.watch.allowed
+              ? {
+                  icon: <PauseCircle className="h-4 w-4" />,
+                  title: "Take a short break",
+                  body: `You have watched ${credits.watch.used} ads in the last few hours, which is the limit. The next one opens up in ${formatUntil(Math.max(0, credits.watch.resetsAt - Date.now()))}. Your balance is safe and still spendable.`,
+                }
+              : null;
 
   const handleWatch = async () => {
     if (watching.current || busy || blocker || notReady) return;
@@ -246,7 +262,7 @@ const Earn = () => {
     setPhase("watching");
 
     try {
-      const outcome = await showRewarded();
+      const outcome = await watchForPoints();
       if (!alive.current) return;
 
       if (!outcome.earned) {
@@ -397,7 +413,7 @@ const Earn = () => {
                 ? "Daily limit reached. It resets at midnight UTC."
                 : notReady
                   ? `Watch ads to collect ${label}.`
-                  : `Each ad pays ${config.pointsPerAd} ${label}, up to ${cap} ads a day.`}
+                  : `Each ad pays ${config.pointsPerAd} ${label}, up to ${cap} ads a day — and at most ${credits.config.watchLimit} ads in any ${credits.config.watchWindowHours} hours.`}
             </p>
           </div>
         </Card>

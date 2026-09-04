@@ -1,17 +1,21 @@
 /**
  * Which ad formats the signed-in account may be shown.
  *
- * `entitlement.adsEnabled` answers "may this account see ads at all" — it is
- * false for paying subscribers and true for everyone else, including anyone
- * inside the free trial. This module answers the narrower question the admin
- * console controls: *which* formats, for *which* plan.
+ * `entitlement.adsEnabled` answers "may this account be SHOWN ads" — it is
+ * false for paying subscribers and true for everyone else. This module answers
+ * the narrower question the admin console controls: *which* formats, for
+ * *which* plan.
+ *
+ * Neither governs rewarded ads a merchant opts into to fund an estimate. Those
+ * are user-initiated and always available (see src/lib/estimateCredits.ts),
+ * which is why a paying Growth subscriber sees no banners and still watches two
+ * ads per estimate.
  *
  * Both have to agree before an ad is requested. Splitting them this way is what
- * lets an admin turn banners off for a promotion, or turn every format on for
- * the trial, without a release — which matters because the formats were
- * previously decided by the bundle, and half of them were never wired up at
- * all: the banner was mounted on the Estimates screen and nowhere else, so most
- * of the app showed no ads whatsoever.
+ * lets an admin turn banners off for a promotion without a release — which
+ * matters because the formats were previously decided by the bundle, and half
+ * of them were never wired up at all: the banner was mounted on the Estimates
+ * screen and nowhere else, so most of the app showed no ads whatsoever.
  *
  * Fails OPEN for a free account (show the banner) and CLOSED for interstitials,
  * because a missing banner is invisible and a surprise full-screen ad is not.
@@ -24,7 +28,10 @@ export interface AdPolicy {
   banner: boolean;
   interstitial: boolean;
   rewarded: boolean;
-  /** Estimates allowed per day before the rewarded gate applies. 0 = unlimited. */
+  /**
+   * Vestigial. It drove the per-day quota gate the credit wallet replaced, and
+   * the migration zeroes it. Kept on the type so an older row still parses.
+   */
   dailyEstimates: number;
   /** Master switch from app_settings.ads.enabled. */
   adsEnabled: boolean;

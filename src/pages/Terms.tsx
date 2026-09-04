@@ -186,13 +186,17 @@ const Terms = () => {
         </LegalItem>
       </LegalList>
 
-      <LegalHeading>9. Free trial</LegalHeading>
+      <LegalHeading>9. Ad-funded estimates</LegalHeading>
       <LegalText>
-        New accounts get a limited free trial of the estimate generator so you can evaluate it before
-        paying. The trial is time-limited, offered once per business, and may be varied or withdrawn at
-        our discretion. When it ends the estimate features lock until you buy an eligible plan &mdash;
-        no payment is taken automatically and no card details are collected to start the trial.
-        Estimates created during the trial are retained on your account.
+        There is no time-limited free trial. On the free plan and on plans that do not include the
+        estimate generator outright, each estimate is funded by watching rewarded ads: a set number
+        of completed ads earns a credit, creating an estimate spends credits, and editing one spends
+        fewer. The current rates are shown in the app before you start, and we may vary them.
+        Credits do not expire, have no cash value, cannot be transferred or refunded, and are held
+        on the device that earned them &mdash; reinstalling the app or clearing its data loses any
+        unspent balance. There is a limit on how many ads may be watched in a rolling period. Plans
+        that include the estimate generator are never asked to watch anything, and estimates you
+        have already created are always yours to open, share and export.
       </LegalText>
 
       <LegalHeading>10. Advertising on the free tier</LegalHeading>

@@ -37,12 +37,53 @@ const DEFAULT_AD_STATE: AdState = { savesSinceInterstitial: 0, lastInterstitialA
 
 let initialized = false;
 let initializing: Promise<boolean> | null = null;
+let initAttempts = 0;
 let adsAllowed = false;
 let canRequestAds = false;
 let bannerVisible = false;
 let interstitialReady = false;
 let bannerHeightPx = 0;
 const bootedAt = Date.now();
+
+/**
+ * A failed `AdMob.initialize()` used to be permanent for the session: the catch
+ * set `initialized = true` alongside `canRequestAds = false`, so every later
+ * call answered false off the cached flag and the app ran ad-free even when the
+ * failure was a one-off - Play Services updating mid-launch being the usual
+ * one. It is retried a few times now, then given up on for good so a device
+ * that genuinely cannot serve ads is not asked again on every navigation.
+ */
+const MAX_INIT_ATTEMPTS = 3;
+
+/**
+ * Whether the app WANTS a banner right now, which is not the same as whether
+ * one is up.
+ *
+ * This is the fix for "there is no ad on the home screen". `showBanner()`
+ * refuses to run until `applyEntitlement()` has set `adsAllowed`, and on a cold
+ * start the shell asks for the banner in the same commit that the entitlement
+ * is still resolving - so the request was dropped on the floor. Nothing ever
+ * asked again: `useAdBanner`'s effect is keyed on `showingAds`, which was
+ * already true and never changed, so the banner turned up only after a trip out
+ * to an ad-free route and back.
+ *
+ * Recording the intent separately is what lets `applyEntitlement()` honour a
+ * request that arrived too early, and lets a no-fill be retried later.
+ */
+let bannerWanted = false;
+let bannerAttempts = 0;
+let bannerRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Backoff for a banner that did not fill, and the point at which we stop.
+ *
+ * AdMob's own refresh cycle only runs for a banner that loaded at least once; a
+ * first request that comes back empty leaves a dead ad view that never tries
+ * again by itself. That turned one unlucky moment at launch into a whole
+ * session with no banner. The delays lengthen so a device with no fill at all
+ * is not polled all day.
+ */
+const BANNER_RETRY_MS = [15_000, 45_000, 120_000, 300_000];
 
 /** Subscribers that want to know the banner's height so they can pad content. */
 type HeightListener = (px: number) => void;
@@ -116,19 +157,32 @@ export async function initAds(): Promise<boolean> {
           setBannerHeight(0);
           return;
         }
-        setBannerHeight(size?.height ?? 0);
+        const height = size?.height ?? 0;
+        // A real height means this banner filled, so the backoff starts again
+        // from scratch the next time one does not.
+        if (height > 0) bannerAttempts = 0;
+        setBannerHeight(height);
       });
       await AdMob.addListener(BannerAdPluginEvents.FailedToLoad, () => {
-        // No fill. Collapse the reserved space so we never leave a grey gap.
+        // No fill. Collapse the reserved space so we never leave a grey gap,
+        // then ask again later - the ad view left behind by a failed first
+        // request never refreshes itself.
         setBannerHeight(0);
+        scheduleBannerRetry();
       });
 
       initialized = true;
       return canRequestAds;
     } catch (err) {
-      console.warn("[ads] initialize failed — running ad-free:", err);
-      initialized = true;
+      initAttempts += 1;
       canRequestAds = false;
+      // Only the last attempt is final. See MAX_INIT_ATTEMPTS.
+      initialized = initAttempts >= MAX_INIT_ATTEMPTS;
+      console.warn(
+        `[ads] initialize failed (attempt ${initAttempts}/${MAX_INIT_ATTEMPTS})`,
+        initialized ? "- running ad-free for this session:" : "- will retry:",
+        err,
+      );
       return false;
     } finally {
       initializing = null;
@@ -151,19 +205,25 @@ export async function applyEntitlement(adsEnabled: boolean): Promise<void> {
   }
 
   const ok = await initAds();
-  if (ok) void preloadInterstitial();
+  if (!ok) return;
+  void preloadInterstitial();
+
+  // Honour a banner asked for before the plan was known. Without this the
+  // shell's very first request is simply lost - see `bannerWanted`.
+  if (bannerWanted && !bannerVisible) void showBanner();
 }
 
 /** Remove every ad surface. Called on upgrade and on sign-out. */
 export async function teardownAds(): Promise<void> {
   if (!isNative) return;
+  bannerWanted = false;
+  cancelBannerRetry();
   bannerVisible = false;
   interstitialReady = false;
   // The preloaded rewarded ad is tagged with the signed-in user's id for SSV,
   // so it must not survive a sign-out — the next viewer would be credited as
   // the previous one.
-  rewardedReady = false;
-  rewardedPreparedFor = null;
+  dropRewarded();
   setBannerHeight(0);
   try {
     await AdMob.hideBanner();
@@ -182,21 +242,72 @@ export function adsActive(): boolean {
   return isNative && adsAllowed && canRequestAds;
 }
 
+function cancelBannerRetry(): void {
+  if (bannerRetryTimer === null) return;
+  clearTimeout(bannerRetryTimer);
+  bannerRetryTimer = null;
+}
+
+/** Ask for the banner again after a no-fill, with a lengthening gap. */
+function scheduleBannerRetry(): void {
+  if (!bannerWanted || !adsAllowed) return;
+  if (bannerAttempts >= BANNER_RETRY_MS.length) return;
+
+  const delay = BANNER_RETRY_MS[bannerAttempts];
+  bannerAttempts += 1;
+  cancelBannerRetry();
+  bannerRetryTimer = setTimeout(() => {
+    bannerRetryTimer = null;
+    if (!bannerWanted || !adsAllowed) return;
+    void reloadBanner();
+  }, delay);
+}
+
+/**
+ * Throw the dead ad view away and request a fresh one.
+ *
+ * Calling `showBanner()` alone is not enough after a failed load: the plugin
+ * keeps the AdView it already built, and that one has finished its single
+ * request and will never make another.
+ */
+async function reloadBanner(): Promise<void> {
+  try {
+    await AdMob.removeBanner();
+  } catch {
+    /* nothing to remove */
+  }
+  bannerVisible = false;
+  setBannerHeight(0);
+  await showBanner();
+}
+
 /**
  * Show the anchored adaptive banner.
  *
- * Screens that must stay ad-free (payment, receipt, PDF preview, legal pages,
- * the trial-lock screen) simply never call this — and call `hideBanner()` on
- * entry to clear a banner left over from the previous screen.
+ * Screens that must stay ad-free (payment, receipt, PDF preview, legal pages)
+ * simply never call this — and call `hideBanner()` on entry to clear a banner
+ * left over from the previous screen.
  */
 export async function showBanner(): Promise<void> {
+  if (!isNative) return;
+
+  // The intent is recorded BEFORE anything that can bail out. A request that
+  // arrives while the plan is still resolving is no longer thrown away -
+  // `applyEntitlement()` replays it the moment ads are switched on.
+  bannerWanted = true;
+  cancelBannerRetry();
+
+  if (!adsAllowed) return;
+
   // Initialise FIRST, then check. `adsActive()` depends on `canRequestAds`,
-  // which only ever gets assigned inside `initAds()` — guarding on it up front
+  // which only ever gets assigned inside `initAds()` - guarding on it up front
   // made the very first call unsatisfiable, so a free user saw no banner at all
   // on the first screen they opened.
-  if (!isNative || !adsAllowed) return;
   const ok = await initAds();
   if (!ok) return;
+  // A screen that moved to an ad-free route while init was in flight has
+  // already asked for the banner to go; do not put one up behind it.
+  if (!bannerWanted) return;
 
   // Set BEFORE the call, not after: SizeChanged fires while the ad view lays
   // out, which is before showBanner() resolves. With the flag set afterwards
@@ -218,11 +329,17 @@ export async function showBanner(): Promise<void> {
     console.warn("[ads] showBanner failed:", err);
     bannerVisible = false;
     setBannerHeight(0);
+    scheduleBannerRetry();
   }
 }
 
 export async function hideBanner(): Promise<void> {
-  if (!isNative || !bannerVisible) return;
+  if (!isNative) return;
+  // Cleared even when no banner is up, so a retry pending for one that never
+  // filled cannot paint an ad over the ad-free screen that asked for quiet.
+  bannerWanted = false;
+  cancelBannerRetry();
+  if (!bannerVisible) return;
   bannerVisible = false;
   setBannerHeight(0);
   try {
@@ -331,6 +448,50 @@ let rewardedPreparing: Promise<boolean> | null = null;
  * the previous one, which is why every show re-checks this.
  */
 let rewardedPreparedFor: string | null = null;
+/** When the loaded ad finished loading, for the staleness check below. */
+let rewardedLoadedAt = 0;
+
+/**
+ * How long a loaded rewarded ad is trusted.
+ *
+ * Google expires a cached rewarded ad roughly an hour after it loads, and a
+ * stale one does not announce itself - `showRewardVideoAd()` simply fails to
+ * show, which arrives here as a no-fill. Preloading happens as each ad ends, so
+ * a merchant who watched one ad and came back after lunch was reliably met with
+ * "No ad was available just now" on a device that could have played one
+ * immediately. Anything older than this is reloaded rather than shown.
+ */
+const REWARDED_TTL_MS = 45 * 60 * 1000;
+
+/**
+ * Attempts per tap, and the pause between them.
+ *
+ * A rewarded load failing once is routine: no fill for that slot, a slow
+ * network, an ad that expired between the preload and the tap. Giving up on the
+ * first failure is most of why the button looked broken - the merchant is told
+ * no ad was available while a second request would have filled. Three tries
+ * with a short gap still keeps the "Playing ad..." spinner under five seconds.
+ *
+ * Only a failure where NOTHING reached the screen is retried. An ad the user
+ * closed is final, because replaying one at somebody who just decided against
+ * it is worse than the error message.
+ */
+const REWARDED_ATTEMPTS = 3;
+const REWARDED_RETRY_MS = 1_200;
+
+const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Forget the loaded ad. Everything that invalidates one goes through here. */
+function dropRewarded(): void {
+  rewardedReady = false;
+  rewardedPreparedFor = null;
+  rewardedLoadedAt = 0;
+}
+
+/** True when a loaded ad is still young enough to be worth showing. */
+function rewardedIsFresh(): boolean {
+  return rewardedReady && Date.now() - rewardedLoadedAt < REWARDED_TTL_MS;
+}
 
 export interface RewardedOutcome {
   /** The user watched to the end and AdMob reported a reward. */
@@ -358,7 +519,7 @@ export async function prepareRewarded(): Promise<boolean> {
   const userId = await currentUserId();
   if (!userId) return false;
 
-  if (rewardedReady && rewardedPreparedFor === userId) return true;
+  if (rewardedIsFresh() && rewardedPreparedFor === userId) return true;
   if (rewardedPreparing) return rewardedPreparing;
 
   rewardedPreparing = (async () => {
@@ -372,11 +533,11 @@ export async function prepareRewarded(): Promise<boolean> {
       });
       rewardedReady = true;
       rewardedPreparedFor = userId;
+      rewardedLoadedAt = Date.now();
       return true;
     } catch (err) {
       console.warn("[ads] prepareRewardVideoAd failed:", err);
-      rewardedReady = false;
-      rewardedPreparedFor = null;
+      dropRewarded();
       return false;
     } finally {
       rewardedPreparing = null;
@@ -409,14 +570,32 @@ export async function showRewarded(): Promise<RewardedOutcome> {
   if (!userId) return { earned: false, reason: "not-signed-in" };
 
   // Re-prepare when the loaded ad belongs to a different account.
-  if (rewardedPreparedFor !== userId) {
-    rewardedReady = false;
-    rewardedPreparedFor = null;
+  if (rewardedPreparedFor !== userId) dropRewarded();
+
+  let last: RewardedOutcome = { earned: false, reason: "no-fill" };
+
+  for (let attempt = 0; attempt < REWARDED_ATTEMPTS; attempt += 1) {
+    if (attempt > 0) await pause(REWARDED_RETRY_MS);
+
+    const loaded = rewardedIsFresh() || (await prepareRewarded());
+    if (!loaded) continue;
+
+    const outcome = await playRewarded();
+    // Both retryable reasons mean the SDK never put an ad on screen - a dead or
+    // expired ad object, or a show that threw. Anything else is the user's own
+    // doing and is final.
+    const retryable = outcome.reason === "no-fill" || outcome.reason === "error";
+    if (!retryable) return outcome;
+    last = outcome;
   }
 
-  const ready = rewardedReady || (await prepareRewarded());
-  if (!ready) return { earned: false, reason: "no-fill" };
+  return last;
+}
 
+/**
+ * One attempt: show the ad that is already loaded, and resolve when it closes.
+ */
+function playRewarded(): Promise<RewardedOutcome> {
   return new Promise<RewardedOutcome>((resolve) => {
     let settled = false;
     const listeners: Array<{ remove: () => void }> = [];
@@ -431,8 +610,7 @@ export async function showRewarded(): Promise<RewardedOutcome> {
           /* already gone */
         }
       });
-      rewardedReady = false;
-      rewardedPreparedFor = null;
+      dropRewarded();
       // Warm the next one straight away; the Earn screen is usually a run of
       // several ads back to back.
       void prepareRewarded();
@@ -471,7 +649,7 @@ export async function showRewarded(): Promise<RewardedOutcome> {
 
 /** True when a rewarded ad is loaded and can be shown immediately. */
 export function isRewardedReady(): boolean {
-  return rewardedReady;
+  return rewardedIsFresh();
 }
 
 export async function openPrivacyOptions(): Promise<boolean> {

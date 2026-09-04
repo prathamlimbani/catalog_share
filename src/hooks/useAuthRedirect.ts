@@ -49,11 +49,16 @@ export const useAuthRedirect = (options: AuthRedirectOptions = {}) => {
                 }
 
                 // Check if has a company — only redirect if fully set up
-                const { data: companies } = await supabase
+                const { data: companies, error: companyError } = await supabase
                     .from("companies")
                     .select("slug")
                     .eq("owner_id", user.id)
                     .limit(1);
+
+                // A failed read is not "no company". Treating it as one pushes a
+                // registered merchant to `incompleteTo` (the registration form).
+                // Stay put instead and let the page render.
+                if (companyError) throw companyError;
 
                 if (companies && companies.length > 0) {
                     navigate("/dashboard", { replace: true });

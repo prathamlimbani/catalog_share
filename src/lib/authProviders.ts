@@ -23,6 +23,21 @@ export interface AuthProvidersConfig {
 
 export const NO_PROVIDERS: AuthProvidersConfig = { googleWebClientId: "" };
 
+/**
+ * Google sign-in is off by product decision, not by missing credentials.
+ *
+ * The owner asked for registration and login to go back to email and password
+ * only (25 Aug 2026) and to add Google later. This is the ONE switch: while it
+ * is false `coerce` reports no client id, so `useGoogleSignInConfig().enabled`
+ * is false and `GoogleButton` renders null on every screen — Register, Login
+ * and the Account page — without a single one of them knowing why.
+ *
+ * Flip to true to bring it back. Nothing was deleted, so that is the whole
+ * change on the client; the server still has to have the OAuth credentials and
+ * SMTP set for `selfhost-smtp-reconcile.sh` to enable the provider.
+ */
+export const GOOGLE_SIGN_IN_ENABLED = false;
+
 /** The generated types predate this row; describe exactly what we read and cast. */
 type Loose = {
   from(table: string): {
@@ -39,6 +54,9 @@ let loaded = false;
 let inflight: Promise<AuthProvidersConfig> | null = null;
 
 function coerce(raw: unknown): AuthProvidersConfig {
+  // The kill switch wins over whatever the server says, so turning the provider
+  // on in the admin console cannot put the button back by surprise.
+  if (!GOOGLE_SIGN_IN_ENABLED) return NO_PROVIDERS;
   const v = (raw ?? {}) as Record<string, unknown>;
   const id = typeof v.google_web_client_id === "string" ? v.google_web_client_id.trim() : "";
   return { googleWebClientId: id };
@@ -61,6 +79,13 @@ export function isGoogleSignInConfigured(): boolean {
  * Google sign-in until the app restarts.
  */
 export async function loadAuthProviders(force = false): Promise<AuthProvidersConfig> {
+  // Nothing to ask the server for while the switch is off, and one fewer
+  // request on every cold start of the login screen.
+  if (!GOOGLE_SIGN_IN_ENABLED) {
+    current = NO_PROVIDERS;
+    loaded = true;
+    return current;
+  }
   if (loaded && !force) return current;
   if (inflight) return inflight;
 

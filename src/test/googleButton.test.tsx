@@ -1,7 +1,16 @@
 /**
- * The Google button must not exist until the server has a client id: a button
- * that opens Google's account picker and then fails is the one outcome this
- * component is there to prevent.
+ * The Google button must not exist until BOTH gates agree.
+ *
+ * Gate 1 is the product switch, `GOOGLE_SIGN_IN_ENABLED` — off since 25 Aug
+ * 2026, when the owner asked for email-and-password registration back.
+ * Gate 2 is the server: a client id in `app_settings.auth`.
+ *
+ * A button that opens Google's account picker and then fails is the one outcome
+ * this component exists to prevent, so either gate closed means no button.
+ *
+ * The "switched back on" suite below is skipped while the flag is off and comes
+ * back by itself the moment it is flipped — flipping the flag must not also
+ * mean rediscovering which tests to un-skip.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -29,7 +38,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import { GoogleButton } from "@/components/GoogleButton";
-import { resetAuthProvidersForTests } from "@/lib/authProviders";
+import { GOOGLE_SIGN_IN_ENABLED, resetAuthProvidersForTests } from "@/lib/authProviders";
 
 /** True once the component's config fetch has run and its state settled. */
 const loaded = () => mocks.reads.count > 0;
@@ -41,7 +50,29 @@ beforeEach(() => {
   mocks.reads.count = 0;
 });
 
-describe("GoogleButton", () => {
+describe("GoogleButton, with Google switched off", () => {
+  it.skipIf(GOOGLE_SIGN_IN_ENABLED)("renders nothing even when the server has a client id", async () => {
+    // The flag outranks the server. Turning the provider on in the admin
+    // console must not put the button back while the product switch is off.
+    mocks.setting.value = { google_web_client_id: "123.apps.googleusercontent.com" };
+    const { container } = render(<GoogleButton onClick={() => {}} label="Sign up with Google" />);
+    await act(async () => {});
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it.skipIf(GOOGLE_SIGN_IN_ENABLED)("does not even ask the server", async () => {
+    // Every screen that could show the button mounts this component, so a
+    // request here would be one wasted round trip on every cold start of the
+    // login and registration screens.
+    mocks.setting.value = { google_web_client_id: "123.apps.googleusercontent.com" };
+    render(<GoogleButton onClick={() => {}} />);
+    await act(async () => {});
+    expect(mocks.reads.count).toBe(0);
+  });
+});
+
+describe.skipIf(!GOOGLE_SIGN_IN_ENABLED)("GoogleButton, once Google is switched back on", () => {
   it("renders nothing when no client id is configured", async () => {
     mocks.setting.value = { google_web_client_id: "" };
     const { container } = render(<GoogleButton onClick={() => {}} />);

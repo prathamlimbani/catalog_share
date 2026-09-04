@@ -12,7 +12,12 @@ import { AlertTriangle, Loader2, Store, Upload, Mail, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import ColorThemePicker from "@/components/ColorThemePicker";
 import { authErrorMessage } from "@/lib/errorMessages";
-import { phoneDigits, safeExternalUrl } from "@/lib/storefront";
+import { safeExternalUrl } from "@/lib/storefront";
+import { findCountry, localNumberError, toE164, toIndianMobile, INDIA } from "@/lib/phone";
+import { authConfig, loadAuthConfig } from "@/lib/authConfig";
+import { fetchSecurityState } from "@/lib/otp";
+import PhoneField from "@/components/auth/PhoneField";
+import OtpChallenge from "@/components/auth/OtpChallenge";
 import { oauthErrorFromLocation, signInWithGoogle } from "@/lib/googleAuth";
 import { useGoogleSignInConfig } from "@/lib/authProviders";
 import { GoogleButton } from "@/components/GoogleButton";
@@ -40,7 +45,7 @@ type CompanyErrors = { companyName?: string; phone?: string; googleMapsUrl?: str
 const Register = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [step, setStep] = useState<"signup" | "company">("signup");
+  const [step, setStep] = useState<"signup" | "confirm" | "company" | "verify">("signup");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const { webClientId: googleWebClientId } = useGoogleSignInConfig();
@@ -62,7 +67,11 @@ const Register = () => {
 
   // Company fields
   const [companyName, setCompanyName] = useState("");
-  const [phone, setPhone] = useState("+91");
+  // The LOCAL part only — ten digits for India. The country is held separately
+  // so "is this ten digits" is a question that can actually be answered; a
+  // single "+91…" box cannot tell the code from the number. See src/lib/phone.ts.
+  const [phone, setPhone] = useState("");
+  const [phoneCountry, setPhoneCountry] = useState(INDIA.code);
   const [address, setAddress] = useState("");
   const [gstNumber, setGstNumber] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -70,9 +79,11 @@ const Register = () => {
   const [themePrimary, setThemePrimary] = useState("25 95% 53%");
   const [themeAccent, setThemeAccent] = useState("25 95% 95%");
   const [contactName1, setContactName1] = useState("");
-  const [contactPhone1, setContactPhone1] = useState("+91");
+  const [contactPhone1, setContactPhone1] = useState("");
+  const [contactCountry1, setContactCountry1] = useState(INDIA.code);
   const [contactName2, setContactName2] = useState("");
-  const [contactPhone2, setContactPhone2] = useState("+91");
+  const [contactPhone2, setContactPhone2] = useState("");
+  const [contactCountry2, setContactCountry2] = useState(INDIA.code);
   const [googleMapsUrl, setGoogleMapsUrl] = useState("");
 
   // The object URL behind the preview, so it can be revoked exactly once.
@@ -96,12 +107,17 @@ const Register = () => {
         const user = data.session?.user;
         if (cancelled || !user) return;
 
-        const { data: companies } = await supabase
+        const { data: companies, error: companyError } = await supabase
           .from("companies")
           .select("id")
           .eq("owner_id", user.id)
           .limit(1);
         if (cancelled) return;
+
+        // The worst place to read a failed query as "no company": it would drop
+        // a merchant who already HAS one onto step 2 and invite a second
+        // company row for the same owner. Bail to step 1 instead.
+        if (companyError) throw companyError;
 
         if (companies && companies.length > 0) {
           navigate("/dashboard", { replace: true });
@@ -162,14 +178,31 @@ const Register = () => {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({ email: email.trim(), password });
-      if (error) throw error;
-      // Immediately sign in so the session is active for company creation
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data: signUpData, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
       });
-      if (signInError) throw signInError;
+      if (error) throw error;
+
+      // signUp returns a session ONLY while GoTrue auto-confirms. The moment an
+      // SMTP password exists, selfhost-smtp-reconcile.sh:138 flips
+      // GOTRUE_MAILER_AUTOCONFIRM to "false" — which happened the day Resend
+      // went live — and every signup comes back with session: null.
+      //
+      // This used to sign in with the password on the very next line and throw
+      // on failure, so from that day on registration died here with "Confirm
+      // your email first" and step 2 was NEVER reached: the account existed,
+      // the company row was never even attempted. Treat a missing session as a
+      // state to move through, not an error to bounce off.
+      if (!signUpData.session) {
+        const { data: signInData, error: signInError } =
+          await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        if (signInError || !signInData.session) {
+          setStep("confirm");
+          return;
+        }
+      }
+
       toast.success("Account created. Now set up your company.");
       setStep("company");
     } catch (error) {
@@ -208,11 +241,15 @@ const Register = () => {
 
       // An existing merchant who tapped "sign up" by mistake is simply signed
       // in; their company is already there.
-      const { data: companies } = await supabase
+      const { data: companies, error: companyError } = await supabase
         .from("companies")
         .select("id")
         .eq("owner_id", session.user.id)
         .limit(1);
+      // Same reasoning as the resume effect: a failed read must not be mistaken
+      // for "no company yet". (Unreachable while GOOGLE_SIGN_IN_ENABLED is off,
+      // fixed here so it is right the day it is switched back on.)
+      if (companyError) throw companyError;
       if (companies && companies.length > 0) {
         toast.success("Welcome back!");
         navigate("/dashboard", { replace: true });
@@ -228,6 +265,42 @@ const Register = () => {
       toast.error(message);
     } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  /**
+   * "I've confirmed — continue".
+   *
+   * The only thing that can tell us whether the merchant actually opened the
+   * link is the server, so this just retries the password sign-in. Staying on
+   * this screen with a readable reason is the correct outcome when they press
+   * it too early; the previous behaviour — throwing them back to an empty
+   * signup form — is what made this a dead end.
+   */
+  const handleConfirmContinue = async () => {
+    if (loading) return;
+    setLoading(true);
+    setFormError(null);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (error || !data.session) {
+        setFormError(
+          authErrorMessage(
+            error,
+            "That email is not confirmed yet. Open the link we sent, then try again.",
+          ),
+        );
+        return;
+      }
+      toast.success("Email confirmed. Now set up your company.");
+      setStep("company");
+    } catch (err) {
+      setFormError(authErrorMessage(err, "Could not check that yet. Please try again."));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -285,12 +358,26 @@ const Register = () => {
     setStep("signup");
   };
 
+  /**
+   * Step 2, submitted.
+   *
+   * Validates, then decides whether the WhatsApp number has to be PROVEN before
+   * the company is created. It does, whenever the admin has WhatsApp
+   * verification on and this account has not already verified this number — the
+   * number is the identity every later message goes to, and a company created
+   * around an unverified one is a company whose owner may not be reachable.
+   *
+   * The actual creation lives in `createCompany` so both paths run exactly the
+   * same code; a separate "verified" copy of it would drift.
+   */
   const handleCompanySetup = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const country = findCountry(phoneCountry);
     const errors: CompanyErrors = {};
     if (!companyName.trim()) errors.companyName = "Your customers will see this name — it can't be blank.";
-    if (phoneDigits(phone).length < 10) errors.phone = "Enter a WhatsApp number with the country code, e.g. +919876543210.";
+    const phoneError = localNumberError(phone, country);
+    if (phoneError) errors.phone = phoneError;
     if (googleMapsUrl.trim() && !safeExternalUrl(googleMapsUrl)) {
       errors.googleMapsUrl = "Paste the full link, starting with https://";
     }
@@ -298,6 +385,41 @@ const Register = () => {
     setFormError(null);
     if (Object.keys(errors).length > 0) return;
 
+    const config = authConfig();
+    // Only Indian numbers can receive a code today (the Fast2SMS WABA), so a
+    // merchant who has chosen another country is let through rather than sent
+    // to a screen whose code can never arrive.
+    if (config.whatsappVerificationEnabled && country.code === INDIA.code) {
+      setLoading(true);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        const security = await fetchSecurityState(user?.id);
+        // A null read means "we could not tell", not "not verified". Sending a
+        // merchant who is already verified through it again is a wasted message
+        // but harmless; the reverse would let an unverified one straight past.
+        // `user_security.phone` holds the ten-digit form the server normalises
+        // to, so compare against the same thing rather than the display value.
+        const already =
+          security?.phoneVerified === true && security.phone === toIndianMobile(phone);
+        if (!already) {
+          setLoading(false);
+          setStep("verify");
+          return;
+        }
+      } catch {
+        // Same reasoning: an unreadable security row must not become a way past
+        // the gate, so fall through to the challenge.
+        setLoading(false);
+        setStep("verify");
+        return;
+      }
+      setLoading(false);
+    }
+
+    await createCompany();
+  };
+
+  const createCompany = async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -329,10 +451,11 @@ const Register = () => {
         slug = `${slug}-${Date.now().toString(36)}`;
       }
 
-      const contactPhoneOrNull = (value: string) => {
-        const cleaned = value.replace(/\s+/g, "");
-        return !cleaned || cleaned === "+91" ? null : cleaned;
-      };
+      // An untouched contact field is empty now rather than the literal "+91"
+      // the old free-text box left behind, so "nothing was entered" is simply
+      // an empty string instead of a sentinel that had to be recognised.
+      const contactPhoneOrNull = (local: string, countryCode: string) =>
+        local.trim() ? toE164(local, findCountry(countryCode)) : null;
 
       const companyEmail = email.trim() || user.email || "";
 
@@ -341,7 +464,7 @@ const Register = () => {
           owner_id: user.id,
           name: companyName.trim(),
           slug: companySlug,
-          phone: phone.replace(/\s+/g, ""),
+          phone: toE164(phone, findCountry(phoneCountry)),
           email: companyEmail,
           address: address.trim() || null,
           gst_number: gstNumber.trim() || null,
@@ -349,9 +472,9 @@ const Register = () => {
           theme_primary: themePrimary,
           theme_accent: themeAccent,
           contact_name_1: contactName1.trim() || null,
-          contact_phone_1: contactPhoneOrNull(contactPhone1),
+          contact_phone_1: contactPhoneOrNull(contactPhone1, contactCountry1),
           contact_name_2: contactName2.trim() || null,
-          contact_phone_2: contactPhoneOrNull(contactPhone2),
+          contact_phone_2: contactPhoneOrNull(contactPhone2, contactCountry2),
           google_maps_url: safeExternalUrl(googleMapsUrl),
         });
 
@@ -427,6 +550,98 @@ const Register = () => {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  // Step 2a: prove the WhatsApp number before the company is created.
+  //
+  // Deliberately BEFORE the company row exists. The number is the identity every
+  // later message goes to — receipts, payment reminders, the reset code — and a
+  // company built around an unverified one is a merchant nobody can reach and an
+  // account nobody can recover.
+  //
+  // Nothing typed in step 2 is lost: the form state is still held above, so
+  // "Change the number" simply returns to it with every field intact.
+  if (step === "verify") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 to-background px-4 py-8">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">Confirm your WhatsApp number</CardTitle>
+            <CardDescription>
+              This is where your orders and receipts will arrive, so we check it works before
+              setting your shop up.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {errorBanner}
+            <OtpChallenge
+              purpose="register"
+              phone={toE164(phone, findCountry(phoneCountry))}
+              email={authConfig().emailVerificationEnabled ? email.trim() || null : null}
+              onVerified={() => {
+                setFormError(null);
+                void createCompany();
+              }}
+              onCancel={() => {
+                setFormError(null);
+                setStep("company");
+              }}
+              cancelLabel="Change the number"
+            />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Step 1a: the account exists but the email is not confirmed yet.
+  //
+  // The confirmation link opens in the EXTERNAL browser, and the app uses the
+  // PKCE flow with its verifier in native storage — so the browser cannot build
+  // a session and nothing resumes on its own. The merchant genuinely has to
+  // come back to this screen, which is why the copy says so in those words.
+  if (step === "confirm") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 to-background px-4 py-8">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+              <Mail className="h-6 w-6 text-primary" />
+            </div>
+            <CardTitle className="text-2xl">Confirm your email</CardTitle>
+            <CardDescription>
+              Your account is created. We sent a verification link to {email || "your inbox"}.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {errorBanner}
+            <p className="text-sm text-muted-foreground">
+              Open that link, then <strong>come back here</strong> and press Continue. Check your
+              spam folder if it has not arrived after a minute.
+            </p>
+            <Button
+              type="button"
+              className="h-12 w-full text-base"
+              disabled={loading}
+              onClick={() => void handleConfirmContinue()}
+            >
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {loading ? "Checking..." : "I've confirmed — continue"}
+            </Button>
+            <button
+              type="button"
+              className="w-full text-center text-sm text-muted-foreground hover:underline"
+              onClick={() => {
+                setFormError(null);
+                setStep("signup");
+              }}
+            >
+              Use a different email
+            </button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -610,31 +825,27 @@ const Register = () => {
                 </p>
               )}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">WhatsApp number *</Label>
-              <Input
-                id="phone"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                value={phone}
-                onChange={(e) => {
-                  setPhone(e.target.value);
-                  setCompanyErrors((prev) => ({ ...prev, phone: undefined }));
-                }}
-                placeholder="+919876543210"
-                aria-invalid={!!companyErrors.phone}
-                aria-describedby={companyErrors.phone ? "phone-error" : undefined}
-                className="h-11"
-              />
-              {companyErrors.phone ? (
-                <p id="phone-error" className="text-sm font-medium text-destructive">
-                  {companyErrors.phone}
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">Orders from your catalog arrive on this number.</p>
-              )}
-            </div>
+            <PhoneField
+              id="phone"
+              label="WhatsApp number"
+              required
+              countryCode={phoneCountry}
+              onCountryChange={(code) => {
+                setPhoneCountry(code);
+                setCompanyErrors((prev) => ({ ...prev, phone: undefined }));
+              }}
+              value={phone}
+              onValueChange={(local) => {
+                setPhone(local);
+                setCompanyErrors((prev) => ({ ...prev, phone: undefined }));
+              }}
+              error={companyErrors.phone}
+              hint={
+                authConfig().whatsappVerificationEnabled
+                  ? "Orders arrive here, and we send a code to confirm it is yours."
+                  : "Orders from your catalog arrive on this number."
+              }
+            />
             <div className="space-y-2">
               <Label htmlFor="address">Address (optional)</Label>
               <Input
@@ -702,18 +913,14 @@ const Register = () => {
                     className="h-11"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="contactPhone1">Contact phone 1</Label>
-                  <Input
-                    id="contactPhone1"
-                    type="tel"
-                    inputMode="tel"
-                    value={contactPhone1}
-                    onChange={(e) => setContactPhone1(e.target.value)}
-                    placeholder="e.g. +9198765..."
-                    className="h-11"
-                  />
-                </div>
+                <PhoneField
+                  id="contactPhone1"
+                  label="Contact phone 1"
+                  countryCode={contactCountry1}
+                  onCountryChange={setContactCountry1}
+                  value={contactPhone1}
+                  onValueChange={setContactPhone1}
+                />
                 <div className="space-y-2">
                   <Label htmlFor="contactName2">Contact name 2</Label>
                   <Input
@@ -725,18 +932,14 @@ const Register = () => {
                     className="h-11"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="contactPhone2">Contact phone 2</Label>
-                  <Input
-                    id="contactPhone2"
-                    type="tel"
-                    inputMode="tel"
-                    value={contactPhone2}
-                    onChange={(e) => setContactPhone2(e.target.value)}
-                    placeholder="e.g. +9198765..."
-                    className="h-11"
-                  />
-                </div>
+                <PhoneField
+                  id="contactPhone2"
+                  label="Contact phone 2"
+                  countryCode={contactCountry2}
+                  onCountryChange={setContactCountry2}
+                  value={contactPhone2}
+                  onValueChange={setContactPhone2}
+                />
               </div>
               <div className="mt-3 space-y-2">
                 <Label htmlFor="googleMapsUrl">Google Maps link</Label>

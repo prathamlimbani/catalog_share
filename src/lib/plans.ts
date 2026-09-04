@@ -18,7 +18,13 @@ export interface PlanDef {
   priceLabel: string;
   productLimit: number;
   features: string[];
-  /** Unlocks the estimate/invoice generator without a trial. */
+  /**
+   * The plan includes the estimate generator OUTRIGHT.
+   *
+   * False does not mean locked out: those plans reach the same screen and fund
+   * each estimate with rewarded ads instead (see src/lib/estimateCredits.ts).
+   * This is the flag `entitlement.estimatesFree` is built from.
+   */
   unlocksEstimates: boolean;
   /** Unlocks the premium skins (gold / wooden / midnight aurora). */
   unlocksPremiumSkins: boolean;
@@ -48,16 +54,19 @@ const BUILT_IN_PLANS: PlanDef[] = [
     productLimit: 300,
     features: [
       "Up to 300 Products",
-      "Estimates & Invoices",
+      "Estimates (ad-funded)",
       "Better Visibility",
       "Premium Themes",
-      "No ads",
+      "No banner ads",
       "Standard Support",
     ],
-    // Growth has always included the estimate generator — the pre-app code
-    // explicitly allowed it. Leaving this false silently locked every paying
-    // ₹199 customer out of the feature they were already using.
-    unlocksEstimates: true,
+    // Growth is the ad-funded estimate tier: the generator is reachable, but
+    // each estimate is paid for with rewarded ads through the credit wallet
+    // (see src/lib/estimateCredits.ts) rather than included outright. This flag
+    // means "included outright", which is why it is false. The live value comes
+    // from `plans.unlocks_estimates` in the database, so which side of the line
+    // Growth sits on is a console edit, not a release.
+    unlocksEstimates: false,
     unlocksPremiumSkins: false,
     unlocksCallSupport: false,
   },

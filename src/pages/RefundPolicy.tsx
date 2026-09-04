@@ -90,8 +90,9 @@ const RefundPolicy = () => {
       <LegalList>
         <LegalItem>Requests made more than 7 days after the payment date.</LegalItem>
         <LegalItem>
-          Change of mind after you have used the plan. Every account gets a free trial of the estimate
-          features before paying &mdash; please use it to check the product suits you.
+          Change of mind after you have used the plan. The estimate generator can be used before
+          paying anything, funded by watching ads &mdash; please use it to check the product suits
+          you.
         </LegalItem>
         <LegalItem>
           <LegalStrong>Partially used periods.</LegalStrong> We do not refund the unused remainder of a

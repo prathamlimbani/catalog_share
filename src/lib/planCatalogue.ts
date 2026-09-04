@@ -10,7 +10,8 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { applyPlanCatalogue, type PlanRow } from "@/lib/plans";
-import { loadTrialConfig } from "@/lib/trialConfig";
+import { loadCreditConfig } from "@/lib/estimateCredits";
+import { loadAuthConfig } from "@/lib/authConfig";
 import { invalidateAdPolicy } from "@/lib/adPolicy";
 
 /**
@@ -79,10 +80,14 @@ export function isCatalogueLoaded(): boolean {
  */
 export function watchPlanCatalogue(): () => void {
   void loadPlanCatalogue();
-  // The trial terms and the ad policy live in the same console and have the
-  // same problem: an admin edit is worthless if the app only reads it at
-  // install time. They ride along on the same triggers.
-  void loadTrialConfig();
+  // The estimate-credit terms, the auth gates and the ad policy live in the
+  // same console and have the same problem: an admin edit is worthless if the
+  // app only reads it at install time. They ride along on the same triggers.
+  void loadCreditConfig();
+  // Which verification steps are required. Loaded here as well as by the login
+  // and registration screens, so a merchant who is already signed in when the
+  // admin turns 2FA on meets it on their next sign-in rather than never.
+  void loadAuthConfig();
 
   const channel = supabase
     .channel("plan-catalogue")
@@ -94,7 +99,8 @@ export function watchPlanCatalogue(): () => void {
   const onFocus = () => {
     if (document.visibilityState !== "visible") return;
     void loadPlanCatalogue();
-    void loadTrialConfig(true);
+    void loadCreditConfig(true);
+    void loadAuthConfig(true);
     // Drop the cached ad policy rather than fetching it here: the next screen
     // that needs it reloads it, and nothing needs it while the app is hidden.
     invalidateAdPolicy();

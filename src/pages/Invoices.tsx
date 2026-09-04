@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Clock, Crown, FileText, Heart, Lock, RotateCcw, Timer, WifiOff } from "lucide-react";
+import { WifiOff } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -14,8 +14,6 @@ import { AdminLayout } from "@/components/AdminLayout";
 import InvoiceForm from "@/components/InvoiceForm";
 import InvoicePreview from "@/components/InvoicePreview";
 import InvoiceHistory from "@/components/InvoiceHistory";
-import { SupportPromoDialog } from "@/components/SupportPromoDialog";
-import { useRazorpaySubscription } from "@/hooks/useRazorpaySubscription";
 import { Button } from "@/components/ui/button";
 
 import {
@@ -27,39 +25,16 @@ import {
 } from "@/lib/offline/estimates";
 import { getMirroredProducts } from "@/lib/offline/mirror";
 import { syncNow } from "@/lib/sync/syncEngine";
-import { getPlanPrice } from "@/lib/plans";
-import { ensureTrialStarted } from "@/lib/trial";
-import { maybeShowInterstitial, prepareRewarded, showRewarded } from "@/native/ads";
+import { maybeShowInterstitial, prepareRewarded } from "@/native/ads";
 import { useSuppressAds } from "@/hooks/useAdSurface";
 import { adPolicy } from "@/lib/adPolicy";
-import {
-  decideGate,
-  loadGateConfig,
-  noteEstimateSaved,
-  noteRewardWatched,
-  quotaState,
-  type GateConfig,
-} from "@/lib/rewardedGate";
-import RewardedSaveDialog from "@/components/RewardedSaveDialog";
+import { useEstimateCredits } from "@/hooks/useEstimateCredits";
+import { costOf, creditsEnforced, spendCredits, type CreditAction } from "@/lib/estimateCredits";
+import EstimateCreditsCard from "@/components/estimates/EstimateCreditsCard";
+import EstimateCreditsDialog from "@/components/estimates/EstimateCreditsDialog";
 import { notify } from "@/native/files";
 
 type ViewMode = "list" | "create" | "edit" | "preview";
-
-/**
- * How much trial is left, in the coarsest unit that is still true.
- *
- * The entitlement clock is re-read on a boundary timer and a ten-minute safety
- * net, not every second, so a "43 minutes left" here could be eight minutes out
- * of date. Under an hour it therefore stops counting and says so — vague and
- * correct beats precise and wrong on a countdown someone is trusting.
- */
-function formatTrialRemaining(ms: number): string {
-  const days = Math.floor(ms / 86_400_000);
-  if (days >= 1) return `${days} day${days === 1 ? "" : "s"} left`;
-  const hours = Math.floor(ms / 3_600_000);
-  if (hours >= 1) return `${hours} hour${hours === 1 ? "" : "s"} left`;
-  return "less than an hour left";
-}
 
 /**
  * Estimates — the app's offline-first surface.
@@ -78,42 +53,26 @@ const Invoices = () => {
   const { entitlement, resolved: entitlementResolved } = useEntitlement();
   const { offline } = useNetwork();
   const { lastSyncAt } = useSyncState();
+  const companyId = company?.id as string | undefined;
+  const { credits, resolved: creditsResolved, watchForCredit } = useEstimateCredits(companyId);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   const [saving, setSaving] = useState(false);
   /**
-   * The rewarded-ad gate, held open across an await.
+   * The credit gate, held open across an await.
    *
    * `resolve` is the continuation of handleSave: the dialog calls it with true
-   * to carry on saving and false to go back to the form. Keeping it here rather
-   * than threading callbacks keeps the save path readable as one sequence.
+   * once the balance covers the save and false to go back to the form. Keeping
+   * it here rather than threading callbacks keeps the save path readable as one
+   * sequence.
    */
   const [gate, setGate] = useState<
     | null
-    | {
-        mode: "required" | "offered";
-        used: number;
-        allowance: number;
-        resolve: (proceed: boolean) => void;
-      }
+    | { action: CreditAction; resolve: (proceed: boolean) => void }
   >(null);
   const [nextNumber, setNextNumber] = useState("INV-0001");
-
-  const companyId = company?.id as string | undefined;
-
-  const { subscribe, loading: subLoading } = useRazorpaySubscription(
-    companyId || "",
-    company?.name || "",
-    company?.email || "",
-  );
-
-  // Opening this screen is what starts the 5-day trial clock.
-  useEffect(() => {
-    if (!companyId) return;
-    void ensureTrialStarted(companyId, company?.trial_started_at ?? null);
-  }, [companyId, company?.trial_started_at]);
 
   // Session check. Deliberately does NOT bounce to /login on a network failure —
   // only when there is definitively no session — otherwise a flaky connection
@@ -173,37 +132,22 @@ const Invoices = () => {
     };
   }, [viewMode, companyId, offline]);
 
-  // ----------------------------------------------------------------- ads
-  // Ads never appear on the preview/PDF screen or on the trial lock screen.
-  // Never lock before we know the answer. The plan and the trial clock both
-  // load asynchronously, and treating "not loaded yet" as "no access" is what
-  // showed a brand-new user "Free trial ended" on a trial that had just begun.
-  const estimatesLocked = entitlementResolved && !entitlement.estimatesUnlocked;
-  // The shell owns the banner now (see useAdSurface.ts); this screen only
-  // declares the two states in which it must not be there. The PDF preview is
-  // a document the merchant is about to send a customer, and the lock screen is
-  // a sales pitch — a banner on either one is noise on top of the message.
-  useSuppressAds("estimate-preview", viewMode === "preview");
-  useSuppressAds("estimates-locked", estimatesLocked);
-
+  // --------------------------------------------------------------- credits
   /**
-   * Trial over, no plan, and no connection to buy one.
+   * Whether this account pays for estimates with ads.
    *
-   * We keep the screen reachable — never hard-lock a merchant out of work they
-   * already have — but read-only: the list and the preview stay available so
-   * existing estimates can be re-shared, while create/edit stay behind the
-   * paywall. Skipping the gate entirely offline made airplane mode an unlimited
-   * bypass of the trial.
+   * Gated on `entitlementResolved` in the SAFE direction: until the plan is
+   * known we assume it is free, so a Pro subscriber is never briefly shown an ad
+   * prompt during a cold start. The save path re-checks before charging
+   * anything, so nothing is given away by being generous here.
    */
-  const lockedOffline = estimatesLocked && offline;
+  const adFunded = entitlementResolved && !entitlement.estimatesFree;
 
-  useEffect(() => {
-    if (lockedOffline && (viewMode === "create" || viewMode === "edit")) setViewMode("list");
-  }, [lockedOffline, viewMode]);
-
-  const notifyLocked = useCallback(() => {
-    toast.info("Your trial has ended — reconnect to choose a plan.");
-  }, []);
+  // The shell owns the banner (see useAdSurface.ts); this screen only declares
+  // the state in which it must not be there. The PDF preview is a document the
+  // merchant is about to send a customer — a banner on it is noise on top of
+  // the message.
+  useSuppressAds("estimate-preview", viewMode === "preview");
 
   // --------------------------------------------------------------- actions
 
@@ -211,43 +155,42 @@ const Invoices = () => {
   // usually already in memory, which is the difference between a prompt that
   // feels instant and one that looks broken.
   useEffect(() => {
+    if (!adFunded) return;
     if (viewMode !== "create" && viewMode !== "edit") return;
     void prepareRewarded();
-  }, [viewMode]);
+  }, [viewMode, adFunded]);
 
   const handleSave = async (invoiceData: Record<string, any>) => {
     if (!companyId || saving) return;
-    if (lockedOffline) {
-      notifyLocked();
-      return;
-    }
+
+    const action: CreditAction = selectedInvoice?.id && viewMode === "edit" ? "edit" : "create";
+    // Charged only when the plan is ad-funded AND the wallet has actually been
+    // read. `creditsResolved` matters: a balance that has not loaded yet reads
+    // as zero, and charging off that would demand ads from someone who has
+    // credits in hand.
+    const mustPay = adFunded && creditsEnforced(credits.config) && creditsResolved;
 
     // The gate runs BEFORE `saving` is set: the dialog can sit open for the
-    // length of a video, and a spinner on the Save button for thirty seconds
-    // reads as a hang.
-    let gateConfig: GateConfig | null = null;
-    try {
-      gateConfig = await loadGateConfig(company as never);
-    } catch {
-      /* loadGateConfig already fails open; this is belt and braces */
-    }
-
-    if (gateConfig) {
-      const decision = decideGate(gateConfig);
-      if (decision.action !== "save") {
-        const q = quotaState();
-        const proceed = await new Promise<boolean>((resolve) => {
-          setGate({
-            mode: decision.action === "require" ? "required" : "offered",
-            used: q.used,
-            allowance: gateConfig!.dailyQuota + q.unlocked,
-            resolve,
-          });
+    // length of two videos, and a spinner on the Save button for a minute reads
+    // as a hang.
+    if (mustPay && credits.balance < costOf(action, credits.config)) {
+      // Ads need a network. Say that plainly rather than opening a dialog whose
+      // only button cannot work — a merchant on a shop floor with no signal and
+      // no banked credits needs to know what to do, not watch a load spinner.
+      if (offline) {
+        toast.error("You need a connection to watch an ad", {
+          description:
+            "Nothing you typed is lost. Credits never expire, so it is worth banking a few next time you are online.",
         });
-        setGate(null);
-        // "Back to estimate" — the form still holds everything they typed.
-        if (!proceed) return;
+        return;
       }
+
+      const proceed = await new Promise<boolean>((resolve) => {
+        setGate({ action, resolve });
+      });
+      setGate(null);
+      // "Back to the estimate" — the form still holds everything they typed.
+      if (!proceed) return;
     }
 
     setSaving(true);
@@ -276,9 +219,9 @@ const Invoices = () => {
 
       const saved = await saveEstimate(payload);
 
-      // Counted only on a save that actually happened, so a failed save never
-      // costs the merchant one of the day's free estimates.
-      noteEstimateSaved();
+      // Charged only AFTER the estimate is safely on the device. A save that
+      // throws must never cost the merchant ads they have already watched.
+      if (mustPay) await spendCredits(companyId, action);
 
       refresh();
       setSelectedInvoice(saved);
@@ -406,133 +349,6 @@ const Invoices = () => {
     );
   }
 
-  // Trial expired with no active plan. The full paywall only renders when the
-  // user can actually act on it — offline there is nothing to buy, so the
-  // screen degrades to read-only instead (see `lockedOffline` below) rather
-  // than dead-ending a merchant who cannot pay from where they are standing.
-  if (estimatesLocked && !offline) {
-    return (
-      <AdminLayout
-        company={company}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        onLogout={handleLogout}
-        showSearch={false}
-        title="Estimates"
-      >
-        <div className="flex min-h-[70vh] items-center justify-center px-2">
-          <div className="w-full max-w-lg space-y-6 text-center">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-rose-100 to-pink-100 shadow-lg shadow-rose-200/50 dark:from-rose-950 dark:to-pink-950">
-              <Lock className="h-10 w-10 text-rose-500" />
-            </div>
-
-            <div>
-              <h2 className="mb-2 text-2xl font-bold text-foreground">Free trial ended</h2>
-              <p className="text-sm text-muted-foreground">
-                Your 5-day free trial for Estimates has expired. Choose a plan to keep creating and
-                sharing estimates. Everything you&apos;ve already made is safe.
-              </p>
-            </div>
-
-            <div className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">
-              <Clock className="h-4 w-4" />
-              Trial expired
-            </div>
-
-            <div className="grid gap-4 text-left sm:grid-cols-2">
-              <div className="flex flex-col rounded-xl border-2 border-indigo-200 bg-indigo-50/50 p-5 dark:border-indigo-900 dark:bg-indigo-950/30">
-                <div className="mb-1 flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                  <span className="font-bold text-indigo-900 dark:text-indigo-200">
-                    Estimate Generator
-                  </span>
-                </div>
-                <p className="mb-3 text-2xl font-bold text-indigo-700 dark:text-indigo-300">
-                  ₹{getPlanPrice("estimate_generate")}
-                  <span className="text-xs font-normal text-indigo-500">/month</span>
-                </p>
-                <ul className="mb-4 flex-1 space-y-1.5 text-xs text-indigo-800 dark:text-indigo-300">
-                  <li>✅ Unlimited estimates</li>
-                  <li>✅ Works fully offline</li>
-                  <li>✅ PDF & WhatsApp sharing</li>
-                  <li>✅ No ads</li>
-                </ul>
-                <Button
-                  className="w-full bg-indigo-600 font-bold text-white hover:bg-indigo-700"
-                  disabled={subLoading}
-                  onClick={() =>
-                    subscribe(
-                      "estimate_generate",
-                      "Estimate Generator Plan",
-                      getPlanPrice("estimate_generate"),
-                      undefined,
-                      (id) => navigate(`/billing/receipt/${id}`),
-                    )
-                  }
-                >
-                  <FileText className="mr-2 h-4 w-4" />
-                  {subLoading ? "Processing..." : `Get for ₹${getPlanPrice("estimate_generate")}/mo`}
-                </Button>
-              </div>
-
-              <div className="relative flex flex-col overflow-hidden rounded-xl border-2 border-rose-200 bg-rose-50/50 p-5 dark:border-rose-900 dark:bg-rose-950/30">
-                <div className="absolute right-0 top-0 rounded-bl-lg bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white">
-                  BEST VALUE
-                </div>
-                <div className="mb-1 flex items-center gap-2">
-                  <Crown className="h-5 w-5 text-rose-600 dark:text-rose-400" />
-                  <span className="font-bold text-rose-900 dark:text-rose-200">Support Plan</span>
-                </div>
-                <p className="mb-3 text-2xl font-bold text-rose-700 dark:text-rose-300">
-                  ₹{getPlanPrice("support")}
-                  <span className="text-xs font-normal text-rose-500">/month</span>
-                </p>
-                <ul className="mb-4 flex-1 space-y-1.5 text-xs text-rose-800 dark:text-rose-300">
-                  <li>✅ Everything in Estimate plan</li>
-                  <li>✅ Priority & call support</li>
-                  <li>✅ Unlimited products</li>
-                  <li>✅ Premium themes & skins</li>
-                </ul>
-                <Button
-                  className="w-full bg-gradient-to-r from-rose-600 to-pink-600 font-bold text-white hover:from-rose-700 hover:to-pink-700"
-                  disabled={subLoading}
-                  onClick={() =>
-                    subscribe(
-                      "support",
-                      "Monthly Support Subscription",
-                      getPlanPrice("support"),
-                      undefined,
-                      (id) => navigate(`/billing/receipt/${id}`),
-                    )
-                  }
-                >
-                  <Heart className="mr-2 h-4 w-4" />
-                  {subLoading ? "Processing..." : `Get for ₹${getPlanPrice("support")}/mo`}
-                </Button>
-              </div>
-            </div>
-
-            {/* Someone who has already been debited must never have to guess.
-                Restore lives on Billing, so send them there rather than making
-                a second payment look like the only way forward. */}
-            <Button
-              variant="ghost"
-              className="h-11 w-full font-semibold sm:w-auto"
-              onClick={() => navigate("/billing")}
-            >
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Already paid? Restore purchase
-            </Button>
-
-            <p className="text-xs text-muted-foreground">
-              Instant access after payment • 30-day plan, no auto-debit • Your data is always safe
-            </p>
-          </div>
-        </div>
-      </AdminLayout>
-    );
-  }
-
   return (
     <AdminLayout
       company={company}
@@ -542,49 +358,32 @@ const Invoices = () => {
       showSearch={false}
       title="Estimates"
     >
-      {/* The trial is otherwise invisible between promo dialogs, which appear at
-          most once a day — a merchant deserves to know how long they have
-          without being sold to. Paid plans never see it. */}
-      {viewMode === "list" && entitlement.trialActive && !entitlement.isPaid && (
-        <div className="mx-auto mb-3 flex w-full max-w-2xl flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-900 dark:bg-amber-950/40 sm:flex-row sm:items-center sm:gap-3">
-          <Timer className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-          <p className="min-w-0 flex-1 text-xs leading-relaxed text-amber-800 dark:text-amber-200">
-            <span className="font-semibold">Free Estimates trial</span> —{" "}
-            {formatTrialRemaining(entitlement.trialMsRemaining)}. Subscribe any time to keep going.
-          </p>
-          <Button
-            variant="outline"
-            className="h-11 w-full shrink-0 text-xs font-semibold sm:w-auto"
-            onClick={() => navigate("/billing")}
-          >
-            See plans
-          </Button>
-        </div>
-      )}
-
-      {lockedOffline && viewMode === "list" && (
-        <div className="mx-auto mb-3 flex w-full max-w-2xl items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-900 dark:bg-amber-950/40">
-          <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-          <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-200">
-            <span className="font-semibold">Your trial has ended</span> — reconnect to choose a
-            plan. You can still open and share the estimates you already have.
-          </p>
-        </div>
+      {/* The price is stated before the form is opened, never only inside the
+          gate dialog. A merchant who learns what an estimate costs at the
+          moment they try to save one has been ambushed; one who saw it on the
+          way in is making a choice. Paid plans that include estimates never see
+          this at all. */}
+      {viewMode === "list" && adFunded && creditsEnforced(credits.config) && (
+        <EstimateCreditsCard
+          credits={credits}
+          onWatch={watchForCredit}
+          onUpgrade={() => navigate("/billing")}
+        />
       )}
 
       {viewMode === "list" && (
         <InvoiceHistory
           invoices={filteredEstimates}
           company={company}
-          onCreateNew={lockedOffline ? notifyLocked : handleCreateNew}
+          onCreateNew={handleCreateNew}
           onView={handleView}
-          onEdit={lockedOffline ? notifyLocked : handleEdit}
+          onEdit={handleEdit}
           onDelete={handleDelete}
           isLoading={estimatesLoading}
         />
       )}
 
-      {(viewMode === "create" || viewMode === "edit") && !lockedOffline && (
+      {(viewMode === "create" || viewMode === "edit") && (
         <InvoiceForm
           company={company}
           products={products as any}
@@ -601,28 +400,21 @@ const Invoices = () => {
         <InvoicePreview invoice={selectedInvoice} company={company} onBack={handleBack} />
       )}
 
-      {viewMode === "list" && <SupportPromoDialog company={company} />}
-
-      {/* The rewarded-ad gate. `gate` is non-null only while handleSave is
-          waiting on the user's answer. */}
+      {/* The credit gate. `gate` is non-null only while handleSave is waiting
+          on the merchant's answer, and the dialog reads the live balance — so
+          the moment an ad tips it over the price, its button becomes Save. */}
       {gate && (
-        <RewardedSaveDialog
+        <EstimateCreditsDialog
           open
-          mode={gate.mode}
-          used={gate.used}
-          allowance={gate.allowance}
-          onWatch={async () => {
-            const outcome = await showRewarded();
-            if (!outcome.earned) return false;
-            // Buys one more save today. The POINTS for the same ad are credited
-            // separately by AdMob's server-side callback — this only lifts the
-            // local quota, and is deliberately not treated as proof of payment.
-            noteRewardWatched();
-            gate.resolve(true);
-            return true;
-          }}
-          onSkip={() => gate.resolve(true)}
+          action={gate.action}
+          credits={credits}
+          onWatch={watchForCredit}
+          onProceed={() => gate.resolve(true)}
           onCancel={() => gate.resolve(false)}
+          onUpgrade={() => {
+            gate.resolve(false);
+            navigate("/billing");
+          }}
         />
       )}
     </AdminLayout>

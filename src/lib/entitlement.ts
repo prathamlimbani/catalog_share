@@ -7,20 +7,24 @@
  * "Free Plan" in emails. Every gate in the app now routes through here.
  *
  * The ad decision lives here too: `adsEnabled === !isPaid`. Nothing else may
- * decide whether ads show.
+ * decide whether ads are SHOWN at someone.
+ *
+ * ESTIMATES ARE A SEPARATE QUESTION, and the reason is worth stating. Ads shown
+ * at a user and ads a user opts into are different things under Play policy and
+ * different things commercially. `adsEnabled` governs the first — banners and
+ * interstitials, which a paying merchant never sees. `estimatesFree` governs
+ * the second: whether this plan gets estimates outright, or funds them by
+ * choosing to watch rewarded ads (see src/lib/estimateCredits.ts). A Growth
+ * subscriber is `adsEnabled: false` and `estimatesFree: false` at the same
+ * time, and both are correct — no banners follow them around, and an estimate
+ * still costs two ads.
+ *
+ * There is no free trial. It was removed along with the daily upsell dialog;
+ * `trial_started_at` survives in the database as history and is read by nothing
+ * here.
  */
 
 import { getPlan, getPlanLimit, isPaidPlanId, type PlanId } from "@/lib/plans";
-import { trialConfig, trialDurationMs } from "@/lib/trialConfig";
-
-/**
- * Length of the free estimate trial as SHIPPED.
- *
- * The live value comes from `trialDurationMs()`, which the admin console can
- * change without a release. This constant remains the fallback and the figure
- * the tests pin, so a config outage cannot silently shorten anyone's trial.
- */
-export const TRIAL_DURATION_MS = 5 * 24 * 60 * 60 * 1000;
 
 /**
  * How long a cached entitlement is trusted once the device goes offline.
@@ -33,7 +37,8 @@ export interface CompanyLike {
   id?: string;
   subscription_plan?: string | null;
   subscription_expires_at?: string | null;
-  trial_started_at?: string | null;
+  /** Product slots bought with points. Added to the plan's limit, never replacing it. */
+  bonus_product_limit?: number | null;
 }
 
 export interface Entitlement {
@@ -45,16 +50,30 @@ export interface Entitlement {
   /** Whole days left on the subscription; 0 when not subscribed. */
   daysRemaining: number;
 
-  /** THE ad decision. Free (including trial) sees ads; paid never does. */
+  /** THE ad decision, for ads shown AT the user. Paid plans never see them. */
   adsEnabled: boolean;
 
-  /** Estimate generator is usable (paid, or inside the free trial). */
-  estimatesUnlocked: boolean;
-  trialActive: boolean;
-  trialEndsAt: number;
-  trialMsRemaining: number;
+  /**
+   * This plan creates and edits estimates at no cost — Pro, Estimate Generator
+   * and Support, driven by `plans.unlocks_estimates`.
+   *
+   * False does NOT mean locked out. It means each estimate is paid for with
+   * rewarded ads through the credit wallet. Nobody is ever shut out of the
+   * Estimates screen, which is why there is no `estimatesLocked` any more.
+   */
+  estimatesFree: boolean;
 
+  /** The plan's allowance PLUS any slots bought with points. */
   productLimit: number;
+  /**
+   * The bought part of that number, on its own.
+   *
+   * Kept separate so a screen can say "40 + 5 you own" rather than a bare 45
+   * that looks like the plan changed. It is also what survives a downgrade:
+   * `productLimit` falls back to the free tier when a subscription lapses, this
+   * does not.
+   */
+  bonusProductLimit: number;
   premiumThemes: boolean;
   premiumSkins: boolean;
   supportPhoneUnlocked: boolean;
@@ -64,19 +83,12 @@ export interface Entitlement {
 export interface CachedEntitlement {
   plan: string;
   expires_at: string | null;
-  trial_started_at: string | null;
   /** Epoch ms when this snapshot was taken from the server. */
   fetched_at: number;
-  /**
-   * Which company the snapshot belongs to.
-   *
-   * Optional because snapshots written by older builds do not carry it. It is
-   * what lets the offline path find the device-local trial stamp when the
-   * company row itself has not loaded yet — without it, a trial that started
-   * offline reads as "never started" and locks a merchant who is still inside
-   * their five days.
-   */
+  /** Which company the snapshot belongs to. Optional on older snapshots. */
   company_id?: string | null;
+  /** Product slots bought with points. Optional on older snapshots. */
+  bonus_product_limit?: number | null;
 }
 
 function parseTs(value: string | null | undefined): number {
@@ -86,44 +98,34 @@ function parseTs(value: string | null | undefined): number {
 }
 
 /**
+ * Product slots bought with points, as a number that can be added to a limit.
+ *
+ * Clamped rather than trusted. The column has a CHECK behind it, but this also
+ * reads the offline mirror, which is a file on a phone — a corrupted value
+ * there must degrade to "no bonus", never to a negative limit that locks a
+ * merchant out of their own catalogue.
+ */
+function bonusSlots(value: unknown): number {
+  const n = Math.floor(Number(value));
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 5000) : 0;
+}
+
+/**
  * Compute the entitlement for a company row.
  *
- * @param company     the `companies` row (or the offline mirror of it)
- * @param now         injected for testability
- * @param localTrialStart  the DEVICE-local trial stamp, used only as a fallback
- *                    when the server has no start recorded (see below)
+ * @param company  the `companies` row (or the offline mirror of it)
+ * @param now      injected for testability
  */
 export function getEntitlement(
   company: CompanyLike | null | undefined,
   now: number = Date.now(),
-  localTrialStart?: number | null,
 ): Entitlement {
   const plan = (company?.subscription_plan ?? "free") as PlanId;
   const planDef = getPlan(plan);
   const expiresAt = parseTs(company?.subscription_expires_at);
 
   const isPaid = isPaidPlanId(plan) && expiresAt > now;
-
-  // Authority order for the trial clock is the same as in src/lib/trial.ts:
-  // the server column first, the device stamp only when the server has none.
-  // The other way round — which is how this read for a while — any device that
-  // could write `cs_trial_start_<id>` could hand itself an unlimited trial, and
-  // clearing app data handed out a brand-new one. `start_estimate_trial` exists
-  // precisely so the start cannot be moved from the device, so the device value
-  // must never be allowed to override it.
-  const serverStart = parseTs(company?.trial_started_at);
-  // A device-only start is additionally clamped to the present: a phone whose
-  // clock is wound forward would otherwise push the end date out with it.
-  const localStart = localTrialStart && localTrialStart > 0 ? Math.min(localTrialStart, now) : 0;
-  const startedAt = serverStart > 0 ? serverStart : localStart;
-
-  const trialEndsAt = startedAt > 0 ? startedAt + trialDurationMs() : 0;
-  const trialMsRemaining = trialEndsAt > 0 ? Math.max(0, trialEndsAt - now) : 0;
-  // An admin who switches the trial off ends the ones already running. That is
-  // the point of the switch — otherwise turning it off would take five days to
-  // have any effect and there would be no way to stop an abused promotion.
-  const trial = trialConfig();
-  const trialActive = trialMsRemaining > 0 && trial.enabled;
+  const bonus = bonusSlots(company?.bonus_product_limit);
 
   return {
     plan,
@@ -132,19 +134,18 @@ export function getEntitlement(
     expiresAt: isPaid ? expiresAt : 0,
     daysRemaining: isPaid ? Math.max(0, Math.ceil((expiresAt - now) / 86_400_000)) : 0,
 
-    // Trial users are on the `free` plan, so they DO see ads. This is the only
-    // unambiguous reading of "ads for free users, none for paid users".
     adsEnabled: !isPaid,
 
-    // What the trial is worth is configurable too, so a promotion can widen or
-    // narrow it without a release.
-    estimatesUnlocked: (isPaid && planDef.unlocksEstimates) || (trialActive && trial.unlocksEstimates),
-    trialActive,
-    trialEndsAt,
-    trialMsRemaining,
+    // A lapsed subscription falls back to ad-funded estimates rather than to a
+    // lockout: the merchant keeps working, they just pay attention instead of
+    // rupees until they renew.
+    estimatesFree: isPaid && planDef.unlocksEstimates,
 
-    productLimit: isPaid ? getPlanLimit(plan) : trial.productLimit,
-    premiumThemes: isPaid || (trialActive && trial.unlocksPremiumThemes),
+    // Slots bought with points are added on top and are NOT lost when a plan
+    // lapses: they were paid for with ads that have already been watched.
+    productLimit: getPlanLimit(isPaid ? plan : "free") + bonus,
+    bonusProductLimit: bonus,
+    premiumThemes: isPaid,
     premiumSkins: isPaid && planDef.unlocksPremiumSkins,
     supportPhoneUnlocked: isPaid && planDef.unlocksCallSupport,
   };
@@ -160,25 +161,24 @@ export function getEntitlement(
 export function getEntitlementFromCache(
   cached: CachedEntitlement | null | undefined,
   now: number = Date.now(),
-  localTrialStart?: number | null,
 ): Entitlement | null {
   if (!cached) return null;
 
   const expiresAt = parseTs(cached.expires_at);
   const cacheExpired = now - cached.fetched_at > OFFLINE_ENTITLEMENT_GRACE_MS;
-
-  // A stale cache may no longer assert a paid plan, but the trial clock is
-  // local anyway so it is still safe to honour.
   const plan = cacheExpired || expiresAt <= now ? "free" : cached.plan;
 
   return getEntitlement(
     {
       subscription_plan: plan,
       subscription_expires_at: cached.expires_at,
-      trial_started_at: cached.trial_started_at,
+      // Carried through even when the cache is too stale to trust for the PLAN.
+      // Staleness is about a subscription that may have lapsed; bought slots
+      // cannot lapse, so demoting them would take away something permanent
+      // because the phone happened to be offline for a week.
+      bonus_product_limit: cached.bonus_product_limit ?? 0,
     },
     now,
-    localTrialStart,
   );
 }
 
@@ -188,22 +188,19 @@ export function freeEntitlement(now: number = Date.now()): Entitlement {
 }
 
 /**
- * The next instant at which this entitlement can change on its own — the trial
- * running out, or the subscription lapsing. 0 when nothing is counting down.
+ * The next instant at which this entitlement can change on its own — now only
+ * the subscription lapsing, since the trial that used to count down beside it
+ * is gone. 0 when nothing is counting down.
  *
  * Entitlement used to be computed once and then never re-evaluated, so a
- * merchant with the app open when their trial expired kept working until the
- * next cold start. `useEntitlement` arms a single timer on this value instead
- * of polling, which is what makes the lock appear on time without a 1s tick
- * running all day.
+ * merchant with the app open when their plan expired kept the paid features
+ * until the next cold start. `useEntitlement` arms a single timer on this value
+ * instead of polling.
  *
  * The returned instant is relative to the clock the entitlement was computed
  * with, so it can be in the past if that clock has since gone stale — callers
  * must treat a non-positive delay as "re-evaluate now".
  */
 export function nextEntitlementBoundary(entitlement: Entitlement): number {
-  const boundaries: number[] = [];
-  if (entitlement.trialActive && entitlement.trialEndsAt > 0) boundaries.push(entitlement.trialEndsAt);
-  if (entitlement.isPaid && entitlement.expiresAt > 0) boundaries.push(entitlement.expiresAt);
-  return boundaries.length > 0 ? Math.min(...boundaries) : 0;
+  return entitlement.isPaid && entitlement.expiresAt > 0 ? entitlement.expiresAt : 0;
 }

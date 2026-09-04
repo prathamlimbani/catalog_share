@@ -15,6 +15,7 @@ import { clearOfflineData } from "@/lib/offline/db";
 import { isOnline, startNetworkWatch } from "./net";
 import { isNative } from "./platform";
 import { clearAppPrefs } from "./prefs";
+import { resetCreditCache } from "@/lib/estimateCredits";
 import { teardownAds } from "./ads";
 
 /** Routes from which the hardware back button should close the app. */
@@ -283,6 +284,13 @@ export function installAuthListener(onSignedOut: () => void): () => void {
     explicitSignOut = false;
 
     void (async () => {
+      // The estimate-credit mirror is memory only, and it is dropped on EVERY
+      // sign-out so the next account on this device cannot read the previous
+      // balance out of it. The persisted rows are keyed by company and are
+      // deliberately left alone: credits are earned by watching ads, and
+      // destroying them on a routine sign-out would be taking that back.
+      resetCreditCache();
+
       // Ads are torn down either way: whoever comes back is unauthenticated
       // until they sign in, and a banner has no business on the login screen.
       if (wasExplicit) {

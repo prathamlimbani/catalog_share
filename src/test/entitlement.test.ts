@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 
 import {
   OFFLINE_ENTITLEMENT_GRACE_MS,
-  TRIAL_DURATION_MS,
   freeEntitlement,
   getEntitlement,
   getEntitlementFromCache,
@@ -25,100 +24,68 @@ const paid = (plan: string, expiresInMs = 20 * DAY): CompanyLike => ({
   subscription_expires_at: iso(NOW + expiresInMs),
 });
 
-describe("trial window", () => {
-  it("is inactive before the clock has ever been started", () => {
-    const ent = getEntitlement({ id: "co-1", subscription_plan: "free" }, NOW);
-    expect(ent.trialActive).toBe(false);
-    expect(ent.trialEndsAt).toBe(0);
-    expect(ent.estimatesUnlocked).toBe(false);
-  });
+/**
+ * The plans that include estimates outright, and the plans that fund them with
+ * ads. Read from the catalogue rather than hardcoded, because the catalogue is
+ * what the app actually gates on and the database can move a plan between the
+ * two without a release.
+ */
+const FREE_ESTIMATE_PLANS = PAID_PLANS.filter((p) => getPlan(p).unlocksEstimates);
+const AD_FUNDED_PAID_PLANS = PAID_PLANS.filter((p) => !getPlan(p).unlocksEstimates);
 
-  it("unlocks estimates on the first day", () => {
-    const ent = getEntitlement({ trial_started_at: iso(NOW) }, NOW);
-    expect(ent.trialActive).toBe(true);
-    expect(ent.estimatesUnlocked).toBe(true);
-    expect(ent.trialMsRemaining).toBe(TRIAL_DURATION_MS);
-  });
-
-  it("is still active one millisecond before the five days are up", () => {
-    const started = NOW - TRIAL_DURATION_MS + 1;
-    const ent = getEntitlement({ trial_started_at: iso(started) }, NOW);
-    expect(ent.trialActive).toBe(true);
-    expect(ent.estimatesUnlocked).toBe(true);
-    expect(ent.trialMsRemaining).toBe(1);
-  });
-
-  it("locks estimates exactly on the boundary, not a tick later", () => {
-    const started = NOW - TRIAL_DURATION_MS;
-    const ent = getEntitlement({ trial_started_at: iso(started) }, NOW);
-    expect(ent.trialActive).toBe(false);
-    expect(ent.trialMsRemaining).toBe(0);
-    expect(ent.estimatesUnlocked).toBe(false);
-  });
-
-  it("stays locked once the trial is well past", () => {
-    const ent = getEntitlement({ trial_started_at: iso(NOW - 30 * DAY) }, NOW);
-    expect(ent.trialActive).toBe(false);
-    expect(ent.estimatesUnlocked).toBe(false);
-  });
-});
-
-describe("trial clock authority", () => {
-  it("prefers the server start over the device stamp", () => {
-    // The device claims the trial began a minute ago; the server recorded it a
-    // week ago. Believing the device is what let a reinstall mint a new trial.
-    const ent = getEntitlement({ trial_started_at: iso(NOW - 7 * DAY) }, NOW, NOW - 60_000);
-    expect(ent.trialActive).toBe(false);
-    expect(ent.estimatesUnlocked).toBe(false);
-  });
-
-  it("falls back to the device stamp when the server has none", () => {
-    // A trial that had to start offline is still honoured.
-    const ent = getEntitlement({ trial_started_at: null }, NOW, NOW - DAY);
-    expect(ent.trialActive).toBe(true);
-    expect(ent.trialMsRemaining).toBe(TRIAL_DURATION_MS - DAY);
-  });
-
-  it("clamps a device stamp set in the future to the present", () => {
-    // A wound-forward clock must not buy more than one fresh trial's worth.
-    const ent = getEntitlement({ trial_started_at: null }, NOW, NOW + 365 * DAY);
-    expect(ent.trialEndsAt).toBe(NOW + TRIAL_DURATION_MS);
-  });
-});
-
-describe("plan gate for estimates", () => {
-  it("keeps the free plan locked outside a trial", () => {
+describe("estimates are never locked", () => {
+  it("does not include estimates on the free plan, and does not lock them either", () => {
     const ent = getEntitlement({ subscription_plan: "free" }, NOW);
     expect(ent.isPaid).toBe(false);
-    expect(ent.estimatesUnlocked).toBe(false);
+    // `estimatesFree: false` means "pay with ads", NOT "locked out". Nothing in
+    // the entitlement may ever shut a merchant out of the Estimates screen —
+    // that is the whole difference between this and the trial it replaced.
+    expect(ent.estimatesFree).toBe(false);
     expect(ent.adsEnabled).toBe(true);
+    expect(ent).not.toHaveProperty("estimatesUnlocked");
   });
 
-  it.each(PAID_PLANS)("unlocks estimates on the %s plan", (plan) => {
+  it("carries no trial state at all", () => {
+    const ent = getEntitlement({ subscription_plan: "free" }, NOW);
+    expect(ent).not.toHaveProperty("trialActive");
+    expect(ent).not.toHaveProperty("trialEndsAt");
+    expect(ent).not.toHaveProperty("trialMsRemaining");
+  });
+
+  it("ignores a historical trial_started_at left on the row", () => {
+    // The column survives as history. A build that still writes it must not be
+    // able to hand anyone free estimates through it.
+    const withTrial = { subscription_plan: "free", trial_started_at: iso(NOW - 1000) };
+    expect(getEntitlement(withTrial as CompanyLike, NOW).estimatesFree).toBe(false);
+  });
+});
+
+describe("which plans pay with ads", () => {
+  it.each(FREE_ESTIMATE_PLANS)("includes estimates outright on %s", (plan) => {
     const ent = getEntitlement(paid(plan), NOW);
     expect(ent.isPaid).toBe(true);
-    expect(ent.estimatesUnlocked).toBe(true);
-    // Nothing a merchant can actually buy may leave estimates locked — that is
-    // the exact shape of the bug that put a paying customer back on the paywall.
-    expect(getPlan(plan).unlocksEstimates).toBe(true);
+    expect(ent.estimatesFree).toBe(true);
     expect(ent.adsEnabled).toBe(false);
   });
 
-  it("never charges a paid plan for ads or the trial UI", () => {
-    const ent = getEntitlement({ ...paid("support"), trial_started_at: iso(NOW - 30 * DAY) }, NOW);
-    // Trial long gone, plan live: access and ad state come from the plan alone.
-    expect(ent.trialActive).toBe(false);
-    expect(ent.estimatesUnlocked).toBe(true);
+  it.each(AD_FUNDED_PAID_PLANS)("funds estimates with ads on %s", (plan) => {
+    const ent = getEntitlement(paid(plan), NOW);
+    // A paid plan, so no banners follow them around...
+    expect(ent.isPaid).toBe(true);
     expect(ent.adsEnabled).toBe(false);
+    // ...but an estimate still costs rewarded ads. Both are correct at once,
+    // and conflating them is the bug this split exists to prevent.
+    expect(ent.estimatesFree).toBe(false);
   });
 
-  it("does not let a lapsed trial lock a paying user out", () => {
-    const ent = getEntitlement(
-      { ...paid("estimate_generate"), trial_started_at: iso(NOW - TRIAL_DURATION_MS) },
-      NOW,
-    );
-    expect(ent.trialActive).toBe(false);
-    expect(ent.estimatesUnlocked).toBe(true);
+  it("puts growth on the ad-funded side and the estimate plans on the free side", () => {
+    // Pins the answer the product actually asked for, so a catalogue edit that
+    // silently gives ₹199 unlimited estimates fails here rather than in the
+    // revenue numbers.
+    expect(getEntitlement(paid("growth"), NOW).estimatesFree).toBe(false);
+    expect(getEntitlement(paid("pro"), NOW).estimatesFree).toBe(true);
+    expect(getEntitlement(paid("estimate_generate"), NOW).estimatesFree).toBe(true);
+    expect(getEntitlement(paid("support"), NOW).estimatesFree).toBe(true);
   });
 
   it("reports whole days remaining on the subscription", () => {
@@ -134,7 +101,9 @@ describe("expired paid plan", () => {
     expect(ent.isPaid).toBe(false);
     expect(ent.plan).toBe("support");
     expect(ent.planName).toBe("Monthly Support Subscription");
-    expect(ent.estimatesUnlocked).toBe(false);
+    // Not locked — ad-funded. A lapsed merchant keeps working and pays in
+    // attention until they renew.
+    expect(ent.estimatesFree).toBe(false);
     expect(ent.adsEnabled).toBe(true);
     expect(ent.productLimit).toBe(40);
     expect(ent.premiumSkins).toBe(false);
@@ -142,14 +111,60 @@ describe("expired paid plan", () => {
     expect(ent.expiresAt).toBe(0);
     expect(ent.daysRemaining).toBe(0);
   });
+});
 
-  it("still honours a trial that is running under an expired plan", () => {
+describe("product slots bought with points", () => {
+  it("adds the bonus on top of the plan's own limit", () => {
+    const ent = getEntitlement({ subscription_plan: "free", bonus_product_limit: 5 }, NOW);
+    expect(ent.productLimit).toBe(45);
+    expect(ent.bonusProductLimit).toBe(5);
+  });
+
+  it("keeps the bonus when the subscription lapses", () => {
+    // The slots were paid for with ads that have already been watched. A plan
+    // expiring must not take them back — the merchant would silently be over
+    // their limit on a catalogue they were told they owned room for.
     const ent = getEntitlement(
-      { ...paid("growth", -1), trial_started_at: iso(NOW - DAY) },
+      { ...paid("pro", -1), bonus_product_limit: 5 },
       NOW,
     );
     expect(ent.isPaid).toBe(false);
-    expect(ent.estimatesUnlocked).toBe(true);
+    expect(ent.productLimit).toBe(45);
+    expect(ent.bonusProductLimit).toBe(5);
+  });
+
+  it("stacks with a paid plan rather than replacing it", () => {
+    const ent = getEntitlement({ ...paid("growth"), bonus_product_limit: 10 }, NOW);
+    expect(ent.productLimit).toBe(getPlan("growth").productLimit + 10);
+  });
+
+  it("treats a missing, negative or nonsense bonus as none", () => {
+    expect(getEntitlement({ subscription_plan: "free" }, NOW).productLimit).toBe(40);
+    expect(
+      getEntitlement({ subscription_plan: "free", bonus_product_limit: -5 }, NOW).productLimit,
+    ).toBe(40);
+    expect(
+      getEntitlement(
+        { subscription_plan: "free", bonus_product_limit: "abc" as unknown as number },
+        NOW,
+      ).productLimit,
+    ).toBe(40);
+  });
+
+  it("survives a cache too stale to trust the plan itself", () => {
+    // Staleness is a statement about a subscription that may have lapsed.
+    // Bought slots cannot lapse, so being offline for a week must not take them.
+    const ent = getEntitlementFromCache(
+      {
+        plan: "pro",
+        expires_at: iso(NOW + 20 * DAY),
+        fetched_at: NOW - OFFLINE_ENTITLEMENT_GRACE_MS - 1,
+        bonus_product_limit: 5,
+      },
+      NOW,
+    );
+    expect(ent?.isPaid).toBe(false);
+    expect(ent?.productLimit).toBe(45);
   });
 });
 
@@ -157,7 +172,6 @@ describe("offline cache", () => {
   const snapshot = (over: Partial<CachedEntitlement> = {}): CachedEntitlement => ({
     plan: "support",
     expires_at: iso(NOW + 20 * DAY),
-    trial_started_at: null,
     fetched_at: NOW,
     company_id: "co-1",
     ...over,
@@ -173,7 +187,7 @@ describe("offline cache", () => {
       NOW,
     );
     expect(ent?.isPaid).toBe(true);
-    expect(ent?.estimatesUnlocked).toBe(true);
+    expect(ent?.estimatesFree).toBe(true);
     expect(ent?.adsEnabled).toBe(false);
   });
 
@@ -184,56 +198,38 @@ describe("offline cache", () => {
       NOW,
     );
     expect(ent?.isPaid).toBe(false);
-    expect(ent?.estimatesUnlocked).toBe(false);
+    expect(ent?.estimatesFree).toBe(false);
   });
 
   it("demotes a snapshot whose subscription has expired even if it is fresh", () => {
     const ent = getEntitlementFromCache(snapshot({ expires_at: iso(NOW - 1) }), NOW);
     expect(ent?.isPaid).toBe(false);
   });
+});
 
-  it("honours a device-local trial the snapshot does not know about", () => {
-    // The trial that started offline is not in the cached row; without the
-    // local stamp the merchant is locked out mid-trial.
-    const ent = getEntitlementFromCache(
-      snapshot({ plan: "free", expires_at: null }),
-      NOW,
-      NOW - DAY,
-    );
-    expect(ent?.trialActive).toBe(true);
-    expect(ent?.estimatesUnlocked).toBe(true);
-  });
-
-  it("expires that local trial on schedule even offline", () => {
-    const ent = getEntitlementFromCache(
-      snapshot({ plan: "free", expires_at: null }),
-      NOW,
-      NOW - TRIAL_DURATION_MS,
-    );
-    expect(ent?.trialActive).toBe(false);
-    expect(ent?.estimatesUnlocked).toBe(false);
+describe("the signed-out default", () => {
+  it("is the free tier, with ads and ad-funded estimates", () => {
+    const ent = freeEntitlement(NOW);
+    expect(ent.plan).toBe("free");
+    expect(ent.isPaid).toBe(false);
+    expect(ent.adsEnabled).toBe(true);
+    expect(ent.estimatesFree).toBe(false);
   });
 });
 
 describe("re-evaluation boundary", () => {
-  it("is the trial end while a trial is running", () => {
-    const ent = getEntitlement({ trial_started_at: iso(NOW) }, NOW);
-    expect(nextEntitlementBoundary(ent)).toBe(NOW + TRIAL_DURATION_MS);
-  });
-
   it("is the subscription expiry for a paid plan", () => {
-    const ent = getEntitlement(paid("pro", 10 * DAY), NOW);
-    expect(nextEntitlementBoundary(ent)).toBe(NOW + 10 * DAY);
+    const ent = getEntitlement(paid("pro", 5 * DAY), NOW);
+    expect(nextEntitlementBoundary(ent)).toBe(NOW + 5 * DAY);
   });
 
-  it("is whichever comes first when both are counting down", () => {
-    const ent = getEntitlement({ ...paid("pro", 10 * DAY), trial_started_at: iso(NOW) }, NOW);
-    expect(nextEntitlementBoundary(ent)).toBe(NOW + TRIAL_DURATION_MS);
-  });
-
-  it("is zero when nothing can change on its own, so no timer is armed", () => {
+  it("is zero for a free account, so no timer is armed at all", () => {
+    // Nothing counts down any more — the trial that used to was the only other
+    // boundary, and a timer with nothing to fire for is pure battery drain.
     expect(nextEntitlementBoundary(freeEntitlement(NOW))).toBe(0);
-    const lapsed = getEntitlement({ ...paid("pro", -1), trial_started_at: iso(NOW - 30 * DAY) }, NOW);
-    expect(nextEntitlementBoundary(lapsed)).toBe(0);
+  });
+
+  it("is zero once a paid plan has lapsed", () => {
+    expect(nextEntitlementBoundary(getEntitlement(paid("pro", -1), NOW))).toBe(0);
   });
 });

@@ -1,5 +1,21 @@
+/**
+ * The MERCHANT's export: one shop's own data, formatted to be read.
+ *
+ * Deliberately not the same thing as the master export, which now lives in
+ * src/lib/tableauExport.ts. That one feeds a BI tool and is all ISO dates,
+ * numeric ratings and join keys; this one is opened in Excel by a shopkeeper,
+ * so "27/08/2026, 3:04 pm" and "4 / 5" are the right answers here and the
+ * wrong ones there. Splitting them is what lets each be correct for its reader.
+ *
+ * What the two DO share is the paginator, because the bug they shared was
+ * fetching without one: a bare select stops at `db-max-rows` and says nothing,
+ * so any shop past a thousand products or events was silently exporting a
+ * sample.
+ */
+
 import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchPaged } from "@/lib/fetchPaged";
 
 export const exportDataToExcel = async (companyId: string, companyName: string) => {
     try {
@@ -13,35 +29,43 @@ export const exportDataToExcel = async (companyId: string, companyName: string) 
         if (companyErr) throw companyErr;
 
         // 2. Fetch Products Data
-        const { data: productsData, error: productsErr } = await supabase
-            .from("products")
-            .select("*")
-            .eq("company_id", companyId)
-            .order("created_at", { ascending: false });
-
-        if (productsErr) throw productsErr;
+        const productsPage = await fetchPaged((from, to) =>
+            supabase
+                .from("products")
+                .select("*")
+                .eq("company_id", companyId)
+                .order("created_at", { ascending: false })
+                .range(from, to),
+        );
+        if (productsPage.error) throw new Error(productsPage.error);
+        const productsData = productsPage.rows as any[];
 
         // 3. Fetch Surveys/Feedback Data (using the company slug)
         let surveysData: any[] = [];
         if (companyData.slug) {
-            const { data: fetchedSurveys, error: surveysErr } = await supabase
-                .from("surveys")
-                .select("*")
-                .eq("store_slug", companyData.slug)
-                .order("created_at", { ascending: false });
-
-            if (surveysErr) throw surveysErr;
-            surveysData = fetchedSurveys || [];
+            const surveysPage = await fetchPaged((from, to) =>
+                supabase
+                    .from("surveys")
+                    .select("*")
+                    .eq("store_slug", companyData.slug)
+                    .order("created_at", { ascending: false })
+                    .range(from, to),
+            );
+            if (surveysPage.error) throw new Error(surveysPage.error);
+            surveysData = surveysPage.rows as any[];
         }
 
         // 4. Fetch Analytics Data
-        const { data: analyticsData, error: analyticsErr } = await supabase
-            .from("analytics_events")
-            .select("*")
-            .eq("company_id", companyId)
-            .order("created_at", { ascending: false });
-
-        if (analyticsErr) throw analyticsErr;
+        const analyticsPage = await fetchPaged((from, to) =>
+            supabase
+                .from("analytics_events")
+                .select("*")
+                .eq("company_id", companyId)
+                .order("created_at", { ascending: false })
+                .range(from, to),
+        );
+        if (analyticsPage.error) throw new Error(analyticsPage.error);
+        const analyticsData = analyticsPage.rows as any[];
 
         // Create a new Workbook
         const wb = XLSX.utils.book_new();
@@ -124,137 +148,6 @@ export const exportDataToExcel = async (companyId: string, companyName: string) 
         return { success: true, fileName };
     } catch (error) {
         console.error("Export Error:", error);
-        throw error;
-    }
-};
-
-export const exportMasterDataToExcel = async () => {
-    try {
-        // 1. Fetch All Companies
-        const { data: companiesData, error: companyErr } = await supabase
-            .from("companies")
-            .select("*")
-            .order("created_at", { ascending: false });
-
-        if (companyErr) throw companyErr;
-
-        // 2. Fetch All Products
-        const { data: productsData, error: productsErr } = await supabase
-            .from("products")
-            .select("*, companies(name, slug)")
-            .order("created_at", { ascending: false });
-
-        if (productsErr) throw productsErr;
-
-        // 3. Fetch All Surveys
-        const { data: surveysData, error: surveysErr } = await supabase
-            .from("surveys")
-            .select("*")
-            .order("created_at", { ascending: false });
-
-        if (surveysErr) throw surveysErr;
-
-        // 4. Fetch All Analytics Events
-        const { data: analyticsData, error: analyticsErr } = await supabase
-            .from("analytics_events")
-            .select("*, companies(name)")
-            .order("created_at", { ascending: false });
-
-        if (analyticsErr) throw analyticsErr;
-
-        // Create a new Workbook
-        const wb = XLSX.utils.book_new();
-
-        // Sheet 1: All Companies
-        const companiesFormatted = (companiesData || []).map(c => ({
-            "ID": c.id,
-            "Company Name": c.name,
-            "Store Slug": c.slug,
-            "Phone": c.phone || "N/A",
-            "Email": c.email || "N/A",
-            "Address": c.address || "N/A",
-            "GST Number": c.gst_number || "N/A",
-            "Created At": new Date(c.created_at).toLocaleString(),
-            "Theme": c.theme_primary || "Default"
-        }));
-        const wsCompanies = XLSX.utils.json_to_sheet(companiesFormatted.length > 0 ? companiesFormatted : [{ Message: "No companies found." }]);
-        wsCompanies["!cols"] = [{ wch: 36 }, { wch: 25 }, { wch: 20 }, { wch: 15 }, { wch: 25 }, { wch: 30 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 15 }];
-        XLSX.utils.book_append_sheet(wb, wsCompanies, "All Companies");
-
-        // Sheet 2: All Products
-        const productsFormatted = (productsData || []).map(p => {
-            const features = p.features && p.features.length > 0 ? p.features.join(", ") : "None";
-            let sizesDetails = "";
-            if (p.feature_sizes && typeof p.feature_sizes === 'object' && Object.keys(p.feature_sizes).length > 0) {
-                sizesDetails = Object.entries(p.feature_sizes)
-                    .map(([feat, sizeArr]) => `${feat}: ${(sizeArr as string[]).join(", ")}`)
-                    .join(" | ");
-            } else if (p.size) {
-                sizesDetails = p.size;
-            } else {
-                sizesDetails = "None";
-            }
-
-            // Extract company name from the joined table if present; fallback to companiesData lookup
-            const companyName = p.companies ? (p.companies as any).name : (companiesData?.find((c: any) => c.id === p.company_id)?.name || "N/A");
-            const companySlug = p.companies ? (p.companies as any).slug : (companiesData?.find((c: any) => c.id === p.company_id)?.slug || "N/A");
-
-            return {
-                "Product ID": p.id,
-                "Company": companyName,
-                "Store Slug": companySlug,
-                "Name": p.name,
-                "Category": p.category || "Uncategorized",
-                "Price": p.price,
-                "In Stock": p.in_stock ? "Yes" : "No",
-                "Trending": p.is_trending ? "Yes" : "No",
-                "Options": features,
-                "Sizes": sizesDetails,
-                "Description": p.description || "",
-                "Created At": new Date(p.created_at).toLocaleString()
-            };
-        });
-        const wsProducts = XLSX.utils.json_to_sheet(productsFormatted.length > 0 ? productsFormatted : [{ Message: "No products found." }]);
-        wsProducts["!cols"] = [{ wch: 36 }, { wch: 25 }, { wch: 20 }, { wch: 25 }, { wch: 15 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 20 }, { wch: 30 }, { wch: 40 }, { wch: 20 }];
-        XLSX.utils.book_append_sheet(wb, wsProducts, "All Products");
-
-        // Sheet 3: All Surveys & Feedback
-        const surveysFormatted = (surveysData || []).map(s => ({
-            "Survey ID": s.id,
-            "Store Slug": s.store_slug || "Global",
-            "Name": s.name,
-            "Role": s.role,
-            "Rating": `${s.rating} / 5`,
-            "Suggestion/Feedback": s.suggestion || "None",
-            "Date": new Date(s.created_at).toLocaleString()
-        }));
-        const wsSurveys = XLSX.utils.json_to_sheet(surveysFormatted.length > 0 ? surveysFormatted : [{ Message: "No feedback recorded yet." }]);
-        wsSurveys["!cols"] = [{ wch: 36 }, { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 10 }, { wch: 50 }, { wch: 20 }];
-        XLSX.utils.book_append_sheet(wb, wsSurveys, "All Feedback & Surveys");
-
-        // Sheet 4: All Analytics Events
-        const analyticsFormatted = (analyticsData || []).map(a => {
-            const companyName = a.companies ? (a.companies as any).name : (companiesData?.find((c: any) => c.id === a.company_id)?.name || "N/A");
-            return {
-                "Event ID": a.id,
-                "Company": companyName,
-                "Event Type": a.event_type,
-                "Page URL": a.page_url,
-                "Product ID": a.product_id || "N/A",
-                "Date": new Date(a.created_at).toLocaleString()
-            };
-        });
-        const wsAnalytics = XLSX.utils.json_to_sheet(analyticsFormatted.length > 0 ? analyticsFormatted : [{ Message: "No analytics events recorded yet." }]);
-        wsAnalytics["!cols"] = [{ wch: 36 }, { wch: 25 }, { wch: 15 }, { wch: 30 }, { wch: 36 }, { wch: 20 }];
-        XLSX.utils.book_append_sheet(wb, wsAnalytics, "All Analytics");
-
-        // Trigger Download
-        const fileName = `Master_Data_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
-        XLSX.writeFile(wb, fileName);
-
-        return { success: true, fileName };
-    } catch (error) {
-        console.error("Master Export Error:", error);
         throw error;
     }
 };

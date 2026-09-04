@@ -11,16 +11,15 @@ import {
 import { PREF_KEYS, prefGetJSON, prefSetJSON } from "@/native/prefs";
 import { applyEntitlement } from "@/native/ads";
 import { useCurrentCompany } from "@/hooks/useCompany";
-import { onTrialChange, readTrialStart } from "@/lib/trial";
 
 /**
  * Safety net for the boundary timer.
  *
  * Android freezes JS timers while the app is backgrounded, so a `setTimeout`
- * armed for the trial's last second can come back minutes late. A coarse
+ * armed for a subscription's last second can come back minutes late. A coarse
  * interval plus the resume/visibility hooks below cover that. Ten minutes, not
- * one second: this only ever moves a lock screen that is already overdue, and
- * a per-second timer on a phone is pure battery drain.
+ * one second: this only ever moves a paywall that is already overdue, and a
+ * per-second timer on a phone is pure battery drain.
  */
 const COARSE_RECHECK_MS = 10 * 60 * 1000;
 
@@ -46,9 +45,9 @@ export async function cacheEntitlementSnapshot(
   const snapshot: CachedEntitlement = {
     plan: company.subscription_plan ?? "free",
     expires_at: company.subscription_expires_at ?? null,
-    trial_started_at: company.trial_started_at ?? null,
     fetched_at: Date.now(),
     company_id: company.id ?? null,
+    bonus_product_limit: company.bonus_product_limit ?? 0,
   };
   await prefSetJSON(PREF_KEYS.entitlement, snapshot);
 }
@@ -63,15 +62,14 @@ export async function cacheEntitlementSnapshot(
  *
  * The entitlement is also RE-EVALUATED over time, not only when the row
  * changes. It used to be computed against a `Date.now()` frozen inside a memo,
- * so a merchant whose trial lapsed while the app was open kept working until
- * they relaunched — and an expired subscription kept its features just as long.
- * See the boundary timer below.
+ * so a merchant whose subscription lapsed while the app was open kept every
+ * paid feature until they relaunched. See the boundary timer below.
  */
 export function useEntitlement(): {
   entitlement: Entitlement;
   loading: boolean;
   fromCache: boolean;
-  /** True once the plan AND the trial clock are both known. */
+  /** True once the plan is known, one way or another. */
   resolved: boolean;
 } {
   const { data: company, isPending, isError } = useCurrentCompany();
@@ -99,46 +97,13 @@ export function useEntitlement(): {
     const snapshot: CachedEntitlement = {
       plan: row.subscription_plan ?? "free",
       expires_at: row.subscription_expires_at ?? null,
-      trial_started_at: row.trial_started_at ?? null,
       fetched_at: Date.now(),
       company_id: row.id ?? null,
+      bonus_product_limit: row.bonus_product_limit ?? 0,
     };
     setCached(snapshot);
     void prefSetJSON(PREF_KEYS.entitlement, snapshot);
   }, [company]);
-
-  // The trial clock is local (see src/lib/trial.ts) and is only READ here —
-  // starting it is the Estimates screen's job.
-  const [trialStart, setTrialStart] = useState<number | null>(null);
-  /** False until the trial clock has actually been read from storage. */
-  const [trialResolved, setTrialResolved] = useState(false);
-  const liveCompanyId = (company as { id?: string } | null | undefined)?.id;
-  // Offline before the row loads there is no live id, but the snapshot knows
-  // which company it belongs to — without that fallback a trial that started
-  // offline reads as "never started" and locks a merchant mid-trial.
-  const companyId = liveCompanyId ?? cached?.company_id ?? undefined;
-
-  useEffect(() => {
-    if (!companyId) return;
-    let active = true;
-
-    const read = () =>
-      readTrialStart(companyId).then((value) => {
-        if (!active) return;
-        setTrialStart(value || null);
-        setTrialResolved(true);
-      });
-
-    void read();
-    // ensureTrialStarted may CREATE the trial after this hook first read it as
-    // absent. Without re-reading, a brand-new user is told their trial ended.
-    const unsubscribe = onTrialChange(() => void read());
-
-    return () => {
-      active = false;
-      unsubscribe();
-    };
-  }, [companyId, cached?.fetched_at]);
 
   const usingCache = !company && (isError || !isPending);
 
@@ -149,16 +114,16 @@ export function useEntitlement(): {
   const [clock, setClock] = useState(() => Date.now());
 
   const entitlement = useMemo(() => {
-    if (company) return getEntitlement(company as CompanyLike, clock, trialStart);
-    const fromCache = getEntitlementFromCache(cached, clock, trialStart);
+    if (company) return getEntitlement(company as CompanyLike, clock);
+    const fromCache = getEntitlementFromCache(cached, clock);
     return fromCache ?? freeEntitlement(clock);
-  }, [company, cached, trialStart, clock]);
+  }, [company, cached, clock]);
 
   /** 0 when nothing is counting down, so no timer is armed at all. */
   const boundary = nextEntitlementBoundary(entitlement);
 
   // Re-evaluate exactly when access can change hands: one timeout aimed at the
-  // trial's last second (or the subscription's), re-armed in <= 6h chunks.
+  // subscription's last second, re-armed in <= 6h chunks.
   useEffect(() => {
     if (!boundary) return;
     const delay = boundary - Date.now();
@@ -213,8 +178,8 @@ export function useEntitlement(): {
   const entitlementKnown = !!company || !!cached;
 
   // The single place ads are switched on or off. It runs off the SAME
-  // entitlement as the estimate lock, so a payment tears the banner down at the
-  // exact moment the paywall disappears.
+  // entitlement as everything else, so a payment tears the banner down at the
+  // exact moment the paid features appear.
   useEffect(() => {
     if (!entitlementKnown) return;
     void applyEntitlement(entitlement.adsEnabled);
@@ -228,12 +193,12 @@ export function useEntitlement(): {
     loading: isPending && !cacheLoaded,
     fromCache: usingCache,
     /**
-     * True once the plan AND the trial clock are both known.
+     * True once the plan is known, one way or another.
      *
-     * Gate on this before showing anything that punishes the user for lacking
-     * access — until it flips, "no plan and no trial" is indistinguishable from
-     * "we have not finished looking".
+     * Gate on this before showing anything that treats the account as free —
+     * until it flips, "no plan" is indistinguishable from "we have not finished
+     * looking", and a paying merchant was briefly shown the ad gate.
      */
-    resolved: (!!company || !!cached || !isPending) && (trialResolved || !companyId),
+    resolved: !!company || !!cached || !isPending,
   };
 }

@@ -38,11 +38,17 @@ const PROJECT_REF = process.env.SUPABASE_PROJECT_REF ?? "yoiqsyjitpchkbodkvpa";
  *   1 widens the plan CHECK constraints and adds the sync columns
  *   2 seeds plan_ad_policy with ids those constraints must already allow
  *   3 seeds the plans table, and its upsert function rewrites those constraints
+ *   4 replaces the two grant functions from 2, and checks public.plans from 3,
+ *     so it cannot run before either
+ *   5 alters the reward tables 2 created and replaces the guard and the redeem
+ *     function 4 leaves behind, so it has to be last
  */
 const FILES = [
   "supabase/APPLY-MISSING-MIGRATIONS.sql",
   "supabase/migrations/20260821000000_monetization.sql",
   "supabase/migrations/20260821010000_plans_table.sql",
+  "supabase/migrations/20260825000000_reward_grant_guard_exemption.sql",
+  "supabase/migrations/20260829000000_points_buy_credits_and_slots.sql",
 ];
 
 const token = process.env.SUPABASE_ACCESS_TOKEN ?? "";

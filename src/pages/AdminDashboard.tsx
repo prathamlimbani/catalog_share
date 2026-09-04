@@ -21,7 +21,7 @@ import {
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { Plus, Trash2, Package, Edit, X, Upload, Pencil, Check, Link as LinkIcon, Copy, ExternalLink, Store, Filter, SlidersHorizontal, ArrowUpDown, Crown } from "lucide-react";
+import { Plus, Trash2, Package, Edit, X, Upload, Pencil, Check, Link as LinkIcon, Copy, ExternalLink, Store, Filter, SlidersHorizontal, ArrowUpDown, Crown, Coins } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tables } from "@/integrations/supabase/types";
 import { AdminLayout } from "@/components/AdminLayout";
@@ -185,7 +185,17 @@ const AdminDashboard = () => {
   const productLimit = entitlement.productLimit;
   const atProductLimit = productCount >= productLimit;
   const planLabel = entitlement.isPaid ? entitlement.planName : getPlanName("free");
-  const limitMessage = `You've reached the ${planLabel} limit of ${productLimit} products. Upgrade to add more.`;
+  /**
+   * Slots bought with points are named separately from the plan's own.
+   *
+   * "the Free Plan limit of 45 products" is a sentence a merchant cannot check
+   * against anything — the plan says 40 — and it reads as a bug in the number
+   * they are being held to.
+   */
+  const bonusSlots = entitlement.bonusProductLimit;
+  const limitMessage = bonusSlots > 0
+    ? `You've reached your limit of ${productLimit} products (${productLimit - bonusSlots} on ${planLabel}, plus ${bonusSlots} you redeemed).`
+    : `You've reached the ${planLabel} limit of ${productLimit} products. Upgrade to add more.`;
 
   const sortLabel = sortOrder === "newest" ? "New to Old"
     : sortOrder === "oldest" ? "Old to New"
@@ -550,10 +560,13 @@ const AdminDashboard = () => {
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-sm mb-0.5">Product limit reached</p>
                 <p className="text-sm text-muted-foreground">
-                  Your {planLabel} allows {productLimit} products and you have {productCount}. Upgrade to keep adding, or delete a product to free up a slot.
+                  {bonusSlots > 0
+                    ? `You can list ${productLimit} products — ${productLimit - bonusSlots} on ${planLabel} plus ${bonusSlots} you redeemed — and you have ${productCount}.`
+                    : `Your ${planLabel} allows ${productLimit} products and you have ${productCount}.`}{" "}
+                  Upgrade, redeem more slots with your points, or delete a product to free one up.
                 </p>
               </div>
-              <div className="flex w-full shrink-0 gap-2 sm:w-auto">
+              <div className="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto">
                 <SubscriptionDialog
                   companyId={company.id}
                   companyName={asText(company.name)}
@@ -564,6 +577,12 @@ const AdminDashboard = () => {
                     <Crown className="h-4 w-4 mr-1.5" /> Upgrade Plan
                   </Button>
                 </SubscriptionDialog>
+                {/* The other way out, and the cheaper one: points buy permanent
+                    slots. Without this the merchant has to already know the Earn
+                    screen sells them. */}
+                <Button className="h-11" variant="outline" onClick={() => navigate("/earn")}>
+                  <Coins className="h-4 w-4 mr-1.5" /> Use points
+                </Button>
                 <Button className="h-11" variant="ghost" onClick={() => setLimitPromptOpen(false)}>
                   Dismiss
                 </Button>

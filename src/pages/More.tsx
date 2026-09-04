@@ -33,7 +33,7 @@ import { Switch } from "@/components/ui/switch";
 import CompanyEditDialog from "@/components/CompanyEditDialog";
 import { ThemeSetting } from "@/components/ThemeSetting";
 import { useRewardsConfig } from "@/hooks/useRewards";
-import { Coins } from "lucide-react";
+import { Coins, MessageCircle } from "lucide-react";
 import { openPrivacyOptions } from "@/native/ads";
 import {
   isBiometricAvailable,
@@ -42,6 +42,17 @@ import {
   type BiometricStatus,
 } from "@/native/biometrics";
 import { isNative } from "@/native/platform";
+import { authConfig, loadAuthConfig } from "@/lib/authConfig";
+import { fetchSecurityState, type SecurityState } from "@/lib/otp";
+import { fromE164, toE164, toIndianMobile, formatForDisplay, INDIA } from "@/lib/phone";
+import OtpChallenge from "@/components/auth/OtpChallenge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { notify } from "@/native/files";
 import {
   SUPPORT_EMAIL,
@@ -215,7 +226,32 @@ const More = () => {
   const { run: syncRun, busy: syncBusy } = useManualSync(company?.id);
   const { config: rewardsConfig } = useRewardsConfig();
   const [editOpen, setEditOpen] = useState(false);
+  /**
+   * What the server says about this account's number.
+   *
+   * null means NOT KNOWN YET, which is rendered differently from
+   * "not verified" — telling a merchant their number is unverified because a
+   * query was slow is how you get someone re-verifying a number that was
+   * already fine.
+   */
+  const [security, setSecurity] = useState<SecurityState | null>(null);
+  const [verifyOpen, setVerifyOpen] = useState(false);
   const [lockStatus, setLockStatus] = useState<BiometricStatus | null>(null);
+
+  // Refreshed whenever the dialog closes, so a successful verification updates
+  // the badge without a reload.
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      await loadAuthConfig();
+      const { data: { user } } = await supabase.auth.getUser();
+      const state = await fetchSecurityState(user?.id);
+      if (active) setSecurity(state);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [verifyOpen]);
   const [lockOn, setLockOn] = useState(false);
   const [lockBusy, setLockBusy] = useState(false);
 
@@ -379,14 +415,17 @@ const More = () => {
   // Guarded rather than inlined: lastSyncAt is a stored epoch, and a bad one
   // would otherwise print the literal string "Invalid Date" in the hint.
   const syncedAt = lastSyncAt ? new Date(lastSyncAt) : null;
+  // The number as stored on the company row, reduced to its local part so it can
+  // be compared with `user_security.phone` (which the server normalises to ten
+  // digits) and rendered consistently.
+  const companyPhoneLocal = fromE164(company?.phone).local;
+  const phoneIsVerified =
+    security?.phoneVerified === true && security.phone === toIndianMobile(companyPhoneLocal);
+
   const syncedAtLabel =
     syncedAt && !Number.isNaN(syncedAt.getTime())
       ? syncedAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
       : null;
-
-  const trialDaysLeft = Number.isFinite(entitlement.trialMsRemaining)
-    ? Math.ceil(entitlement.trialMsRemaining / 86_400_000)
-    : 0;
 
   return (
     <AdminLayout
@@ -443,18 +482,12 @@ const More = () => {
                   <Badge className="h-5 bg-emerald-500/15 px-1.5 text-[10px] font-bold text-emerald-600 hover:bg-emerald-500/15 dark:text-emerald-400">
                     ACTIVE
                   </Badge>
-                ) : entitlement.trialActive ? (
-                  <Badge className="h-5 bg-amber-500/15 px-1.5 text-[10px] font-bold text-amber-600 hover:bg-amber-500/15 dark:text-amber-400">
-                    TRIAL
-                  </Badge>
                 ) : null}
               </div>
               <p className="text-xs text-muted-foreground">
                 {entitlement.isPaid
                   ? `Renews manually · ${entitlement.daysRemaining} day${entitlement.daysRemaining === 1 ? "" : "s"} left`
-                  : entitlement.trialActive
-                    ? `Free trial · ${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"} left`
-                    : "Ads supported · upgrade to remove ads"}
+                  : "Ads supported · upgrade to remove ads"}
               </p>
             </div>
             <Button size="sm" className="shrink-0" onClick={() => navigate("/billing")}>
@@ -467,6 +500,35 @@ const More = () => {
             visible for an account that already has Google attached even if the
             setting is later switched off - they need the Disconnect control. */}
         <Section title="Sign-in methods">
+          {/* The WhatsApp number, and whether anyone has ever proven it.
+              It matters more than it looks: an unverified number cannot receive
+              a password reset and cannot be used to sign in, so a merchant who
+              loses their password has no way back in until this says Verified. */}
+          {companyPhoneLocal && (
+            <MethodRow
+              icon={<MessageCircle className="h-4 w-4" />}
+              label="WhatsApp number"
+              hint={formatForDisplay(companyPhoneLocal, INDIA)}
+              action={
+                security === null ? (
+                  <span className="text-xs text-muted-foreground">Checking…</span>
+                ) : phoneIsVerified ? (
+                  <Badge className="h-6 bg-emerald-500/15 px-2 text-[10px] font-bold text-emerald-600 hover:bg-emerald-500/15 dark:text-emerald-400">
+                    VERIFIED
+                  </Badge>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 shrink-0 text-xs"
+                    onClick={() => setVerifyOpen(true)}
+                  >
+                    Verify now
+                  </Button>
+                )
+              }
+            />
+          )}
           {hasEmailIdentity && (
             <MethodRow
               icon={<KeyRound className="h-4 w-4" />}
@@ -652,6 +714,31 @@ const More = () => {
           onExternalOpenChange={setEditOpen}
         />
       )}
+
+      {/* Verifying an existing number. `change_number` is reused deliberately —
+          proving control of a number and recording it is the same operation
+          whether or not the number changed, and a second near-identical purpose
+          would be a second place for the rules to drift. */}
+      <Dialog open={verifyOpen} onOpenChange={setVerifyOpen}>
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-md p-4 sm:p-6">
+          <DialogHeader className="text-left">
+            <DialogTitle>Confirm your WhatsApp number</DialogTitle>
+            <DialogDescription>
+              Once confirmed you can sign in with this number instead of a password, and reset your
+              password through WhatsApp.
+            </DialogDescription>
+          </DialogHeader>
+          {verifyOpen && companyPhoneLocal && (
+            <OtpChallenge
+              purpose="change_number"
+              phone={toE164(companyPhoneLocal, INDIA)}
+              onVerified={() => setVerifyOpen(false)}
+              onCancel={() => setVerifyOpen(false)}
+              cancelLabel="Not now"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 };

@@ -29,6 +29,7 @@ import {
   KeyRound,
   Loader2,
   Mail,
+  MessageCircle,
   MonitorPlay,
   Save,
   Settings2,
@@ -60,10 +61,23 @@ type Loose = {
 /** Grouped so an operator configuring email is not scrolling past AdMob ids. */
 const GROUPS: Array<{ title: string; icon: typeof Mail; blurb: string; keys: string[] }> = [
   {
-    title: "Email",
+    title: "WhatsApp (Fast2SMS)",
+    icon: MessageCircle,
+    blurb:
+      "The permanent channel: signup codes, login 2FA, password resets and the payment templates. The API key is sent as a bare Authorization header — Fast2SMS does not use \"Bearer\". Which templates exist, and their variable order, is set under Verification.",
+    keys: [
+      "FAST2SMS_API_KEY",
+      "FAST2SMS_PHONE_NUMBER_ID",
+      "FAST2SMS_WABA_ID",
+      "FAST2SMS_SENDER_NUMBER",
+      "ADMIN_WHATSAPP_NUMBER",
+    ],
+  },
+  {
+    title: "Email (legacy fields)",
     icon: Mail,
     blurb:
-      "Used for password resets and every transactional email. For Resend, the username is the literal word \"resend\" and the password is your API key.",
+      "Superseded by the provider list under Verification, which supports Microsoft 365, Gmail and any other SMTP account and can switch between them. These are kept as the fallback for a deployment where that migration has not been applied yet, and as what GoTrue reads for its own password-reset mail.",
     keys: ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM", "SMTP_FROM_NAME", "RESEND_API_KEY"],
   },
   {

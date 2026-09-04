@@ -10,6 +10,11 @@ import { Upload, QrCode, Trash2 } from "lucide-react";
 import { Tables } from "@/integrations/supabase/types";
 import ColorThemePicker from "@/components/ColorThemePicker";
 import { asText } from "@/lib/productData";
+import { authConfig, loadAuthConfig } from "@/lib/authConfig";
+import { fetchSecurityState } from "@/lib/otp";
+import { INDIA, findCountry, fromE164, localNumberError, toE164, toIndianMobile } from "@/lib/phone";
+import PhoneField from "@/components/auth/PhoneField";
+import OtpChallenge from "@/components/auth/OtpChallenge";
 
 type Company = Tables<"companies">;
 
@@ -20,9 +25,6 @@ interface CompanyEditDialogProps {
   onExternalOpenChange?: (open: boolean) => void;
 }
 
-/** The default a blank contact phone starts from, and the value that counts as "empty". */
-const PHONE_PREFIX = "+91";
-
 /**
  * Every column below is nullable in the database.
  *
@@ -30,31 +32,44 @@ const PHONE_PREFIX = "+91";
  * and the field stops tracking state — and the same null reaching `.trim()` on
  * save throws. Both are avoided by coercing once, here.
  */
-const formFromCompany = (company: Company) => ({
-  name: asText(company.name),
-  phone: asText(company.phone),
-  email: asText(company.email),
-  address: asText(company.address),
-  gst_number: asText(company.gst_number),
-  theme_primary: asText(company.theme_primary) || "25 95% 53%",
-  theme_accent: asText(company.theme_accent) || "25 95% 95%",
-  contact_name_1: asText(company.contact_name_1),
-  contact_phone_1: asText(company.contact_phone_1) || PHONE_PREFIX,
-  contact_name_2: asText(company.contact_name_2),
-  contact_phone_2: asText(company.contact_phone_2) || PHONE_PREFIX,
-  google_maps_url: asText(company.google_maps_url),
-  upi_id: asText(company.upi_id),
-});
+const formFromCompany = (company: Company) => {
+  // Stored numbers are E.164. The form edits them as a country plus a local
+  // part, because that is the only shape in which "exactly ten digits" is a
+  // question that can be answered — see src/lib/phone.ts.
+  const main = fromE164(company.phone);
+  const c1 = fromE164(company.contact_phone_1);
+  const c2 = fromE164(company.contact_phone_2);
 
-/** Strips spaces, and treats a bare dialling code as "no number given". */
-const normalisePhone = (value: string): string | null => {
-  const digits = asText(value).replace(/\s+/g, "");
-  return digits === PHONE_PREFIX || digits === "" ? null : digits;
+  return {
+    name: asText(company.name),
+    phone: main.local,
+    phone_country: main.country.code,
+    email: asText(company.email),
+    address: asText(company.address),
+    gst_number: asText(company.gst_number),
+    theme_primary: asText(company.theme_primary) || "25 95% 53%",
+    theme_accent: asText(company.theme_accent) || "25 95% 95%",
+    contact_name_1: asText(company.contact_name_1),
+    contact_phone_1: c1.local,
+    contact_country_1: c1.country.code,
+    contact_name_2: asText(company.contact_name_2),
+    contact_phone_2: c2.local,
+    contact_country_2: c2.country.code,
+    google_maps_url: asText(company.google_maps_url),
+    upi_id: asText(company.upi_id),
+  };
 };
+
+/** An untouched contact field is empty, so "nothing given" is simply "". */
+const normalisePhone = (local: string, countryCode: string): string | null =>
+  asText(local).trim() ? toE164(local, findCountry(countryCode)) : null;
 
 const CompanyEditDialog = ({ company, children, externalOpen, onExternalOpenChange }: CompanyEditDialogProps) => {
   const queryClient = useQueryClient();
   const [internalOpen, setInternalOpen] = useState(false);
+  /** Set while the new WhatsApp number is being proved by OTP. */
+  const [verifying, setVerifying] = useState(false);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
 
   // Determine if we're in externally controlled mode
   const isExternallyControlled = externalOpen !== undefined;
@@ -135,7 +150,7 @@ const CompanyEditDialog = ({ company, children, externalOpen, onExternalOpenChan
         .from("companies")
         .update({
           name: form.name.trim(),
-          phone: form.phone.replace(/\s+/g, ''),
+          phone: toE164(form.phone, findCountry(form.phone_country)),
           email: form.email.trim(),
           address: form.address.trim() || null,
           gst_number: form.gst_number.trim() || null,
@@ -143,9 +158,9 @@ const CompanyEditDialog = ({ company, children, externalOpen, onExternalOpenChan
           theme_primary: form.theme_primary,
           theme_accent: form.theme_accent,
           contact_name_1: form.contact_name_1.trim() || null,
-          contact_phone_1: normalisePhone(form.contact_phone_1),
+          contact_phone_1: normalisePhone(form.contact_phone_1, form.contact_country_1),
           contact_name_2: form.contact_name_2.trim() || null,
-          contact_phone_2: normalisePhone(form.contact_phone_2),
+          contact_phone_2: normalisePhone(form.contact_phone_2, form.contact_country_2),
           google_maps_url: form.google_maps_url.trim() || null,
           upi_id: form.upi_id.trim() || null,
           upi_qr_url: qrUrl,
@@ -163,6 +178,74 @@ const CompanyEditDialog = ({ company, children, externalOpen, onExternalOpenChan
     onError: (err: any) => toast.error(err?.message || "Couldn't save your company details. Please try again."),
   });
 
+  /**
+   * Save, but prove the WhatsApp number first if it has changed.
+   *
+   * Re-verifying on change is the half people forget: verifying at signup and
+   * then letting the number be edited freely means the verified flag says
+   * nothing about the number actually stored. Every message the platform sends
+   * — receipts, reminders, the reset code — goes to whatever is in this field,
+   * so pointing it somewhere unproven is pointing the account's recovery there.
+   *
+   * Only the number itself is gated. Everything else on this form saves the
+   * moment the code is accepted, in one mutation, so a merchant editing their
+   * address and their number together does not lose the address.
+   */
+  const handleSubmit = async () => {
+    const country = findCountry(form.phone_country);
+    const error = localNumberError(form.phone, country);
+    if (error) {
+      setPhoneError(error);
+      return;
+    }
+    setPhoneError(null);
+
+    const config = await loadAuthConfig();
+    const changed = toE164(form.phone, country) !== asText(company.phone);
+
+    // Nothing to prove: the number is untouched, verification is off, or it is
+    // not a number a code can reach anyway (only Indian numbers can today).
+    if (!changed || !config.whatsappVerificationEnabled || country.code !== INDIA.code) {
+      updateMutation.mutate();
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const security = await fetchSecurityState(user?.id);
+    if (security?.phoneVerified === true && security.phone === toIndianMobile(form.phone)) {
+      // Already verified on this account — re-proving it would be theatre.
+      updateMutation.mutate();
+      return;
+    }
+
+    setVerifying(true);
+  };
+
+  if (verifying) {
+    return (
+      <Dialog open={open} onOpenChange={(next) => { if (!next) setVerifying(false); setOpen(next); }}>
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-md p-4 sm:p-6">
+          <DialogHeader className="text-left">
+            <DialogTitle>Confirm your new number</DialogTitle>
+            <DialogDescription>
+              Your other changes are saved as soon as this number is confirmed.
+            </DialogDescription>
+          </DialogHeader>
+          <OtpChallenge
+            purpose="change_number"
+            phone={toE164(form.phone, findCountry(form.phone_country))}
+            onVerified={() => {
+              setVerifying(false);
+              updateMutation.mutate();
+            }}
+            onCancel={() => setVerifying(false)}
+            cancelLabel="Go back and edit"
+          />
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {children && (
@@ -178,17 +261,28 @@ const CompanyEditDialog = ({ company, children, externalOpen, onExternalOpenChan
           </DialogDescription>
         </DialogHeader>
         <form
-          onSubmit={(e) => { e.preventDefault(); updateMutation.mutate(); }}
+          onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }}
           className="space-y-4"
         >
           <div className="space-y-2">
             <Label htmlFor="company-name">Company Name *</Label>
             <Input id="company-name" className="h-11" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="company-phone">WhatsApp Number *</Label>
-            <Input id="company-phone" className="h-11" type="tel" inputMode="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required />
-          </div>
+          <PhoneField
+            id="company-phone"
+            label="WhatsApp Number"
+            required
+            countryCode={form.phone_country}
+            onCountryChange={(code) => { setForm({ ...form, phone_country: code }); setPhoneError(null); }}
+            value={form.phone}
+            onValueChange={(local) => { setForm({ ...form, phone: local }); setPhoneError(null); }}
+            error={phoneError}
+            hint={
+              authConfig().whatsappVerificationEnabled
+                ? "Changing this asks for a code on the new number."
+                : undefined
+            }
+          />
           <div className="space-y-2">
             <Label htmlFor="company-email">Email *</Label>
             <Input id="company-email" className="h-11 break-anywhere" type="email" inputMode="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
@@ -234,16 +328,28 @@ const CompanyEditDialog = ({ company, children, externalOpen, onExternalOpenChan
                 <Input id="contact-name-1" className="h-11" value={form.contact_name_1} onChange={(e) => setForm({ ...form, contact_name_1: e.target.value })} placeholder="e.g. John Doe" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="contact-phone-1">Contact Phone 1</Label>
-                <Input id="contact-phone-1" className="h-11" type="tel" inputMode="tel" value={form.contact_phone_1} onChange={(e) => setForm({ ...form, contact_phone_1: e.target.value })} placeholder="e.g. +9198765..." />
+                <PhoneField
+                  id="contact-phone-1"
+                  label="Contact Phone 1"
+                  countryCode={form.contact_country_1}
+                  onCountryChange={(code) => setForm({ ...form, contact_country_1: code })}
+                  value={form.contact_phone_1}
+                  onValueChange={(local) => setForm({ ...form, contact_phone_1: local })}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="contact-name-2">Contact Name 2</Label>
                 <Input id="contact-name-2" className="h-11" value={form.contact_name_2} onChange={(e) => setForm({ ...form, contact_name_2: e.target.value })} placeholder="e.g. Jane Doe" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="contact-phone-2">Contact Phone 2</Label>
-                <Input id="contact-phone-2" className="h-11" type="tel" inputMode="tel" value={form.contact_phone_2} onChange={(e) => setForm({ ...form, contact_phone_2: e.target.value })} placeholder="e.g. +9198765..." />
+                <PhoneField
+                  id="contact-phone-2"
+                  label="Contact Phone 2"
+                  countryCode={form.contact_country_2}
+                  onCountryChange={(code) => setForm({ ...form, contact_country_2: code })}
+                  value={form.contact_phone_2}
+                  onValueChange={(local) => setForm({ ...form, contact_phone_2: local })}
+                />
               </div>
             </div>
             <div className="space-y-2 mt-3">

@@ -1,10 +1,16 @@
 /**
- * Transactional email sender (Resend) for CatalogShare.
+ * Transactional email sender for CatalogShare.
+ *
+ * Delivery moved out to ./mailer.mjs, which picks whichever provider is active
+ * in `email_providers` — Resend, Microsoft 365, Gmail, anything with an SMTP
+ * account — and falls back to the others when it fails. This module now owns
+ * only the templates and the routing (which type goes to the merchant, which
+ * goes to the admin).
  *
  * Ported from supabase/functions/send-emails/index.ts. The Deno-isms that had
  * to change:
  *   - `serve(...)` -> `export default async function handler(req)`
- *   - `Deno.env.get("RESEND_API_KEY")` -> `env("RESEND_API_KEY")`
+ *   - `Deno.env.get("RESEND_API_KEY")` -> the provider-aware sendMail()
  *   - the local `corsHeaders` and the hand-rolled JSON responses now come from
  *     ./runtime.mjs. Same statuses, same bodies; runtime's corsHeaders also
  *     carries Access-Control-Allow-Methods, which the Deno copy omitted.
@@ -21,11 +27,49 @@
  */
 
 import { corsHeaders, env, json } from "./runtime.mjs";
+import { sendMail, mailerReady } from "./mailer.mjs";
+import { sendWhatsApp } from "./whatsapp.mjs";
 
-const RESEND_API_KEY = env("RESEND_API_KEY");
-const FROM_EMAIL = "CatalogShare <noreply@catalogshare.online>";
-const REPLY_TO = "catalogshare123@gmail.com";
-const ADMIN_EMAIL = "catalogshare123@gmail.com";
+/**
+ * Mirror an admin alert to WhatsApp.
+ *
+ * Fire-and-forget and completely silent about its own failure: the email has
+ * already gone, and a platform alert that could fail the request would mean a
+ * merchant's payment verification depends on whether a notification template is
+ * approved yet.
+ *
+ * It no-ops until the matching row in `whatsapp_templates` has a Fast2SMS
+ * message id — `sendWhatsApp` answers `not_provisioned` and this logs one line.
+ * That is the normal state today: only the OTP template is approved, so nothing
+ * here sends until the notification templates come back from Meta.
+ *
+ * The values are NAMED; the positional order comes from the template row, so
+ * approving a template with its variables in a different order is a row edit
+ * rather than a code change.
+ */
+function alertAdmin(purpose, values) {
+  const to = env("ADMIN_WHATSAPP_NUMBER");
+  if (!to) return;
+
+  void sendWhatsApp(purpose, to, values)
+    .then((result) => {
+      if (!result.ok && result.reason !== "not_provisioned") {
+        console.warn(`[alert] ${purpose} not delivered:`, result.error);
+      }
+    })
+    .catch((err) => console.warn(`[alert] ${purpose} threw:`, err?.message ?? err));
+}
+
+// The From address is no longer decided here. It comes from whichever provider
+// in `email_providers` is active (see mailer.mjs), because a From that does not
+// belong to the sending account is exactly what SPF and DMARC exist to reject -
+// hardcoding "noreply@catalogshare.online" while sending through a Microsoft
+// 365 mailbox would put every message in a spam folder.
+//
+// REPLY_TO and ADMIN_EMAIL stay, and stay overridable: where merchant replies
+// land is a business decision, not a property of the mail account.
+const REPLY_TO = env("SUPPORT_EMAIL", "catalogshare123@gmail.com");
+const ADMIN_EMAIL = env("SUPPORT_EMAIL", "catalogshare123@gmail.com");
 
 /**
  * The payload shape this function accepts (was the `EmailPayload` interface):
@@ -677,8 +721,13 @@ export default async function handler(req) {
       return json({ error: "Missing required fields: type, to, companyName" }, 400);
     }
 
-    if (!RESEND_API_KEY) {
-      return json({ error: "RESEND_API_KEY not configured" }, 500);
+    // Checked per-request so a provider switched in the admin console is picked
+    // up by the next email, not the next process restart.
+    if (!(await mailerReady())) {
+      return json(
+        { error: "No email provider is configured. Set one up under Integrations → Email." },
+        500,
+      );
     }
 
     let subject = "";
@@ -720,17 +769,28 @@ export default async function handler(req) {
         subject = `🎉 New Company Joined: ${companyName}`;
         html = adminNewCompanyHtml(companyName, payload.companyEmail || to);
         recipientEmail = ADMIN_EMAIL; // override: send to admin
+        alertAdmin("admin_new_company", {
+          company: companyName,
+          email: payload.companyEmail || to,
+        });
         break;
       case "admin_new_subscription":
         subject = `💰 New Subscription: ${companyName} → ${payload.planName}`;
         html = adminNewSubscriptionHtml(companyName, payload.companyEmail || to, payload.planName || "Unknown", payload.amount || 0, payload.expiresAt || "");
         recipientEmail = ADMIN_EMAIL; // override: send to admin
+        alertAdmin("admin_new_subscription", {
+          company: companyName,
+          plan: payload.planName || "Unknown",
+          // Paise on the wire, rupees for a human.
+          amount: payload.amount ? (payload.amount / 100).toFixed(0) : "0",
+        });
         break;
       case "admin_plan_change": {
         // Generate PDF invoice
         const pdfBytes = await generateInvoicePdf(payload);
         const pdfBase64 = btoa(String.fromCharCode(...pdfBytes));
         const planLabel = payload.planName || "Subscription";
+        alertAdmin("admin_plan_change", { company: companyName, plan: planLabel });
         const changeSubject = `📋 Plan Updated: ${companyName} → ${planLabel}`;
         const changeHtml = planChangeEmailHtml(payload);
         const attachment = {
@@ -739,51 +799,34 @@ export default async function handler(req) {
         };
 
         // 1) Send to the company
-        const companyRes = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${RESEND_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            from: FROM_EMAIL,
-            to: [to],
-            reply_to: REPLY_TO,
-            subject: changeSubject,
-            html: changeHtml,
-            attachments: [attachment],
-          }),
+        const companyResult = await sendMail({
+          to,
+          replyTo: REPLY_TO,
+          subject: changeSubject,
+          html: changeHtml,
+          attachments: [attachment],
         });
-        const companyData = await companyRes.json();
-        if (!companyRes.ok) {
-          console.error("Resend company email error:", companyData);
+        if (!companyResult.ok) {
+          console.error("Company plan-change email failed:", companyResult.error);
         }
 
         // 2) Send to admin
-        const adminRes = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${RESEND_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            from: FROM_EMAIL,
-            to: [ADMIN_EMAIL],
-            reply_to: REPLY_TO,
-            subject: `💰 Admin: Plan Changed for ${companyName} → ${planLabel}`,
-            html: changeHtml,
-            attachments: [attachment],
-          }),
+        const adminResult = await sendMail({
+          to: ADMIN_EMAIL,
+          replyTo: REPLY_TO,
+          subject: `💰 Admin: Plan Changed for ${companyName} → ${planLabel}`,
+          html: changeHtml,
+          attachments: [attachment],
         });
-        const adminData = await adminRes.json();
-        if (!adminRes.ok) {
-          console.error("Resend admin email error:", adminData);
+        if (!adminResult.ok) {
+          console.error("Admin plan-change email failed:", adminResult.error);
         }
 
         return json({
           success: true,
-          company_email_id: companyData.id || null,
-          admin_email_id: adminData.id || null,
+          company_email_id: companyResult.id || null,
+          admin_email_id: adminResult.id || null,
+          provider: companyResult.provider ?? adminResult.provider ?? null,
         }, 200);
       }
       case "plan_status":
@@ -798,34 +841,28 @@ export default async function handler(req) {
         subject = `⚠️ Auto-Downgrade: ${companyName} (${payload.previousPlan || 'Paid'} → Free)`;
         html = adminPlanDowngradedHtml(companyName, payload.companyEmail || to, payload.previousPlan || 'Paid Plan');
         recipientEmail = ADMIN_EMAIL;
+        alertAdmin("admin_plan_downgraded", {
+          company: companyName,
+          previous: payload.previousPlan || "Paid Plan",
+        });
         break;
       default:
         return json({ error: "Invalid email type" }, 400);
     }
 
-    const resendResponse = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: FROM_EMAIL,
-        to: [recipientEmail],
-        reply_to: REPLY_TO,
-        subject,
-        html,
-      }),
+    const result = await sendMail({
+      to: recipientEmail,
+      replyTo: REPLY_TO,
+      subject,
+      html,
     });
 
-    const resendData = await resendResponse.json();
-
-    if (!resendResponse.ok) {
-      console.error("Resend API error:", resendData);
-      return json({ error: "Failed to send email", details: resendData }, 500);
+    if (!result.ok) {
+      console.error("Email send failed:", result.error, result.tried);
+      return json({ error: "Failed to send email", details: result.error, tried: result.tried }, 500);
     }
 
-    return json({ success: true, id: resendData.id }, 200);
+    return json({ success: true, id: result.id, provider: result.provider }, 200);
   } catch (err) {
     console.error("Edge function error:", err);
     return json({ error: "Internal server error" }, 500);
